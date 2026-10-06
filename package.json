@@ -1,10 +1,11 @@
 {
-  "name": "vow",
+  "name": "vow-agents",
   "version": "1.0.0",
-  "description": "",
+  "description": "Agentes de IA para VOW",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "hola": "node src/hola.js"
   },
   "repository": {
     "type": "git",
@@ -13,9 +14,13 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "bugs": {
     "url": "https://github.com/FacundoGuiraldes/vow/issues"
   },
-  "homepage": "https://github.com/FacundoGuiraldes/vow#readme"
+  "homepage": "https://github.com/FacundoGuiraldes/vow#readme",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "dotenv": "^18.0.5"
+  }
 }
