@@ -4,9 +4,10 @@
   "description": "Agentes de IA para VOW",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test",
     "hola": "node src/hola.js",
-    "prueba": "node src/prueba.js"
+    "prueba": "node src/prueba.js",
+    "costos": "node src/costos-prueba.js"
   },
   "repository": {
     "type": "git",
