@@ -1,0 +1,18 @@
+{
+  "name": "vow-landing",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@studio-freight/lenis": "^1.0.42",
+    "gsap": "^3.12.5"
+  },
+  "devDependencies": {
+    "vite": "^5.2.0"
+  }
+}

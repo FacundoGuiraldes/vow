@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="VOW. Tu promesa. Tu fuerza. Accesorios y ropa de gym." />
+  <meta name="theme-color" content="#0A0A0A" />
+  <meta property="og:title" content="VOW | Lista de espera" />
+  <meta property="og:description" content="Disciplina cruda. Primera tanda limitada." />
+  <link rel="icon" type="image/svg+xml" href="/assets/logo-black.svg" />
+  <title>VOW | Lista de espera</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&family=Unbounded:wght@800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+  <a class="skip-link" href="#sec-05">Saltar al formulario</a>
+
+  <div class="noise" aria-hidden="true"></div>
+  <div class="cursor" aria-hidden="true"></div>
+  <div class="grid-overlay" aria-hidden="true"><div></div><div></div><div></div><div></div></div>
+
+  <header class="marquee-container">
+    <p class="sr-only" id="marquee-sr"></p>
+    <div class="marquee" aria-hidden="true"><span id="marquee-text"></span></div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="sec-01" aria-labelledby="hero-title">
+      <div class="section-label" aria-hidden="true">01 / 05</div>
+      <div class="hero-bg" aria-hidden="true">
+        <img src="/images/drop-01/hero-hoodie-back.webp" alt="" width="1000" height="1087" fetchpriority="high">
+      </div>
+      <div class="hero-logo" id="hero-logo" role="img" aria-label="VOW"></div>
+      <h1 id="hero-title" class="title-huge"></h1>
+      <a class="cta-arrow" href="#sec-05" id="hero-cta-link">
+        <span id="hero-cta"></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true" focusable="false"><path d="M5 19L19 5M19 5v10M19 5H9"/></svg>
+      </a>
+    </section>
+
+    <section class="manifest" id="sec-02" aria-label="Manifiesto">
+      <div class="section-label" aria-hidden="true">02 / 05</div>
+      <p id="manifest-text" class="manifest-content"></p>
+    </section>
+
+    <section class="drop" id="sec-03" aria-labelledby="drop-title">
+      <div class="section-label" aria-hidden="true">03 / 05</div>
+      <div class="drop-pin">
+        <header class="drop-header">
+          <p class="kicker" id="drop-kicker"></p>
+          <h2 class="title-large" id="drop-title"></h2>
+          <p class="drop-disclaimer" id="drop-disclaimer"></p>
+        </header>
+        <div class="gallery" id="gallery" tabindex="0" role="region" aria-label="Renders del Drop 01 (desplazable)">
+          <ul class="gallery-track" id="gallery-track"></ul>
+        </div>
+      </div>
+      <h3 class="lineup-title" id="lineup-title"></h3>
+      <ol class="lineup" id="lineup"></ol>
+    </section>
+
+    <section class="product" id="sec-04" aria-labelledby="product-name">
+      <div class="section-label" aria-hidden="true">04 / 05</div>
+      <div class="product-grid">
+        <div class="product-placeholder" role="img" aria-label="Diseño de las muñequeras en desarrollo">
+          <span aria-hidden="true" id="product-placeholder"></span>
+        </div>
+        <div class="product-info">
+          <p class="kicker">08 / 10 · PRODUCTO DESTACADO · EN DESARROLLO</p>
+          <h2 id="product-name" class="title-large"></h2>
+          <ul id="product-tags" class="tags-container" aria-label="Características"></ul>
+          <a class="cta-arrow" href="#sec-05">
+            <span>QUIERO SER DE LOS PRIMEROS</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true" focusable="false"><path d="M5 19L19 5M19 5v10M19 5H9"/></svg>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="waitlist" id="sec-05" aria-labelledby="waitlist-title">
+      <div class="section-label" aria-hidden="true">05 / 05</div>
+      <h2 class="title-large" id="waitlist-title">ACCESO</h2>
+      <form id="waitlist-form" class="form" novalidate>
+        <div class="input-group">
+          <label for="email" class="sr-only">Email</label>
+          <input type="email" id="email" name="email" required autocomplete="email"
+                 inputmode="email" spellcheck="false" placeholder="EMAIL" aria-describedby="form-msg">
+        </div>
+        <div class="input-group">
+          <label for="ig" class="sr-only">Usuario de Instagram (opcional)</label>
+          <input type="text" id="ig" name="instagram" autocomplete="off" autocapitalize="none"
+                 spellcheck="false" maxlength="31" placeholder="INSTAGRAM (OPCIONAL)" aria-describedby="form-msg">
+        </div>
+        <!-- Honeypot anti-bots: los humanos no lo ven ni lo completan -->
+        <div class="hp" aria-hidden="true">
+          <label for="company">No completar</label>
+          <input type="text" id="company" name="company" tabindex="-1" autocomplete="off">
+        </div>
+        <button type="submit" class="cta-btn">
+          <span class="cta-label">ENVIAR</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true" focusable="false"><path d="M5 19L19 5M19 5v10M19 5H9"/></svg>
+        </button>
+        <p id="form-msg" class="msg" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-logo" role="img" aria-label="VOW"></div>
+    <!-- TODO: reemplazar por la URL real y sumar target="_blank" rel="noopener noreferrer" -->
+    <a href="#" class="ig-link">INSTAGRAM</a>
+    <p>© 2026 VOW</p>
+  </footer>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
