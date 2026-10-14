@@ -7,7 +7,8 @@
     "test": "node --test",
     "hola": "node src/hola.js",
     "prueba": "node src/prueba.js",
-    "costos": "node src/costos-prueba.js"
+    "costos": "node src/costos-prueba.js",
+    "db-probar": "node src/db/probar-conexion.js"
   },
   "repository": {
     "type": "git",
@@ -23,6 +24,7 @@
   "homepage": "https://github.com/FacundoGuiraldes/vow#readme",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
-    "dotenv": "^18.0.5"
+    "dotenv": "^18.0.5",
+    "pg": "^8.23.1"
   }
 }
