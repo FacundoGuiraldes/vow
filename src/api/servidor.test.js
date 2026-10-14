@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { crearPool } from "../db/conexion.js";
 import { migrar } from "../db/migrar.js";
-import { crearApp, MENSAJE_EXITO } from "./servidor.js";
+import { crearApp, MENSAJE_EXITO, MENSAJE_INSTAGRAM_INVALIDO } from "./servidor.js";
 
 const pool = crearPool();
 const emailsCreados = new Set();
@@ -35,6 +35,11 @@ const enviar = async (instancia, cuerpo, encabezados = {}) => {
     body: JSON.stringify(cuerpo),
   });
   return { status: respuesta.status, headers: respuesta.headers, cuerpo: await respuesta.json() };
+};
+
+const leerRegistro = async (email) => {
+  const { rows } = await pool.query("SELECT email, instagram, origen FROM lista_espera WHERE email = $1", [email]);
+  return rows[0];
 };
 
 const contarRegistros = async (email) => {
@@ -127,4 +132,89 @@ test("solo habilita CORS para los orígenes de ALLOWED_ORIGINS", async () => {
   } finally {
     await cerrar(conCors);
   }
+});
+
+test("/api/salud responde 200 y no consulta la base", async () => {
+  let consultas = 0;
+  const poolEspia = {
+    query: async () => {
+      consultas += 1;
+      throw new Error("no debería consultar la base");
+    },
+  };
+  const instancia = await levantar(crearApp({ pool: poolEspia, origenesPermitidos: [] }));
+  try {
+    const respuesta = await fetch(`http://127.0.0.1:${instancia.address().port}/api/salud`);
+    assert.equal(respuesta.status, 200);
+    assert.deepEqual(await respuesta.json(), { ok: true });
+    assert.equal(consultas, 0);
+  } finally {
+    await cerrar(instancia);
+  }
+});
+
+test("con TRUST_PROXY=1 el límite por IP usa la IP de X-Forwarded-For", async () => {
+  const anterior = process.env.TRUST_PROXY;
+  process.env.TRUST_PROXY = "1";
+  const instancia = await levantar(crearApp({ pool, origenesPermitidos: [] }));
+  try {
+    const desde = (ip) => enviar(instancia, { email: "no-es-un-email" }, { "X-Forwarded-For": ip });
+
+    for (let i = 0; i < 5; i++) {
+      assert.equal((await desde("203.0.113.10")).status, 400);
+    }
+    assert.equal((await desde("203.0.113.10")).status, 429);
+    assert.equal((await desde("203.0.113.20")).status, 400);
+  } finally {
+    await cerrar(instancia);
+    if (anterior === undefined) {
+      delete process.env.TRUST_PROXY;
+    } else {
+      process.env.TRUST_PROXY = anterior;
+    }
+  }
+});
+
+test("guarda un Instagram válido normalizado", async () => {
+  const email = emailDePrueba();
+  const r = await enviar(servidor, { email, instagram: "@Vow_AR ", origen: "landing" });
+  assert.equal(r.status, 200);
+  assert.equal(r.cuerpo.mensaje, MENSAJE_EXITO);
+
+  const registro = await leerRegistro(email);
+  assert.equal(registro.instagram, "vow_ar");
+  assert.equal(registro.origen, "landing");
+});
+
+test("sin Instagram guarda NULL y responde 200", async () => {
+  for (const cuerpo of [{}, { instagram: "" }, { instagram: "   " }, { instagram: null }]) {
+    const email = emailDePrueba();
+    const r = await enviar(servidor, { email, ...cuerpo });
+    assert.equal(r.status, 200);
+    assert.equal((await leerRegistro(email)).instagram, null);
+  }
+});
+
+test("rechaza un Instagram con espacios, caracteres raros o más de 30 caracteres", async () => {
+  const invalidos = ["vow ar", "vow-ar", "vow!", "vów", "@", "a".repeat(31), 12345];
+  for (const instagram of invalidos) {
+    const email = emailDePrueba();
+    const r = await enviar(servidor, { email, instagram });
+    assert.equal(r.status, 400, String(instagram));
+    assert.equal(r.cuerpo.error, MENSAJE_INSTAGRAM_INVALIDO);
+    assert.equal(r.cuerpo.campo, "instagram");
+    assert.equal(await contarRegistros(email), 0);
+  }
+});
+
+test("un email repetido con otro Instagram no modifica el registro", async () => {
+  const email = emailDePrueba();
+  const primera = await enviar(servidor, { email, instagram: "primero" });
+  const segunda = await enviar(servidor, { email, instagram: "segundo" });
+
+  assert.equal(primera.status, 200);
+  assert.equal(segunda.status, 200);
+  assert.deepEqual(segunda.cuerpo, primera.cuerpo);
+  assert.equal(await contarRegistros(email), 1);
+  assert.equal((await leerRegistro(email)).instagram, "primero");
 });

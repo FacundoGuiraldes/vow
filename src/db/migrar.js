@@ -6,10 +6,12 @@ export async function migrar(pool) {
     CREATE TABLE IF NOT EXISTS lista_espera (
       id SERIAL PRIMARY KEY,
       email TEXT NOT NULL UNIQUE CHECK (email = lower(email)),
+      instagram TEXT,
       origen TEXT,
       creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
+  await pool.query("ALTER TABLE lista_espera ADD COLUMN IF NOT EXISTS instagram text");
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
