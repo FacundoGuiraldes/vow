@@ -45,7 +45,7 @@ img { max-width: 100%; }
 }
 .skip-link:focus { top: 12px; }
 :focus-visible { outline: 2px solid var(--bordo); outline-offset: 4px; }
-.waitlist :focus-visible, footer :focus-visible { outline-color: var(--beige); }
+.waitlist :focus-visible, .privacy :focus-visible, footer :focus-visible { outline-color: var(--beige); }
 
 .noise {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -202,6 +202,10 @@ section {
 }
 .is-preview .lineup-status { background: var(--bordo); border-color: var(--bordo); color: var(--bone); }
 .is-featured .lineup-status { background: var(--black); border-color: var(--black); color: var(--bone); }
+@media (max-width: 400px) {
+  .lineup-item { grid-template-columns: 2.5em minmax(0, 1fr); grid-template-areas: "id name" ". spec" ". status"; }
+  .lineup-status { justify-self: start; margin-top: 6px; }
+}
 @media (min-width: 768px) {
   .lineup-item { grid-template-columns: 3em minmax(0, 1.1fr) minmax(0, 1.4fr) auto; grid-template-areas: "id name spec status"; padding: 20px 0; }
 }
@@ -255,6 +259,22 @@ section {
 .msg { font-family: var(--font-mono); font-size: 0.9rem; min-height: 20px; margin-top: -10px; text-transform: uppercase; }
 .msg.error { color: var(--bordo-light); }
 .msg.success { color: var(--beige); }
+.form-legal { font-family: var(--font-mono); font-size: 0.75rem; line-height: 1.5; color: rgba(236,232,225,0.8); margin-top: -14px; }
+.form-legal a, .privacy-body a { color: var(--bone); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.form-legal a:hover, .privacy-body a:hover { color: var(--beige); }
+
+/* ---------- Política de privacidad ---------- */
+.privacy { background: var(--black); color: var(--bone); border-top: 1px solid rgba(236,232,225,0.12); }
+.privacy .section-label { color: var(--bone); }
+.privacy:focus { outline: none; }
+.privacy-body { max-width: 65ch; margin-top: 32px; font-size: 1rem; line-height: 1.6; }
+.privacy-body h3 {
+  font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; text-transform: uppercase;
+  color: var(--beige); margin: 32px 0 8px;
+}
+.privacy-body p { color: rgba(236,232,225,0.88); }
+.privacy-intro { font-size: 1.05rem; color: var(--bone); }
+.privacy-updated { margin-top: 32px; font-family: var(--font-mono); font-size: 0.75rem; }
 
 footer {
   background: var(--black); color: var(--bone);

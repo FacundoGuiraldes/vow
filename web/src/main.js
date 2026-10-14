@@ -185,6 +185,38 @@ document.querySelectorAll('a[href="#sec-05"]:not(.skip-link)').forEach(link =>
   })
 );
 
+// Enlaces a la política de privacidad: scroll a la sección y foco en ella para teclado/lectores
+const privacySection = document.getElementById('privacidad');
+function goToPrivacy({ immediate = false } = {}) {
+  const focusPrivacy = () => privacySection.focus({ preventScroll: true });
+  if (lenis) {
+    lenis.scrollTo(privacySection, { immediate, onComplete: focusPrivacy });
+    if (immediate) focusPrivacy();
+  } else {
+    privacySection.scrollIntoView();
+    focusPrivacy();
+  }
+}
+document.querySelectorAll('a[href="#privacidad"]').forEach(link =>
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    history.replaceState(null, '', '#privacidad');
+    goToPrivacy();
+  })
+);
+// Entrada directa con /#privacidad: el layout se sigue acomodando después del load (fuentes, pin de
+// la galería), así que se vuelve a posicionar cuando terminan de cargar las fuentes y un rato después
+window.addEventListener('load', () => {
+  if (location.hash !== '#privacidad') return;
+  const reposition = () => {
+    ScrollTrigger.refresh();
+    goToPrivacy({ immediate: true });
+  };
+  reposition();
+  document.fonts.ready.then(() => requestAnimationFrame(reposition));
+  setTimeout(reposition, 800);
+});
+
 // ---------- Cursor custom (solo mouse) ----------
 const cursor = document.querySelector('.cursor');
 if (finePointer) {
