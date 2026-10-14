@@ -45,6 +45,7 @@ flowchart LR
     classDef planificado fill:#ffffff,stroke:#7A7064,stroke-dasharray:5 5,color:#4F4840
     class landing,api,db,motor,costos existe
     class contenido,soporte,inventario planificado
+    style agentes fill:#ffffff,stroke:#7A7064,color:#4F4840
 ```
 
 Los bloques con borde continuo ya existen en el repo. Los bloques con borde punteado están planificados. La landing y la API todavía no están publicadas y hoy corren en local.
