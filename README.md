@@ -1,5 +1,7 @@
 # VOW
 
+Demo de la landing: https://vow-17x.pages.dev
+
 [![Tests](https://github.com/FacundoGuiraldes/vow/actions/workflows/tests.yml/badge.svg)](https://github.com/FacundoGuiraldes/vow/actions/workflows/tests.yml)
 
 VOW es una marca argentina de ropa y accesorios de gym que vende directo al público. Está en construcción, con lanzamiento previsto para 2027.
@@ -48,7 +50,7 @@ flowchart LR
     style agentes fill:#ffffff,stroke:#7A7064,color:#4F4840
 ```
 
-Los bloques con borde continuo ya existen en el repo. Los bloques con borde punteado están planificados. La landing y la API todavía no están publicadas y hoy corren en local.
+Los bloques con borde continuo ya existen en el repo. Los bloques con borde punteado están planificados. La landing está publicada en Cloudflare Pages y la API en Render (plan gratuito), con la base de datos en Neon. Por el plan gratuito, el primer pedido después de un rato sin tráfico puede tardar cerca de un minuto; para acortar esa espera, la landing despierta la API al cargar.
 
 ## Stack
 
@@ -145,7 +147,7 @@ En GitHub Actions corren con cada push. La CI toma `DATABASE_URL` de un secreto 
 
 ## Hoja de ruta
 
-- [ ] Publicar la API y la landing.
+- [x] Publicar la API y la landing.
 - [ ] Agente de contenido con evaluaciones.
 - [ ] Agente de atención al cliente.
 - [ ] Agente de inventario.
