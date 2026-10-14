@@ -65,10 +65,8 @@ export const content = {
     sending: "ENVIANDO...",
     submit: "ENVIAR",
     success: "SUMADO A LA LISTA DE ESPERA.",
-    duplicate: "YA ESTÁS EN LA LISTA.",
     invalidEmail: "INGRESÁ UN EMAIL VÁLIDO.",
-    invalidIg: "USUARIO DE INSTAGRAM INVÁLIDO.",
-    rateLimited: "DEMASIADOS INTENTOS. PROBÁ EN UN MINUTO.",
-    error: "ALGO FALLÓ. PROBÁ DE NUEVO."
+    rateLimited: "Probá de nuevo en un minuto",
+    error: "NO PUDIMOS CONECTARNOS. REVISÁ TU CONEXIÓN Y PROBÁ DE NUEVO."
   }
 };

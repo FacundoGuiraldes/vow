@@ -7,7 +7,9 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 gsap.registerPlugin(ScrollTrigger);
 
-const WAITLIST_ENDPOINT = import.meta.env.VITE_WAITLIST_ENDPOINT || '/api/waitlist';
+// Sin VITE_API_URL se usa la ruta relativa (API publicada en el mismo dominio que la landing)
+const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+const WAITLIST_ENDPOINT = `${API_URL}/api/lista-espera`;
 const REQUEST_TIMEOUT_MS = 10000;
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -203,13 +205,9 @@ if (finePointer) {
 
 // ---------- Formulario de lista de espera ----------
 const form = document.getElementById('waitlist-form');
-const igInput = document.getElementById('ig');
 const submitBtn = form.querySelector('button[type="submit"]');
 const submitLabel = submitBtn.querySelector('.cta-label');
 const msg = document.getElementById('form-msg');
-
-const IG_PATTERN = /^[a-z0-9._]{1,30}$/;
-const normalizeIg = value => value.trim().replace(/^@/, '').toLowerCase();
 
 function setMessage(text, type = '') {
   msg.className = type ? `msg ${type}` : 'msg';
@@ -222,38 +220,27 @@ function setLoading(loading) {
   submitLabel.textContent = loading ? content.form.sending : content.form.submit;
 }
 
-function markInvalid(input, invalid) {
-  if (invalid) input.setAttribute('aria-invalid', 'true');
-  else input.removeAttribute('aria-invalid');
+function markInvalid(invalid) {
+  if (invalid) emailInput.setAttribute('aria-invalid', 'true');
+  else emailInput.removeAttribute('aria-invalid');
 }
 
-[emailInput, igInput].forEach(input =>
-  input.addEventListener('input', () => markInvalid(input, false))
-);
+emailInput.addEventListener('input', () => markInvalid(false));
 
-function validate() {
-  const email = emailInput.value.trim();
-  const instagram = normalizeIg(igInput.value);
-
-  const emailOk = email !== '' && emailInput.checkValidity();
-  markInvalid(emailInput, !emailOk);
-  if (!emailOk) return { error: content.form.invalidEmail, field: emailInput };
-
-  const igOk = instagram === '' || IG_PATTERN.test(instagram);
-  markInvalid(igInput, !igOk);
-  if (!igOk) return { error: content.form.invalidIg, field: igInput };
-
-  return { data: { email, instagram: instagram || null } };
+function showEmailError(text) {
+  setMessage(text, 'error');
+  markInvalid(true);
+  emailInput.focus();
 }
 
-async function postWaitlist(payload) {
+async function postWaitlist(email) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     return await fetch(WAITLIST_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ email, origen: 'landing' }),
       signal: controller.signal
     });
   } finally {
@@ -265,43 +252,34 @@ form.addEventListener('submit', async e => {
   e.preventDefault();
   if (submitBtn.disabled) return;
 
-  const { data, error, field } = validate();
-  if (error) {
-    setMessage(error, 'error');
-    field.focus();
+  // Chequeo rápido en el navegador; la API valida de nuevo y es la que manda
+  const email = emailInput.value.trim();
+  if (email === '' || !emailInput.checkValidity()) {
+    showEmailError(content.form.invalidEmail);
     return;
   }
 
+  markInvalid(false);
   setMessage('');
   setLoading(true);
 
   try {
-    const res = await postWaitlist({
-      ...data,
-      company: form.elements.company.value, // honeypot: el backend descarta si viene con valor
-      source: 'landing',
-      referrer: document.referrer || null,
-      utm: Object.fromEntries(
-        [...new URLSearchParams(location.search)].filter(([k]) => k.startsWith('utm_'))
-      )
-    });
+    const res = await postWaitlist(email);
 
+    // 200 = anotado. La API responde igual si el mail ya estaba, así que el mensaje es el mismo
     if (res.ok) {
       setMessage(content.form.success, 'success');
       form.reset();
-    } else if (res.status === 409) {
-      setMessage(content.form.duplicate, 'success');
-    } else if (res.status === 400 || res.status === 422) {
-      setMessage(content.form.invalidEmail, 'error');
-      markInvalid(emailInput, true);
-      emailInput.focus();
+    } else if (res.status === 400) {
+      const data = await res.json().catch(() => ({}));
+      showEmailError(data.error || content.form.invalidEmail);
     } else if (res.status === 429) {
       setMessage(content.form.rateLimited, 'error');
     } else {
       throw new Error(`HTTP ${res.status}`);
     }
   } catch (err) {
-    console.error('[VOW] Error al enviar a la lista de espera:', err);
+    console.error('[VOW] Error al enviar a la lista de espera:', err.message);
     setMessage(content.form.error, 'error');
   } finally {
     setLoading(false);
