@@ -10,6 +10,7 @@ gsap.registerPlugin(ScrollTrigger);
 // Sin VITE_API_URL se usa la ruta relativa (API publicada en el mismo dominio que la landing)
 const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
 const WAITLIST_ENDPOINT = `${API_URL}/api/lista-espera`;
+const HEALTH_ENDPOINT = `${API_URL}/api/salud`;
 const REQUEST_TIMEOUT_MS = 10000;
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -203,11 +204,17 @@ if (finePointer) {
   });
 }
 
+// ---------- API ----------
+// Aviso silencioso al cargar: despierta la API si está dormida para que el envío del formulario sea rápido
+fetch(HEALTH_ENDPOINT, { cache: 'no-store' }).catch(() => {});
+
 // ---------- Formulario de lista de espera ----------
 const form = document.getElementById('waitlist-form');
+const igInput = document.getElementById('ig');
 const submitBtn = form.querySelector('button[type="submit"]');
 const submitLabel = submitBtn.querySelector('.cta-label');
 const msg = document.getElementById('form-msg');
+const fieldsByName = { email: emailInput, instagram: igInput };
 
 function setMessage(text, type = '') {
   msg.className = type ? `msg ${type}` : 'msg';
@@ -220,27 +227,27 @@ function setLoading(loading) {
   submitLabel.textContent = loading ? content.form.sending : content.form.submit;
 }
 
-function markInvalid(invalid) {
-  if (invalid) emailInput.setAttribute('aria-invalid', 'true');
-  else emailInput.removeAttribute('aria-invalid');
+function markInvalid(input, invalid) {
+  if (invalid) input.setAttribute('aria-invalid', 'true');
+  else input.removeAttribute('aria-invalid');
 }
 
-emailInput.addEventListener('input', () => markInvalid(false));
+[emailInput, igInput].forEach(input => input.addEventListener('input', () => markInvalid(input, false)));
 
-function showEmailError(text) {
+function showFieldError(input, text) {
   setMessage(text, 'error');
-  markInvalid(true);
-  emailInput.focus();
+  markInvalid(input, true);
+  input.focus();
 }
 
-async function postWaitlist(email) {
+async function postWaitlist(payload) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     return await fetch(WAITLIST_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ email, origen: 'landing' }),
+      body: JSON.stringify(payload),
       signal: controller.signal
     });
   } finally {
@@ -252,19 +259,20 @@ form.addEventListener('submit', async e => {
   e.preventDefault();
   if (submitBtn.disabled) return;
 
-  // Chequeo rápido en el navegador; la API valida de nuevo y es la que manda
+  // Chequeo rápido en el navegador; la API valida de nuevo (también el Instagram) y es la que manda
   const email = emailInput.value.trim();
   if (email === '' || !emailInput.checkValidity()) {
-    showEmailError(content.form.invalidEmail);
+    showFieldError(emailInput, content.form.invalidEmail);
     return;
   }
 
-  markInvalid(false);
+  markInvalid(emailInput, false);
+  markInvalid(igInput, false);
   setMessage('');
   setLoading(true);
 
   try {
-    const res = await postWaitlist(email);
+    const res = await postWaitlist({ email, instagram: igInput.value, origen: 'landing' });
 
     // 200 = anotado. La API responde igual si el mail ya estaba, así que el mensaje es el mismo
     if (res.ok) {
@@ -272,7 +280,7 @@ form.addEventListener('submit', async e => {
       form.reset();
     } else if (res.status === 400) {
       const data = await res.json().catch(() => ({}));
-      showEmailError(data.error || content.form.invalidEmail);
+      showFieldError(fieldsByName[data.campo] || emailInput, data.error || content.form.invalidEmail);
     } else if (res.status === 429) {
       setMessage(content.form.rateLimited, 'error');
     } else {
