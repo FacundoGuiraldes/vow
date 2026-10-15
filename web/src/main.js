@@ -42,7 +42,6 @@ const el = (tag, className, text) => {
   return node;
 };
 
-document.getElementById('hero-logo').innerHTML = logoSvg;
 document.querySelector('.footer-logo').innerHTML = logoSvg;
 
 // ---------- Scroll + animaciones ----------
@@ -57,11 +56,21 @@ if (!reducedMotion) {
 
   gsap.from('#hero-logo', { opacity: 0, y: 30, duration: 1, ease: 'power3.out', delay: 0.2 });
   gsap.from('#hero-title', { opacity: 0, y: 30, duration: 1, ease: 'power3.out', delay: 0.4 });
+  gsap.from('#hero-cta-link', { opacity: 0, y: 30, duration: 1, ease: 'power3.out', delay: 0.55 });
 
   gsap.to('.word', {
     opacity: 1,
     stagger: 0.1,
     scrollTrigger: { trigger: '#sec-02', start: 'top 80%', end: 'bottom 40%', scrub: true }
+  });
+
+  // Banda outline: las dos líneas se separan levemente mientras la banda cruza la pantalla
+  [['.banda__linea--1', -1], ['.banda__linea--2', 1]].forEach(([selector, direction]) => {
+    gsap.fromTo(selector, { x: 0 }, {
+      x: () => direction * window.innerWidth * 0.06,
+      ease: 'none',
+      scrollTrigger: { trigger: '.banda', start: 'top bottom', end: 'bottom top', scrub: true, invalidateOnRefresh: true }
+    });
   });
 }
 
@@ -114,6 +123,37 @@ window.addEventListener('load', () => {
   setTimeout(reposition, 800);
 });
 
+// ---------- Índice de secciones ----------
+// #sec-05 y #privacidad ya tienen sus handlers (foco en el email / en la política). Acá van las otras secciones:
+// scroll con el mismo helper y foco en la sección (tienen tabindex="-1").
+document.querySelectorAll('.indice a').forEach(link => {
+  const id = link.getAttribute('href').slice(1);
+  if (id === 'sec-05' || id === 'privacidad') return;
+  const target = document.getElementById(id);
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    scrollToElement(target, { onComplete: () => target.focus({ preventScroll: true }) });
+  });
+});
+
+// La sección activa es la que cruza el centro de la pantalla. No es una animación: funciona también con reduced-motion
+const indexLinks = [...document.querySelectorAll('.indice a')];
+function setActiveSection(id) {
+  indexLinks.forEach(link => {
+    if (link.getAttribute('href') === `#${id}`) link.setAttribute('aria-current', 'true');
+    else link.removeAttribute('aria-current');
+  });
+}
+indexLinks.forEach(link => {
+  const id = link.getAttribute('href').slice(1);
+  ScrollTrigger.create({
+    trigger: `#${id}`,
+    start: 'top center',
+    end: 'bottom center',
+    onToggle: self => { if (self.isActive) setActiveSection(id); }
+  });
+});
+
 // ---------- Cursor custom (solo mouse) ----------
 const cursor = document.querySelector('.cursor');
 if (finePointer) {
@@ -154,6 +194,31 @@ function setCatalogStatus(text, { error = false, visuallyHidden = false } = {}) 
   catalogStatus.classList.toggle('sr-only', visuallyHidden);
 }
 
+// Nombre de color de la API -> variable CSS. Se compara en minúsculas y sin tildes ("bordó" = "bordo")
+const COLOR_VARS = {
+  beige: '--c-beige',
+  negro: '--c-negro',
+  bordo: '--c-bordo',
+  'gris topo': '--c-gris-topo',
+  hueso: '--c-hueso'
+};
+const normalizeColor = name => String(name).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
+function renderColorDots(colores) {
+  const names = Array.isArray(colores) ? colores : [];
+  const dots = el('span', 'catalog-dots');
+  dots.setAttribute('role', 'img');
+  dots.setAttribute('aria-label', `Colores: ${names.join(', ')}`);
+  names.forEach(name => {
+    const dot = el('i');
+    const cssVar = COLOR_VARS[normalizeColor(name)];
+    // Color desconocido: círculo neutro (solo borde); el nombre igual queda en el aria-label
+    if (cssVar) dot.style.setProperty('--dot', `var(${cssVar})`);
+    dots.append(dot);
+  });
+  return dots;
+}
+
 // Solo textContent: los datos vienen de la API y nunca se interpretan como HTML
 function renderCatalogItem(product) {
   const estado = CATALOG_STATUS_LABELS[product.estado] ? product.estado : 'concepto';
@@ -167,6 +232,8 @@ function renderCatalogItem(product) {
     el('span', 'lineup-id', String(product.numero).padStart(2, '0')),
     el('span', 'lineup-name', product.nombre),
     detail,
+    renderColorDots(product.colores),
+    el('span', 'catalog-cat', product.categoria ?? ''),
     el('span', 'lineup-status', CATALOG_STATUS_LABELS[estado])
   );
   return li;

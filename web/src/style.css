@@ -14,7 +14,18 @@
   --font-mono: 'Space Mono', monospace;
   --gutter: clamp(20px, 4vw, 48px);
   --line: rgba(10,10,10,0.18);
+  /* Padding lateral del contenido: el índice fijo (≥1200px) y las etiquetas verticales (≥1024px) lo agrandan */
+  --pad-l: var(--gutter);
+  --pad-r: var(--gutter);
+  /* Colores de producto (aproximados, ajustables): puntos del listado y cuadrados de la tarjeta */
+  --c-beige: #CDBFA6;
+  --c-negro: #0A0A0A;
+  --c-bordo: #7A1F24;
+  --c-gris-topo: #8C8378;
+  --c-hueso: #ECE8E1;
 }
+@media (min-width: 1024px) { :root { --pad-r: calc(var(--gutter) + 24px); } }
+@media (min-width: 1200px) { :root { --pad-l: calc(var(--gutter) + 56px); } }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html.lenis, html.lenis body { height: auto; }
 .lenis.lenis-smooth { scroll-behavior: auto !important; }
@@ -45,7 +56,7 @@ img { max-width: 100%; }
 }
 .skip-link:focus { top: 12px; }
 :focus-visible { outline: 2px solid var(--bordo); outline-offset: 4px; }
-.waitlist :focus-visible, .privacy :focus-visible, footer :focus-visible { outline-color: var(--beige); }
+.manifest :focus-visible, .waitlist :focus-visible, footer :focus-visible { outline-color: var(--beige); }
 
 .noise {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -85,59 +96,160 @@ img { max-width: 100%; }
 }
 .marquee { display: inline-block; white-space: nowrap; will-change: transform; }
 
+/* Cortes duros claro/oscuro: cada bloque marca su borde superior con una línea punteada */
 section {
-  padding: 100px var(--gutter) 80px; position: relative;
-  border-bottom: 1px solid var(--line);
+  padding: 100px var(--pad-r) 80px var(--pad-l); position: relative;
+  border-top: 1px dashed currentColor;
 }
-.section-label { font-family: var(--font-mono); font-size: 0.8rem; position: absolute; top: 20px; left: var(--gutter); z-index: 1; }
+section[tabindex="-1"]:focus { outline: none; }
+.section-label { font-family: var(--font-mono); font-size: 0.8rem; position: absolute; top: 20px; left: var(--pad-l); z-index: 1; }
+
+/* Grano sutil en las secciones claras (hero, Drop 01, Legal) */
+.hero, .catalog, .privacy { isolation: isolate; }
+.hero::before, .catalog::before, .privacy::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: url(/img/grain.svg); opacity: 0.12; mix-blend-mode: multiply;
+}
+
+/* Marcas de registro (+) en las esquinas: solo con espacio suficiente para no chocar con las etiquetas */
+.mk { position: absolute; width: 15px; height: 15px; pointer-events: none; display: none; }
+.mk::before { content: ''; position: absolute; left: 7px; top: 0; width: 1px; height: 15px; background: currentColor; }
+.mk::after { content: ''; position: absolute; top: 7px; left: 0; height: 1px; width: 15px; background: currentColor; }
+.mk--tl { top: 28px; left: 28px; } .mk--tr { top: 28px; right: 28px; }
+.mk--bl { bottom: 28px; left: 28px; } .mk--br { bottom: 28px; right: 28px; }
+@media (min-width: 1200px) { .mk { display: block; } }
+
+/* Etiquetas verticales de borde (≥1024px). En el Drop 01 la misma etiqueta es texto normal en pantallas chicas */
+.hero .etiqueta-vertical { display: none; }
+@media (min-width: 1024px) {
+  .etiqueta-vertical {
+    display: block; position: absolute; right: 40px; top: 50%; margin: 0;
+    writing-mode: vertical-rl; transform: translateY(-50%) rotate(180deg);
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+    white-space: nowrap; color: var(--topo-ink); pointer-events: none;
+  }
+  .hero .etiqueta-vertical { display: block; }
+}
+
+/* Índice de secciones (≥1200px). Blanco con blend difference: se lee sobre fondos claros y oscuros */
+.indice { display: none; }
+@media (min-width: 1200px) {
+  .indice {
+    display: block; position: fixed; left: 24px; top: 150px; z-index: 500;
+    color: #fff; mix-blend-mode: difference;
+  }
+  .indice ol { display: grid; gap: 6px; }
+  .indice a {
+    display: flex; align-items: center; gap: 8px; padding: 4px 0; color: inherit; text-decoration: none;
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .indice a::before {
+    content: ''; width: 7px; height: 7px; border-radius: 50%; border: 1px solid currentColor; flex-shrink: 0;
+  }
+  .indice a[aria-current="true"]::before { background: currentColor; }
+  .indice a:focus-visible { outline: 1px solid currentColor; outline-offset: 3px; }
+}
 .kicker {
   font-family: var(--font-mono); font-size: 0.8rem; text-transform: uppercase;
   color: var(--bordo); font-weight: 700; margin-bottom: 12px;
 }
 
-/* Unbounded es muy ancha: a 390px "TU PROMESA." necesita ~10vw para no desbordar */
-.title-huge {
-  font-family: var(--font-title); font-weight: 900; font-size: clamp(2.25rem, 10vw, 8rem);
-  line-height: 0.9; text-transform: uppercase; letter-spacing: -0.02em; white-space: pre-line;
-}
 .title-large {
   font-family: var(--font-title); font-weight: 900; font-size: clamp(1.75rem, 6vw, 4rem);
   line-height: 1; text-transform: uppercase; overflow-wrap: break-word;
 }
 
 /* ---------- 01 Hero ---------- */
+/* Columna: isotipo, título y CTA arriba; el wordmark gigante empujado al borde inferior */
 .hero {
-  min-height: 90vh; min-height: 90svh; display: flex; flex-direction: column; justify-content: flex-end;
-  padding-bottom: 40px; overflow: hidden;
+  min-height: 90vh; min-height: 90svh; display: flex; flex-direction: column; justify-content: flex-start;
+  align-items: flex-start; padding-bottom: 0; overflow: hidden;
 }
-.hero-logo { width: clamp(160px, 42vw, 280px); aspect-ratio: 801 / 745; margin-bottom: auto; margin-top: 40px; }
-.hero-logo svg { display: block; width: 100%; height: auto; }
-.cta-arrow {
-  font-family: var(--font-mono); font-size: 1rem; font-weight: 700; text-decoration: none;
-  display: flex; align-items: center; gap: 10px; margin-top: 40px; min-height: 44px;
-  text-transform: uppercase; width: fit-content; color: var(--black);
+.hero .section-label { top: 40px; }
+/* Regla de sastre en el borde superior */
+.regla {
+  position: absolute; inset: 0 0 auto 0; height: 24px; pointer-events: none;
+  background:
+    repeating-linear-gradient(90deg, currentColor 0 1px, transparent 1px 120px) top / 100% 24px no-repeat,
+    repeating-linear-gradient(90deg, currentColor 0 1px, transparent 1px 12px) top / 100% 14px no-repeat;
 }
-.cta-arrow svg { width: 24px; height: 24px; flex-shrink: 0; transition: transform 0.3s, color 0.3s; }
-.cta-arrow:hover svg, .cta-arrow:focus-visible svg { transform: translate(5px, -5px); color: var(--bordo); }
+/* Wordmark gigante decorativo: en el flujo, debajo del CTA (no tapa título ni CTA), recortado por el borde inferior */
+.hero-wordmark {
+  align-self: stretch; margin: auto calc(-1 * var(--pad-r)) -0.16em calc(-1 * var(--pad-l)); padding-top: 32px;
+  font-family: var(--font-title); font-weight: 800; font-size: 31vw; line-height: 0.8; letter-spacing: -0.04em;
+  text-align: center; color: var(--black); white-space: nowrap; pointer-events: none; user-select: none;
+}
+/* Desde 1024px la etiqueta vertical vive a 40px del borde derecho: el wordmark (centrado, ~3.2 veces su
+   tamaño de ancho) se limita para dejar libres 60px a cada lado y no pasar por debajo de la etiqueta */
+@media (min-width: 1024px) {
+  .hero-wordmark { font-size: min(31vw, calc((100vw - 120px) / 3.2)); }
+}
 
-/* ---------- 02 Manifiesto ---------- */
-.manifest { min-height: 70vh; min-height: 70svh; display: flex; align-items: center; }
+/* ---------- Banda outline (entre hero y manifiesto) ---------- */
+.banda {
+  background: var(--black); color: var(--bone); overflow: hidden;
+  border-top: 1px dashed currentColor; padding: clamp(40px, 7vw, 96px) 0;
+}
+.banda__linea {
+  font-family: var(--font-title); font-weight: 800; text-transform: uppercase; letter-spacing: -0.02em;
+  line-height: 1.05;
+  /* Outline: Unbounded llega como fuente variable con contornos superpuestos, y con color: transparent
+     el trazo deja ver líneas internas dentro de las letras. Se pinta primero el trazo (4px, centrado) y
+     encima el relleno del color del fondo, que tapa la mitad interna y esas líneas: queda un borde de 2px. */
+  color: var(--black); -webkit-text-stroke: 4px var(--bone); paint-order: stroke fill;
+  /* Entra en una línea mientras puede (Unbounded es muy ancha); en celular corta entre palabras, nunca dentro */
+  font-size: clamp(2.5rem, calc((100vw - var(--pad-l) - var(--pad-r)) / 15.5), 7rem);
+  padding: 0 var(--pad-r) 0 var(--pad-l);
+}
+.banda__linea--1 { text-align: left; }
+.banda__linea--2 { text-align: right; }
+@media (max-width: 480px) { .banda__linea { -webkit-text-stroke-width: 3px; } }
+@media (hover: hover) {
+  .banda__linea { transition: color 0.2s; }
+  .banda:hover .banda__linea { color: var(--bone); }
+}
+/* Isotipo solo (sin "VOW": la palabra queda en el wordmark gigante y en el alt) */
+.hero-logo { width: clamp(144px, 15.6vw, 224px); margin-top: 24px; margin-bottom: clamp(24px, 2.8vw, 40px); }
+.hero-logo img { display: block; width: 100%; height: auto; }
+.hero-title {
+  font-family: var(--font-title); font-weight: 800; font-size: clamp(1.25rem, 1.8vw, 1.625rem);
+  line-height: 1.2; text-transform: uppercase; letter-spacing: -0.01em; max-width: 420px;
+  white-space: pre-line; margin-bottom: 28px;
+}
+/* CTA como botón relleno. Hover/foco: se invierte (hueso con borde negro) */
+.hero-btn {
+  display: inline-flex; align-items: center; gap: 12px; min-height: 44px; padding: 18px 32px;
+  background: var(--black); color: var(--bone); border: 1px solid var(--black); border-radius: 0;
+  font-family: var(--font-mono); font-size: 14px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; text-decoration: none; transition: background-color 0.2s, color 0.2s;
+}
+.hero-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+.hero-btn:hover, .hero-btn:focus-visible { background: var(--bone); color: var(--black); }
+.hero-btn:focus-visible { outline: 2px solid var(--bordo); outline-offset: 3px; }
+
+/* ---------- 02 Manifiesto (oscuro) ---------- */
+.manifest { min-height: 70vh; min-height: 70svh; display: flex; align-items: center; background: var(--black); color: var(--bone); }
 .manifest-content {
   font-family: var(--font-title); font-weight: 800; font-size: clamp(1.5rem, 5vw, 3.5rem);
   line-height: 1.1; text-transform: uppercase; max-width: 22em;
 }
-.word { opacity: 0.1; display: inline-block; margin-right: 0.3em; transition: opacity 0.1s; }
+.word { opacity: 0.16; display: inline-block; margin-right: 0.3em; transition: opacity 0.1s; }
 .no-motion .word { opacity: 1; }
 
 /* ---------- Listado de productos (lo dibuja el catálogo del Drop 01) ---------- */
+/* Celular: n° y nombre arriba, descripción debajo y una fila con puntos, categoría y estado */
 .lineup-item {
-  display: grid; grid-template-columns: 2.5em 1fr auto;
-  grid-template-areas: "id name status" ". spec spec";
-  gap: 4px 12px; align-items: baseline; padding: 16px 0; border-bottom: 1px solid var(--line);
+  display: grid; grid-template-columns: 2.5em auto auto 1fr;
+  grid-template-areas: "id name name name" ". spec spec spec" ". dots cat status";
+  gap: 6px 12px; align-items: baseline; padding: 16px 12px;
+  border-bottom: 1px dashed rgba(10,10,10,0.45);
 }
 .lineup-id { grid-area: id; font-family: var(--font-mono); font-size: 0.8rem; }
 .lineup-name { grid-area: name; font-family: var(--font-title); font-weight: 800; font-size: clamp(0.95rem, 2.2vw, 1.4rem); text-transform: uppercase; }
 .lineup-spec { grid-area: spec; font-family: var(--font-mono); font-size: 0.75rem; color: var(--topo-ink); text-transform: uppercase; }
+.catalog-dots { grid-area: dots; display: flex; gap: 6px; align-items: center; align-self: center; }
+.catalog-dots i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid currentColor; background: var(--dot, transparent); }
+.catalog-cat { grid-area: cat; font-family: var(--font-mono); font-size: 0.75rem; text-transform: uppercase; color: var(--topo-ink); }
 .lineup-status {
   grid-area: status; justify-self: end; white-space: nowrap;
   font-family: var(--font-mono); font-size: 0.7rem; padding: 3px 10px; border-radius: 20px;
@@ -145,17 +257,38 @@ section {
 }
 .is-preview .lineup-status { background: var(--bordo); border-color: var(--bordo); color: var(--bone); }
 .is-featured .lineup-status { background: var(--black); border-color: var(--black); color: var(--bone); }
-@media (max-width: 400px) {
-  .lineup-item { grid-template-columns: 2.5em minmax(0, 1fr); grid-template-areas: "id name" ". spec" ". status"; }
-  .lineup-status { justify-self: start; margin-top: 6px; }
-}
 @media (min-width: 768px) {
-  .lineup-item { grid-template-columns: 3em minmax(0, 1.1fr) minmax(0, 1.4fr) auto; grid-template-areas: "id name spec status"; padding: 20px 0; }
+  .lineup-item {
+    grid-template-columns: 48px minmax(0, 1fr) 96px 100px 120px;
+    grid-template-areas: "id name dots cat status" ". spec . . .";
+    padding: 20px 16px;
+  }
+}
+@media (min-width: 1024px) {
+  .lineup-item { grid-template-columns: 72px minmax(0, 1fr) 120px 130px 140px; }
+}
+/* Hover de fila: se invierte. No son enlaces: sin flecha ni cursor de mano */
+@media (hover: hover) {
+  .catalog-item { transition: background-color 0.2s, color 0.2s; }
+  .catalog-item:hover { background: var(--black); color: var(--bone); }
+  .catalog-item:hover .lineup-spec, .catalog-item:hover .catalog-desc, .catalog-item:hover .catalog-cat { color: var(--bone); }
+  .catalog-item:hover .lineup-status { color: var(--bordo-light); border-color: var(--bordo-light); }
 }
 
 /* ---------- Drop 01 (catálogo desde la API) ---------- */
 .drop-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px 24px; }
 .drop-head__sub { font-family: var(--font-mono); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--topo-ink); }
+/* Marco de la imagen + sello. El sello va sobre concreto vacío, lejos de los rótulos de la imagen */
+.drop-feature__frame { position: relative; }
+.sello {
+  position: absolute; left: 55%; top: 75%; pointer-events: none; white-space: nowrap;
+  font-family: var(--font-mono); font-size: clamp(8px, 0.4vw + 7px, 14px); font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; line-height: 1.2;
+  color: var(--bordo); border: 3px solid var(--bordo); padding: 0.57em 1em;
+  transform: rotate(-7deg); transform-origin: left top;
+}
+@media (max-width: 600px) { .sello { left: 36%; top: 70%; } }
+@media (max-width: 480px) { .sello { border-width: 2px; } }
 
 /* Imagen a 2/3 + tarjeta editorial. La imagen va entera, en su proporción nativa: los rótulos de los
    bordes no se pueden recortar, así que nunca se le fija altura ni se usa object-fit: cover */
@@ -182,7 +315,9 @@ section {
   font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; text-transform: uppercase;
   color: var(--bordo-light);
 }
-.drop-feature__colores { display: grid; gap: 4px; font-family: var(--font-mono); font-size: 0.8rem; text-transform: uppercase; }
+.drop-feature__colores { display: grid; gap: 6px; font-family: var(--font-mono); font-size: 0.8rem; text-transform: uppercase; }
+.drop-feature__swatches { display: flex; gap: 6px; }
+.drop-feature__swatches i { width: 30px; height: 30px; border: 1px solid var(--bone); background: var(--sw); }
 .drop-feature__cta {
   display: flex; align-items: center; justify-content: center; min-height: 44px;
   background: var(--bone); color: var(--black); text-align: center; text-decoration: none; text-transform: uppercase;
@@ -202,7 +337,7 @@ section {
   .drop-feature__num { font-size: clamp(4rem, 7.5vw, 9.4rem); }
 }
 
-.catalog-list-wrap { margin-top: 40px; border-top: 1px solid var(--black); }
+.catalog-list-wrap { margin-top: 40px; border-top: 1px dashed currentColor; }
 .catalog-status { padding: 20px 0; font-family: var(--font-mono); font-size: 0.85rem; color: var(--topo-ink); }
 .catalog-status.is-error { color: var(--bordo); }
 .catalog-detail { display: grid; gap: 6px; }
@@ -213,7 +348,7 @@ section {
 
 /* ---------- Lista de espera ---------- */
 .waitlist { background: var(--black); color: var(--bone); }
-.waitlist .section-label { color: var(--bone); }
+.waitlist .section-label, .manifest .section-label { color: var(--bone); }
 .form { margin-top: 40px; max-width: 500px; display: flex; flex-direction: column; gap: 30px; }
 .input-group input {
   width: 100%; background: transparent; border: none; border-radius: 0;
@@ -244,28 +379,32 @@ section {
 .msg.error { color: var(--bordo-light); }
 .msg.success { color: var(--beige); }
 .form-legal { font-family: var(--font-mono); font-size: 0.75rem; line-height: 1.5; color: rgba(236,232,225,0.8); margin-top: -14px; }
-.form-legal a, .privacy-body a { color: var(--bone); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
-.form-legal a:hover, .privacy-body a:hover { color: var(--beige); }
+.form-legal a, .privacy-body a { text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.form-legal a { color: var(--bone); }
+.form-legal a:hover { color: var(--beige); }
+.privacy-body a { color: var(--black); }
+.privacy-body a:hover { color: var(--bordo); }
 
 /* ---------- Política de privacidad ---------- */
-.privacy { background: var(--black); color: var(--bone); border-top: 1px solid rgba(236,232,225,0.12); }
-.privacy .section-label { color: var(--bone); }
+/* Legal (claro) */
+.privacy { color: var(--black); }
 .privacy:focus { outline: none; }
 .privacy-body { max-width: 65ch; margin-top: 32px; font-size: 1rem; line-height: 1.6; }
 .privacy-body h3 {
   font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; text-transform: uppercase;
-  color: var(--beige); margin: 32px 0 8px;
+  color: var(--bordo); margin: 28px 0 8px; padding-top: 20px; border-top: 1px dashed rgba(10,10,10,0.45);
 }
-.privacy-body p { color: rgba(236,232,225,0.88); }
-.privacy-intro { font-size: 1.05rem; color: var(--bone); }
+.privacy-body p { color: rgba(10,10,10,0.88); }
+.privacy-intro { font-size: 1.05rem; color: var(--black); }
 .privacy-updated { margin-top: 32px; font-family: var(--font-mono); font-size: 0.75rem; }
 
 footer {
   background: var(--black); color: var(--bone);
   padding: 40px var(--gutter); padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
   display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px 24px;
-  font-family: var(--font-mono); font-size: 0.8rem; border-top: 1px solid rgba(236,232,225,0.12);
+  font-family: var(--font-mono); font-size: 0.8rem; border-top: 1px dashed currentColor;
 }
+@media (min-width: 1200px) { footer { padding-left: var(--pad-l); } }
 .footer-logo { width: 64px; aspect-ratio: 801 / 745; color: var(--bone); }
 .footer-logo svg { display: block; width: 100%; height: auto; }
 .ig-link { color: var(--bone); text-decoration: none; padding: 12px 0; }
