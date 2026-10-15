@@ -13,6 +13,11 @@ const FORMATO_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FORMATO_INSTAGRAM = /^[a-z0-9._]{1,30}$/;
 const LARGO_MAXIMO_EMAIL = 254;
 const LARGO_MAXIMO_ORIGEN = 100;
+const FORMATO_SLUG = /^[a-z0-9-]{1,60}$/;
+const FORMATO_DROP = /^[1-9][0-9]{0,8}$/;
+const COLUMNAS_PUBLICAS =
+  "drop_numero, numero, slug, nombre, categoria, descripcion, colores, destacado, estado, imagen";
+const CACHE_CATALOGO = "public, max-age=300";
 
 export const leerOrigenes = (valor = "") =>
   valor
@@ -88,10 +93,21 @@ export function validarPedido(cuerpo = {}) {
   };
 }
 
+export function leerDrop(valor) {
+  if (valor === undefined) {
+    return { valor: null };
+  }
+  if (typeof valor !== "string" || !FORMATO_DROP.test(valor)) {
+    return { error: "El parámetro drop tiene que ser un número entero positivo." };
+  }
+  return { valor: Number(valor) };
+}
+
 export function crearApp({
   pool,
   origenesPermitidos = leerOrigenes(process.env.ALLOWED_ORIGINS),
   limitePorMinuto = 5,
+  limiteCatalogoPorMinuto = 60,
 } = {}) {
   const app = express();
 
@@ -134,6 +150,49 @@ export function crearApp({
     res.status(200).json({ mensaje: MENSAJE_EXITO });
   });
 
+  const limitadorCatalogo = rateLimit({
+    windowMs: 60 * 1000,
+    limit: limiteCatalogoPorMinuto,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    message: { error: "Demasiados pedidos. Probá de nuevo en un minuto." },
+  });
+
+  app.get("/api/productos", limitadorCatalogo, async (req, res) => {
+    const { valor: drop, error } = leerDrop(req.query.drop);
+    if (error) {
+      return res.status(400).json({ error });
+    }
+
+    const { rows } =
+      drop === null
+        ? await pool.query(`SELECT ${COLUMNAS_PUBLICAS} FROM productos ORDER BY drop_numero, numero`)
+        : await pool.query(
+            `SELECT ${COLUMNAS_PUBLICAS} FROM productos WHERE drop_numero = $1 ORDER BY drop_numero, numero`,
+            [drop]
+          );
+
+    res.set("Cache-Control", CACHE_CATALOGO);
+    res.status(200).json({ productos: rows });
+  });
+
+  app.get("/api/productos/:slug", limitadorCatalogo, async (req, res) => {
+    const { slug } = req.params;
+    if (!FORMATO_SLUG.test(slug)) {
+      return res.status(400).json({
+        error: "El identificador del producto solo puede tener letras minúsculas, números y guiones (hasta 60).",
+      });
+    }
+
+    const { rows } = await pool.query(`SELECT ${COLUMNAS_PUBLICAS} FROM productos WHERE slug = $1`, [slug]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Producto no encontrado" });
+    }
+
+    res.set("Cache-Control", CACHE_CATALOGO);
+    res.status(200).json({ producto: rows[0] });
+  });
+
   app.use((req, res) => {
     res.status(404).json({ error: "Ruta no encontrada." });
   });
@@ -145,8 +204,13 @@ export function crearApp({
     if (error.type === "entity.too.large") {
       return res.status(413).json({ error: "El pedido es demasiado grande." });
     }
-    console.error(`Error en la lista de espera: ${error.code ?? "sin código"} ${error.message}`);
-    res.status(500).json({ error: "No pudimos registrarte. Probá de nuevo en unos minutos." });
+    const esCatalogo = req.path.startsWith("/api/productos");
+    console.error(`Error en ${esCatalogo ? "el catálogo" : "la lista de espera"}: ${error.code ?? "sin código"} ${error.message}`);
+    res.status(500).json({
+      error: esCatalogo
+        ? "No pudimos cargar el catálogo. Probá de nuevo en unos minutos."
+        : "No pudimos registrarte. Probá de nuevo en unos minutos.",
+    });
   });
 
   return app;
@@ -161,6 +225,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const puerto = Number(process.env.PORT) || 3000;
   const app = crearApp({ pool: crearPool(), origenesPermitidos });
   app.listen(puerto, () => {
-    console.log(`API de lista de espera escuchando en http://localhost:${puerto}`);
+    console.log(`API de VOW escuchando en http://localhost:${puerto}`);
   });
 }

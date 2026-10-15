@@ -11,10 +11,12 @@ Este repositorio contiene el backend y la capa de agentes de IA de la marca. En 
 ## Qué funciona hoy
 
 - **API de lista de espera:** `POST /api/lista-espera` recibe `{ email, instagram, origen }`, valida y normaliza los datos y guarda el registro. `instagram` es opcional: se guarda sin "@", en minúsculas, y tiene que tener de 1 a 30 letras, números, puntos o guiones bajos. `GET /api/salud` responde `{ "ok": true }` sin consultar la base.
-- **Conexión a PostgreSQL (Neon):** pool de conexiones, script de prueba y migración de la tabla `lista_espera`.
+- **Catálogo del Drop 01:** tabla `productos` con los 7 productos del Drop 01 en estado concepto, cargados con el script `db-seed`. `GET /api/productos` y `GET /api/productos/:slug` los exponen sin precios, stock ni datos internos.
+- **Sección Drop 01 en la landing:** muestra la imagen conceptual del drop y el listado que trae de la API, con avisos mientras el servidor despierta y si la carga falla.
+- **Conexión a PostgreSQL (Neon):** pool de conexiones, script de prueba y migración de las tablas `lista_espera` y `productos`.
 - **Motor de agentes:** ejecuta agentes sobre el SDK de Anthropic con soporte para herramientas, límite de turnos y conteo de tokens.
 - **Calculadora de costos:** calcula el costo de importación por unidad y el margen a partir de los datos de una orden. Todavía no incluye IVA de importación ni Ingresos Brutos, que quedan pendientes de confirmar con un contador.
-- **Tests y CI:** 16 tests automáticos que corren en GitHub Actions con cada push.
+- **Tests y CI:** 25 tests automáticos que corren en GitHub Actions con cada push.
 
 ## Arquitectura
 
@@ -23,7 +25,7 @@ flowchart LR
     visitante(["Visitante"])
     landing["Landing de lista de espera<br/>web/ · Vite"]
     api["API de lista de espera<br/>src/api · Express"]
-    db[("PostgreSQL<br/>tabla lista_espera")]
+    db[("PostgreSQL<br/>tablas lista_espera y productos")]
 
     subgraph agentes["Capa de agentes"]
         motor["Motor de agentes<br/>src/core/runAgent.js"]
@@ -36,7 +38,7 @@ flowchart LR
     anthropic["API de Anthropic"]
 
     visitante --> landing
-    landing -->|"POST /api/lista-espera"| api
+    landing -->|"POST /api/lista-espera<br/>GET /api/productos"| api
     api --> db
     motor --> anthropic
     contenido -.-> motor
@@ -51,6 +53,34 @@ flowchart LR
 ```
 
 Los bloques con borde continuo ya existen en el repo. Los bloques con borde punteado están planificados. La landing está publicada en Cloudflare Pages y la API en Render (plan gratuito), con la base de datos en Neon. Por el plan gratuito, el primer pedido después de un rato sin tráfico puede tardar cerca de un minuto; para acortar esa espera, la landing despierta la API al cargar.
+
+## Endpoints de la API
+
+| Método y ruta | Qué hace |
+|---|---|
+| `GET /api/salud` | Responde `{ "ok": true }` sin consultar la base. Sirve para despertar el servidor. |
+| `POST /api/lista-espera` | Anota un email en la lista de espera, con Instagram opcional. Límite: 5 pedidos por minuto por IP. |
+| `GET /api/productos` | Devuelve `{ "productos": [...] }` ordenados por drop y número. Acepta `?drop=N` (entero positivo); con otro valor responde 400. |
+| `GET /api/productos/:slug` | Devuelve `{ "producto": {...} }`. El slug tiene que cumplir `^[a-z0-9-]{1,60}$` (si no, 400) y, si no existe, responde 404 con "Producto no encontrado". |
+
+Los dos endpoints de productos responden con `Cache-Control: public, max-age=300` y tienen su propio límite de 60 pedidos por minuto por IP, separado del de la lista de espera. Solo exponen campos públicos: `drop_numero`, `numero`, `slug`, `nombre`, `categoria`, `descripcion`, `colores`, `destacado`, `estado` e `imagen`.
+
+### Tabla `productos`
+
+| Columna | Tipo y reglas |
+|---|---|
+| `id` | serial, clave primaria (no se expone en la API) |
+| `drop_numero` | entero, por defecto 1 |
+| `numero` | entero; único junto con `drop_numero` |
+| `slug` | texto único |
+| `nombre`, `descripcion` | texto |
+| `categoria` | `ropa` o `accesorio` |
+| `colores` | lista de textos |
+| `destacado` | booleano, por defecto `false` |
+| `estado` | `concepto`, `proximamente` o `disponible`; por defecto `concepto` |
+| `imagen` | texto opcional; por ahora `null` |
+
+La tabla no tiene columnas de precio, stock, material, gramaje ni medidas. Los datos del Drop 01 viven en `src/data/drop-01.js` y se cargan con `npm run db-seed`, que actualiza los productos existentes por `slug` y nunca borra registros.
 
 ## Stack
 
@@ -103,6 +133,7 @@ La API también acepta `PORT`, que es opcional (por defecto 3000). La landing le
 ```bash
 npm run db-probar
 npm run db-migrar
+npm run db-seed
 npm run servidor
 ```
 
@@ -118,9 +149,10 @@ npm run dev
 | Script | Qué hace |
 |---|---|
 | `npm test` | Corre todos los tests con `node --test`. |
-| `npm run servidor` | Levanta la API de lista de espera. |
+| `npm run servidor` | Levanta la API (lista de espera y catálogo). |
 | `npm run db-probar` | Verifica la conexión a la base y muestra la versión de PostgreSQL. |
-| `npm run db-migrar` | Crea la tabla `lista_espera` si no existe y agrega las columnas nuevas a una tabla existente. Se puede correr más de una vez. |
+| `npm run db-migrar` | Crea las tablas `lista_espera` y `productos` si no existen y agrega las columnas nuevas a las tablas existentes. Se puede correr más de una vez. |
+| `npm run db-seed` | Carga o actualiza los productos del Drop 01. Se puede correr más de una vez sin duplicar y nunca borra registros. |
 | `npm run costos` | Corre la calculadora de costos con un caso de ejemplo. |
 | `npm run hola` | Pide un eslogan a la API de Anthropic. Hace una llamada real y consume crédito. |
 | `npm run prueba` | Corre el agente de prueba sobre el motor de agentes. Hace una llamada real y consume crédito. |
@@ -133,7 +165,7 @@ Dentro de `web/`: `npm run dev`, `npm run build` y `npm run preview`.
 npm test
 ```
 
-Son 16 tests: 3 de la calculadora de costos y 13 de la API. Los de la API necesitan `DATABASE_URL`, crean la tabla si no existe y usan emails descartables bajo un dominio `.invalid`. Al terminar, borran los registros que crearon.
+Son 25 tests: 3 de la calculadora de costos, 13 de la lista de espera y 9 del catálogo. Los de la API necesitan `DATABASE_URL` y antes de empezar corren la migración; los del catálogo también corren el seed. Las dos operaciones se pueden repetir sin duplicar datos. Los de la lista de espera usan emails descartables bajo un dominio `.invalid` y, al terminar, borran los registros que crearon.
 
 En GitHub Actions corren con cada push. La CI toma `DATABASE_URL` de un secreto del repositorio.
 
@@ -143,11 +175,13 @@ En GitHub Actions corren con cada push. La CI toma `DATABASE_URL` de un secreto 
 - **Respuesta idéntica para emails repetidos:** un email nuevo y uno ya anotado reciben el mismo `200` y el mismo mensaje, así nadie puede averiguar quién está en la lista.
 - **Límite de pedidos por IP:** 5 pedidos por minuto en el endpoint de la lista de espera. `GET /api/salud` no cuenta para el límite.
 - **CORS restringido:** solo responden a los orígenes definidos en `ALLOWED_ORIGINS`.
+- **Catálogo sin datos internos:** la API elige explícitamente las columnas públicas, así que el `id` y cualquier dato comercial quedan afuera. La landing dibuja el catálogo solo con `textContent`, nunca con `innerHTML`.
 - **Datos descartables en los tests:** los tests usan emails que no pueden existir y los borran al terminar, sin tocar registros reales.
 
 ## Hoja de ruta
 
 - [x] Publicar la API y la landing.
+- [x] Catálogo del Drop 01 en la API y en la landing.
 - [ ] Agente de contenido con evaluaciones.
 - [ ] Agente de atención al cliente.
 - [ ] Agente de inventario.

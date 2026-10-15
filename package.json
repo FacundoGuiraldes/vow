@@ -10,7 +10,8 @@
     "costos": "node src/costos-prueba.js",
     "db-probar": "node src/db/probar-conexion.js",
     "servidor": "node src/api/servidor.js",
-    "db-migrar": "node src/db/migrar.js"
+    "db-migrar": "node src/db/migrar.js",
+    "db-seed": "node src/db/seed-catalogo.js"
   },
   "repository": {
     "type": "git",
