@@ -63,6 +63,13 @@ if (!reducedMotion) {
     stagger: 0.1,
     scrollTrigger: { trigger: '#sec-02', start: 'top 80%', end: 'bottom 40%', scrub: true }
   });
+
+  // Franja del Drop 01: zoom lento mientras cruza la pantalla (con reduced-motion queda en scale 1)
+  gsap.fromTo('.drop-interludio__img', { scale: 1 }, {
+    scale: 1.03,
+    ease: 'none',
+    scrollTrigger: { trigger: '#drop-interludio', start: 'top bottom', end: 'bottom top', scrub: true }
+  });
 }
 
 // Scroll suave a un elemento. Antes de animar, sincroniza Lenis con la posición real: si el foco con Tab
