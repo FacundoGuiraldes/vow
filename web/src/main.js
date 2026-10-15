@@ -1,5 +1,5 @@
 import './style.css';
-import { content, colors } from './content.js';
+import { content } from './content.js';
 import logoSvg from './assets/logo.svg?raw';
 import Lenis from '@studio-freight/lenis';
 import { gsap } from 'gsap';
@@ -11,6 +11,7 @@ gsap.registerPlugin(ScrollTrigger);
 const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
 const WAITLIST_ENDPOINT = `${API_URL}/api/lista-espera`;
 const HEALTH_ENDPOINT = `${API_URL}/api/salud`;
+const CATALOG_ENDPOINT = `${API_URL}/api/productos?drop=1`;
 const REQUEST_TIMEOUT_MS = 10000;
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -33,76 +34,13 @@ content.manifest.split(' ').forEach((w, i) => {
   manifestEl.append(span);
 });
 
-document.getElementById('product-name').textContent = content.product.name;
-const tagsContainer = document.getElementById('product-tags');
-content.product.tags.forEach(tag => {
-  const el = document.createElement('li');
-  el.className = 'tag';
-  el.textContent = tag;
-  tagsContainer.appendChild(el);
-});
-
-document.getElementById('product-placeholder').textContent = content.product.placeholder;
-
-// Drop 01: galería de renders + line-up completo
+// Crea un nodo con clase y texto (siempre textContent, nunca HTML)
 const el = (tag, className, text) => {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text != null) node.textContent = text;
   return node;
 };
-const total = String(content.products.length).padStart(2, '0');
-
-document.getElementById('drop-kicker').textContent = content.drop.kicker;
-document.getElementById('drop-title').textContent = content.drop.title;
-document.getElementById('drop-disclaimer').textContent = content.drop.disclaimer;
-document.getElementById('lineup-title').textContent = content.drop.lineupTitle;
-
-const galleryTrack = document.getElementById('gallery-track');
-content.products.filter(p => p.images).forEach(p => {
-  const { src, w, h } = p.images;
-  const img = el('img');
-  img.src = `${src}-1600.webp`;
-  img.srcset = `${src}-900.webp 900w, ${src}-1600.webp 1600w`;
-  img.sizes = '(min-width: 1024px) 70vw, 88vw';
-  img.width = w;
-  img.height = h;
-  img.loading = 'lazy';
-  img.decoding = 'async';
-  img.alt = p.alt;
-
-  const swatches = el('ul', 'swatches');
-  swatches.setAttribute('aria-label', 'Colorway');
-  p.colors.forEach(key => {
-    const li = el('li', 'swatch', colors[key].label);
-    li.style.setProperty('--swatch', colors[key].hex);
-    swatches.append(li);
-  });
-
-  const caption = el('figcaption', 'sheet-caption');
-  const head = el('p', 'sheet-head');
-  head.append(el('span', 'sheet-id', `${p.id} / ${total}`), el('span', 'sheet-status', content.drop.status.preview));
-  caption.append(head, el('h3', 'sheet-name', p.name), el('p', 'sheet-spec', p.spec), swatches);
-
-  const figure = el('figure', 'sheet-figure');
-  figure.append(img, caption);
-  const li = el('li', 'sheet');
-  li.append(figure);
-  galleryTrack.append(li);
-});
-
-const lineup = document.getElementById('lineup');
-content.products.forEach(p => {
-  const status = p.images ? 'preview' : p.featured ? 'featured' : 'dev';
-  const li = el('li', `lineup-item is-${status}`);
-  li.append(
-    el('span', 'lineup-id', p.id),
-    el('span', 'lineup-name', p.name),
-    el('span', 'lineup-spec', p.spec),
-    el('span', 'lineup-status', content.drop.status[status])
-  );
-  lineup.append(li);
-});
 
 document.getElementById('hero-logo').innerHTML = logoSvg;
 document.querySelector('.footer-logo').innerHTML = logoSvg;
@@ -125,77 +63,36 @@ if (!reducedMotion) {
     stagger: 0.1,
     scrollTrigger: { trigger: '#sec-02', start: 'top 80%', end: 'bottom 40%', scrub: true }
   });
+}
 
-  // Fondo del hero: parallax leve
-  gsap.to('.hero-bg img', {
-    yPercent: 12,
-    ease: 'none',
-    scrollTrigger: { trigger: '#sec-01', start: 'top top', end: 'bottom top', scrub: true }
-  });
-
-  gsap.from('.lineup-item', {
-    opacity: 0, y: 20, duration: 0.6, ease: 'power3.out', stagger: 0.05,
-    scrollTrigger: { trigger: '#lineup', start: 'top 85%' }
-  });
-
-  // Desktop: la galería se fija y scrollea en horizontal. En mobile queda el scroll-snap nativo.
-  gsap.matchMedia().add('(min-width: 1024px)', () => {
-    const gallery = document.getElementById('gallery');
-    const track = document.getElementById('gallery-track');
-    gallery.classList.add('is-pinned');
-    // Recorrido = ancho del track menos el área visible (sin los gutters laterales)
-    const distance = () => {
-      const { paddingLeft, paddingRight } = getComputedStyle(gallery);
-      const visible = gallery.clientWidth - parseFloat(paddingLeft) - parseFloat(paddingRight);
-      return Math.max(0, track.scrollWidth - visible);
-    };
-    gsap.to(track, {
-      x: () => -distance(),
-      ease: 'none',
-      scrollTrigger: {
-        trigger: '.drop-pin',
-        start: 'top top',
-        end: () => `+=${distance()}`,
-        pin: true,
-        scrub: true,
-        invalidateOnRefresh: true
-      }
-    });
-    return () => gallery.classList.remove('is-pinned');
-  });
-
-  // Las imágenes lazy cambian el alto/ancho: recalcular posiciones al cargarlas
-  document.querySelectorAll('.sheet img').forEach(img =>
-    img.addEventListener('load', () => ScrollTrigger.refresh(), { once: true })
-  );
+// Scroll suave a un elemento. Antes de animar, sincroniza Lenis con la posición real: si el foco con Tab
+// movió la página de forma nativa y se aprieta Enter enseguida, Lenis todavía no se enteró y calcularía
+// el destino desde una posición vieja.
+function scrollToElement(target, { immediate = false, onComplete = () => {} } = {}) {
+  if (!lenis) {
+    target.scrollIntoView();
+    onComplete();
+    return;
+  }
+  lenis.scrollTo(window.scrollY, { immediate: true });
+  lenis.scrollTo(target, { immediate, onComplete });
+  if (immediate) onComplete();
 }
 
 // CTAs al formulario: scroll y foco en el email (sirve también para teclado/lectores)
 const emailInput = document.getElementById('email');
+const waitlistSection = document.getElementById('sec-05');
 document.querySelectorAll('a[href="#sec-05"]:not(.skip-link)').forEach(link =>
   link.addEventListener('click', e => {
     e.preventDefault();
-    const focusEmail = () => emailInput.focus({ preventScroll: true });
-    if (lenis) {
-      lenis.scrollTo('#sec-05', { onComplete: focusEmail });
-    } else {
-      document.getElementById('sec-05').scrollIntoView();
-      focusEmail();
-    }
+    scrollToElement(waitlistSection, { onComplete: () => emailInput.focus({ preventScroll: true }) });
   })
 );
 
 // Enlaces a la política de privacidad: scroll a la sección y foco en ella para teclado/lectores
 const privacySection = document.getElementById('privacidad');
 function goToPrivacy({ immediate = false } = {}) {
-  const focusPrivacy = () => privacySection.focus({ preventScroll: true });
-  if (lenis) {
-    lenis.scrollTo(privacySection, { immediate, onComplete: focusPrivacy });
-    if (immediate) focusPrivacy();
-  } else {
-    privacySection.scrollIntoView();
-    focusPrivacy();
-  }
+  scrollToElement(privacySection, { immediate, onComplete: () => privacySection.focus({ preventScroll: true }) });
 }
 document.querySelectorAll('a[href="#privacidad"]').forEach(link =>
   link.addEventListener('click', e => {
@@ -204,8 +101,8 @@ document.querySelectorAll('a[href="#privacidad"]').forEach(link =>
     goToPrivacy();
   })
 );
-// Entrada directa con /#privacidad: el layout se sigue acomodando después del load (fuentes, pin de
-// la galería), así que se vuelve a posicionar cuando terminan de cargar las fuentes y un rato después
+// Entrada directa con /#privacidad: el layout se sigue acomodando después del load (fuentes, catálogo
+// que llega de la API), así que se vuelve a posicionar cuando terminan de cargar las fuentes y un rato después
 window.addEventListener('load', () => {
   if (location.hash !== '#privacidad') return;
   const reposition = () => {
@@ -239,6 +136,68 @@ if (finePointer) {
 // ---------- API ----------
 // Aviso silencioso al cargar: despierta la API si está dormida para que el envío del formulario sea rápido
 fetch(HEALTH_ENDPOINT, { cache: 'no-store' }).catch(() => {});
+
+// ---------- Catálogo Drop 01 (desde la API) ----------
+// El servidor gratuito puede tardar cerca de un minuto en despertar: aviso a los 8 s y corte a los 60 s
+const CATALOG_SLOW_MS = 8000;
+const CATALOG_TIMEOUT_MS = 60000;
+const CATALOG_STATUS_LABELS = { concepto: 'CONCEPTO', proximamente: 'PRÓXIMAMENTE', disponible: 'DISPONIBLE' };
+
+const catalogStatus = document.getElementById('catalogo-estado');
+const catalogList = document.getElementById('catalogo-lista');
+
+function setCatalogStatus(text, { error = false, visuallyHidden = false } = {}) {
+  catalogStatus.textContent = text;
+  catalogStatus.classList.toggle('is-error', error);
+  catalogStatus.classList.toggle('sr-only', visuallyHidden);
+}
+
+// Solo textContent: los datos vienen de la API y nunca se interpretan como HTML
+function renderCatalogItem(product) {
+  const estado = CATALOG_STATUS_LABELS[product.estado] ? product.estado : 'concepto';
+  const li = el('li', `lineup-item catalog-item is-${estado}`);
+  const detail = el('span', 'lineup-spec catalog-detail');
+  detail.append(el('span', 'catalog-desc', product.descripcion));
+  if (Array.isArray(product.colores) && product.colores.length > 0) {
+    detail.append(el('span', 'catalog-colors', `Colores: ${product.colores.join(' / ')}`));
+  }
+  li.append(
+    el('span', 'lineup-id', String(product.numero).padStart(2, '0')),
+    el('span', 'lineup-name', product.nombre),
+    detail,
+    el('span', 'lineup-status', CATALOG_STATUS_LABELS[estado])
+  );
+  return li;
+}
+
+async function loadCatalog() {
+  const controller = new AbortController();
+  const slowTimer = setTimeout(
+    () => setCatalogStatus('El servidor se está despertando, puede tardar hasta un minuto…'),
+    CATALOG_SLOW_MS
+  );
+  const timeoutTimer = setTimeout(() => controller.abort(), CATALOG_TIMEOUT_MS);
+  try {
+    const res = await fetch(CATALOG_ENDPOINT, { signal: controller.signal, headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const { productos } = await res.json();
+    if (!Array.isArray(productos)) throw new Error('Respuesta inválida');
+
+    catalogList.replaceChildren(...productos.map(renderCatalogItem));
+    catalogList.hidden = false;
+    setCatalogStatus(`Drop 01: ${productos.length} productos en desarrollo.`, { visuallyHidden: true });
+    ScrollTrigger.refresh();
+  } catch (err) {
+    console.error('[VOW] No se pudo cargar el Drop 01:', err.message);
+    catalogList.hidden = true;
+    setCatalogStatus('No pudimos cargar el Drop 01. Probá de nuevo más tarde.', { error: true });
+  } finally {
+    clearTimeout(slowTimer);
+    clearTimeout(timeoutTimer);
+  }
+}
+
+loadCatalog();
 
 // ---------- Formulario de lista de espera ----------
 const form = document.getElementById('waitlist-form');

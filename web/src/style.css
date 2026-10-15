@@ -110,19 +110,6 @@ section {
   min-height: 90vh; min-height: 90svh; display: flex; flex-direction: column; justify-content: flex-end;
   padding-bottom: 40px; overflow: hidden;
 }
-.hero > :not(.hero-bg, .section-label) { position: relative; z-index: 1; }
-.hero-bg {
-  position: absolute; z-index: 0; top: 0; right: 0; bottom: 0;
-  width: min(78vw, 680px); pointer-events: none;
-  -webkit-mask-image: linear-gradient(to left, #000 45%, transparent), linear-gradient(to top, transparent, #000 25%);
-  -webkit-mask-composite: source-in; mask-composite: intersect;
-  mask-image: linear-gradient(to left, #000 45%, transparent), linear-gradient(to top, transparent, #000 25%);
-}
-.hero-bg img {
-  width: 100%; height: 115%; object-fit: cover; object-position: center 30%;
-  opacity: 0.16; mix-blend-mode: multiply; display: block;
-}
-@media (min-width: 768px) { .hero-bg img { opacity: 0.22; } }
 .hero-logo { width: clamp(160px, 42vw, 280px); aspect-ratio: 801 / 745; margin-bottom: auto; margin-top: 40px; }
 .hero-logo svg { display: block; width: 100%; height: auto; }
 .cta-arrow {
@@ -142,51 +129,7 @@ section {
 .word { opacity: 0.1; display: inline-block; margin-right: 0.3em; transition: opacity 0.1s; }
 .no-motion .word { opacity: 1; }
 
-/* ---------- 03 Drop 01 ---------- */
-.drop { background: var(--beige); }
-.drop-pin { display: flex; flex-direction: column; justify-content: center; }
-.drop-header { max-width: 40rem; }
-.drop-disclaimer { font-family: var(--font-mono); font-size: 0.75rem; text-transform: uppercase; color: var(--topo-ink); margin-top: 16px; }
-
-.gallery {
-  margin: 32px calc(-1 * var(--gutter)) 0; padding: 0 var(--gutter) 8px;
-  overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 var(--gutter);
-  scrollbar-width: none; overscroll-behavior-x: contain;
-}
-.gallery::-webkit-scrollbar { display: none; }
-.gallery.is-pinned { overflow: hidden; overflow: clip; scroll-snap-type: none; }
-.gallery-track { display: flex; gap: 16px; width: max-content; align-items: flex-start; }
-.sheet { width: 86vw; max-width: 640px; scroll-snap-align: start; }
-.sheet-figure img {
-  display: block; width: 100%; height: auto;
-  border-radius: 24px; border: 1px solid var(--black); background: var(--topo);
-}
-.sheet-caption { display: grid; gap: 6px; padding: 14px 4px 0; }
-.sheet-head { display: flex; justify-content: space-between; gap: 12px; font-family: var(--font-mono); font-size: 0.75rem; }
-.sheet-status { background: var(--bordo); color: var(--bone); padding: 2px 10px; border-radius: 20px; }
-.sheet-name { font-family: var(--font-title); font-weight: 800; font-size: 1.1rem; text-transform: uppercase; }
-.sheet-spec { font-family: var(--font-mono); font-size: 0.8rem; color: var(--topo-ink); text-transform: uppercase; }
-.swatches { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 4px; font-family: var(--font-mono); font-size: 0.7rem; }
-.swatch { display: flex; align-items: center; gap: 6px; }
-.swatch::before {
-  content: ''; width: 14px; height: 14px; border-radius: 4px;
-  background: var(--swatch); border: 1px solid var(--black);
-}
-
-@media (min-width: 1024px) {
-  .drop-pin { min-height: 100vh; min-height: 100svh; padding-block: 24px; }
-  .gallery-track { gap: 32px; }
-  .sheet { width: auto; max-width: none; }
-  .sheet-figure img { width: auto; height: min(50vh, 560px); }
-  .sheet-caption { grid-template-columns: auto 1fr; align-items: baseline; column-gap: 20px; }
-  .sheet-head { grid-column: 1 / -1; justify-content: flex-start; }
-  .swatches { grid-column: 1 / -1; }
-}
-
-.lineup-title {
-  font-family: var(--font-mono); font-size: 0.8rem; text-transform: uppercase;
-  margin-top: 64px; padding-bottom: 12px; border-bottom: 1px solid var(--black);
-}
+/* ---------- Listado de productos (lo dibuja el catálogo del Drop 01) ---------- */
 .lineup-item {
   display: grid; grid-template-columns: 2.5em 1fr auto;
   grid-template-areas: "id name status" ". spec spec";
@@ -210,24 +153,24 @@ section {
   .lineup-item { grid-template-columns: 3em minmax(0, 1.1fr) minmax(0, 1.4fr) auto; grid-template-areas: "id name spec status"; padding: 20px 0; }
 }
 
-/* ---------- 04 Producto destacado ---------- */
-.product-grid { display: grid; grid-template-columns: 1fr; gap: 40px; margin-top: 20px; }
-@media (min-width: 768px) { .product-grid { grid-template-columns: 1fr 1fr; align-items: center; gap: clamp(40px, 6vw, 96px); } }
-.product-placeholder {
-  aspect-ratio: 4/5; width: 100%; border-radius: 40px; /* Uso de la O redondeada */
-  background: repeating-linear-gradient(45deg, var(--graphite), var(--graphite) 2px, var(--black) 2px, var(--black) 15px);
-  display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px;
-  color: var(--bone); font-family: var(--font-mono); font-size: 1rem;
-  border: 1px solid var(--black);
+/* ---------- Drop 01 (catálogo desde la API) ---------- */
+.catalog-figure { margin-top: 32px; }
+.catalog-figure img {
+  display: block; width: 100%; height: auto; max-width: 1100px;
+  border-radius: 24px; border: 1px solid var(--black); background: var(--topo);
 }
-@media (min-width: 768px) { .product-placeholder { max-height: 80vh; } }
-.tags-container { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0 0; }
-.tag {
-  font-family: var(--font-mono); font-size: 0.75rem; border: 1px solid var(--black);
-  padding: 6px 12px; border-radius: 20px; text-transform: uppercase;
-}
+.catalog-note { margin-top: 10px; font-family: var(--font-mono); font-size: 0.75rem; color: var(--topo-ink); }
+.catalog-list-wrap { margin-top: 40px; border-top: 1px solid var(--black); }
+.catalog-status { padding: 20px 0; font-family: var(--font-mono); font-size: 0.85rem; color: var(--topo-ink); }
+.catalog-status.is-error { color: var(--bordo); }
+.catalog-detail { display: grid; gap: 6px; }
+.catalog-desc { font-family: var(--font-body); font-size: 0.95rem; line-height: 1.5; text-transform: none; color: var(--black); }
+.catalog-colors { font-family: var(--font-mono); font-size: 0.75rem; }
+.catalog-item.is-proximamente .lineup-status { background: var(--bordo); border-color: var(--bordo); color: var(--bone); }
+.catalog-item.is-disponible .lineup-status { background: var(--black); border-color: var(--black); color: var(--bone); }
+.catalog .cta-arrow { margin-top: 32px; }
 
-/* ---------- 05 Lista de espera ---------- */
+/* ---------- Lista de espera ---------- */
 .waitlist { background: var(--black); color: var(--bone); }
 .waitlist .section-label { color: var(--bone); }
 .form { margin-top: 40px; max-width: 500px; display: flex; flex-direction: column; gap: 30px; }
@@ -290,7 +233,6 @@ footer {
 @media (min-width: 1024px) {
   section { padding-top: 140px; padding-bottom: 120px; }
   .section-label { top: 32px; }
-  .drop { padding-top: 80px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
