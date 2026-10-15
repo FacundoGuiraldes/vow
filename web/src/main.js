@@ -63,13 +63,6 @@ if (!reducedMotion) {
     stagger: 0.1,
     scrollTrigger: { trigger: '#sec-02', start: 'top 80%', end: 'bottom 40%', scrub: true }
   });
-
-  // Franja del Drop 01: zoom lento mientras cruza la pantalla (con reduced-motion queda en scale 1)
-  gsap.fromTo('.drop-interludio__img', { scale: 1 }, {
-    scale: 1.03,
-    ease: 'none',
-    scrollTrigger: { trigger: '#drop-interludio', start: 'top bottom', end: 'bottom top', scrub: true }
-  });
 }
 
 // Scroll suave a un elemento. Antes de animar, sincroniza Lenis con la posición real: si el foco con Tab
@@ -86,10 +79,10 @@ function scrollToElement(target, { immediate = false, onComplete = () => {} } = 
   if (immediate) onComplete();
 }
 
-// CTAs al formulario: scroll y foco en el email (sirve también para teclado/lectores)
+// Enlaces al formulario (skip-link y CTAs): scroll y foco en el email (sirve también para teclado/lectores)
 const emailInput = document.getElementById('email');
 const waitlistSection = document.getElementById('sec-05');
-document.querySelectorAll('a[href="#sec-05"]:not(.skip-link)').forEach(link =>
+document.querySelectorAll('a[href="#sec-05"]').forEach(link =>
   link.addEventListener('click', e => {
     e.preventDefault();
     scrollToElement(waitlistSection, { onComplete: () => emailInput.focus({ preventScroll: true }) });
@@ -152,6 +145,8 @@ const CATALOG_STATUS_LABELS = { concepto: 'CONCEPTO', proximamente: 'PRÓXIMAMEN
 
 const catalogStatus = document.getElementById('catalogo-estado');
 const catalogList = document.getElementById('catalogo-lista');
+// Número decorativo de la tarjeta (aria-hidden): refleja la cantidad real; la lista ya la informa a lectores
+const dropCount = document.getElementById('drop-count');
 
 function setCatalogStatus(text, { error = false, visuallyHidden = false } = {}) {
   catalogStatus.textContent = text;
@@ -192,11 +187,13 @@ async function loadCatalog() {
 
     catalogList.replaceChildren(...productos.map(renderCatalogItem));
     catalogList.hidden = false;
+    dropCount.textContent = String(productos.length).padStart(2, '0');
     setCatalogStatus(`Drop 01: ${productos.length} productos en desarrollo.`, { visuallyHidden: true });
     ScrollTrigger.refresh();
   } catch (err) {
     console.error('[VOW] No se pudo cargar el Drop 01:', err.message);
     catalogList.hidden = true;
+    dropCount.textContent = '—';
     setCatalogStatus('No pudimos cargar el Drop 01. Probá de nuevo más tarde.', { error: true });
   } finally {
     clearTimeout(slowTimer);
