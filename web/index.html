@@ -25,37 +25,64 @@
     <div class="marquee" aria-hidden="true"><span id="marquee-text"></span></div>
   </header>
 
+  <nav class="indice" aria-label="Secciones">
+    <ol>
+      <li><a href="#sec-01" aria-label="Ir a la sección 01">01</a></li>
+      <li><a href="#sec-02" aria-label="Ir a la sección 02">02</a></li>
+      <li><a href="#drop-01" aria-label="Ir al Drop 01">Drop</a></li>
+      <li><a href="#sec-05" aria-label="Ir a la sección 03, acceso">03</a></li>
+      <li><a href="#privacidad" aria-label="Ir a la política de privacidad">Legal</a></li>
+    </ol>
+  </nav>
+
   <main id="main">
-    <section class="hero" id="sec-01" aria-labelledby="hero-title">
+    <section class="hero" id="sec-01" aria-labelledby="hero-title" tabindex="-1">
+      <div class="regla" aria-hidden="true"></div>
+      <div class="mk mk--tl" aria-hidden="true"></div><div class="mk mk--tr" aria-hidden="true"></div>
+      <div class="mk mk--bl" aria-hidden="true"></div><div class="mk mk--br" aria-hidden="true"></div>
+      <p class="etiqueta-vertical" aria-hidden="true">Desarrollo de producto</p>
       <div class="section-label" aria-hidden="true">01 / 03</div>
-      <div class="hero-logo" id="hero-logo" role="img" aria-label="VOW"></div>
-      <h1 id="hero-title" class="title-huge"></h1>
-      <a class="cta-arrow" href="#sec-05" id="hero-cta-link">
+      <div class="hero-logo" id="hero-logo">
+        <img src="/src/assets/logo-mark.svg" alt="VOW" width="492" height="518">
+      </div>
+      <h1 id="hero-title" class="hero-title"></h1>
+      <a class="hero-btn" href="#sec-05" id="hero-cta-link">
         <span id="hero-cta"></span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true" focusable="false"><path d="M5 19L19 5M19 5v10M19 5H9"/></svg>
       </a>
+      <div class="hero-wordmark" aria-hidden="true">VOW</div>
     </section>
 
-    <section class="manifest" id="sec-02" aria-label="Manifiesto">
+    <div class="banda" aria-hidden="true">
+      <p class="banda__linea banda__linea--1">Honor the vow</p>
+      <p class="banda__linea banda__linea--2">Bound by discipline</p>
+    </div>
+
+    <section class="manifest" id="sec-02" aria-label="Manifiesto" tabindex="-1">
       <div class="section-label" aria-hidden="true">02 / 03</div>
       <p id="manifest-text" class="manifest-content"></p>
     </section>
 
-    <section class="catalog" id="drop-01" aria-labelledby="drop01-title">
+    <section class="catalog" id="drop-01" aria-labelledby="drop01-title" tabindex="-1">
+      <div class="mk mk--tl" aria-hidden="true"></div><div class="mk mk--tr" aria-hidden="true"></div>
+      <div class="mk mk--bl" aria-hidden="true"></div><div class="mk mk--br" aria-hidden="true"></div>
       <div class="section-label" aria-hidden="true">DROP 01</div>
       <div class="drop-head">
         <div class="drop-head__titulo">
           <p class="kicker">Lo que viene · En desarrollo</p>
           <h2 class="title-large" id="drop01-title">Drop 01</h2>
         </div>
-        <p class="drop-head__sub">Colección deportiva &amp; urbana</p>
+        <p class="drop-head__sub etiqueta-vertical">Colección deportiva &amp; urbana</p>
       </div>
 
       <div class="drop-feature">
         <figure class="drop-feature__media">
-          <img class="drop-feature__img" src="/img/coming-soon.webp"
-               alt="Coming soon. Colección deportiva y urbana VOW, en desarrollo de producto."
-               width="1456" height="814" loading="lazy" decoding="async">
+          <div class="drop-feature__frame">
+            <img class="drop-feature__img" src="/img/coming-soon.webp"
+                 alt="Coming soon. Colección deportiva y urbana VOW, en desarrollo de producto."
+                 width="1456" height="814" loading="lazy" decoding="async">
+            <div class="sello" aria-hidden="true">Concepto · En desarrollo</div>
+          </div>
           <figcaption class="drop-feature__pie">Imagen conceptual</figcaption>
         </figure>
         <aside class="drop-feature__card" aria-label="Resumen del Drop 01">
@@ -64,6 +91,9 @@
           <p class="drop-feature__estado">En desarrollo</p>
           <div class="drop-feature__colores">
             <span class="drop-feature__mini">Colorway</span>
+            <span class="drop-feature__swatches" aria-hidden="true">
+              <i style="--sw: var(--c-beige)"></i><i style="--sw: var(--c-negro)"></i><i style="--sw: var(--c-bordo)"></i><i style="--sw: var(--c-gris-topo)"></i>
+            </span>
             <span>Beige / Negro / Bordó / Gris topo</span>
           </div>
           <a class="drop-feature__cta" href="#sec-05">Lista de espera</a>
@@ -77,6 +107,8 @@
     </section>
 
     <section class="waitlist" id="sec-05" aria-labelledby="waitlist-title">
+      <div class="mk mk--tl" aria-hidden="true"></div><div class="mk mk--tr" aria-hidden="true"></div>
+      <div class="mk mk--bl" aria-hidden="true"></div><div class="mk mk--br" aria-hidden="true"></div>
       <div class="section-label" aria-hidden="true">03 / 03</div>
       <h2 class="title-large" id="waitlist-title">ACCESO</h2>
       <form id="waitlist-form" class="form" novalidate>
