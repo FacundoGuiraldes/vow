@@ -153,23 +153,55 @@ section {
   .lineup-item { grid-template-columns: 3em minmax(0, 1.1fr) minmax(0, 1.4fr) auto; grid-template-areas: "id name spec status"; padding: 20px 0; }
 }
 
-/* ---------- Franja de interludio (imagen del Drop 01 a ancho completo) ---------- */
-/* La imagen va entera, en su proporción nativa: los rótulos de los bordes no se pueden recortar */
-.drop-interludio {
-  margin: 0; background: var(--bone);
-  padding-top: 100px; border-bottom: 1px solid var(--line);
-}
-.drop-interludio__marco { overflow: hidden; width: 100%; aspect-ratio: 1456 / 814; background: var(--topo); }
-.drop-interludio__img {
-  display: block; width: 100%; height: 100%; object-fit: cover;
-  transform-origin: center; will-change: transform;
-}
-.drop-interludio__pie {
+/* ---------- Drop 01 (catálogo desde la API) ---------- */
+.drop-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px 24px; }
+.drop-head__sub { font-family: var(--font-mono); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--topo-ink); }
+
+/* Imagen a 2/3 + tarjeta editorial. La imagen va entera, en su proporción nativa: los rótulos de los
+   bordes no se pueden recortar, así que nunca se le fija altura ni se usa object-fit: cover */
+.drop-feature { display: grid; grid-template-columns: 1fr; gap: 1.5rem; margin-top: 32px; }
+.drop-feature__media { margin: 0; }
+.drop-feature__img { display: block; width: 100%; height: auto; aspect-ratio: 1456 / 814; background: var(--topo); }
+.drop-feature__pie {
   font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--topo-ink); padding: 0.75rem var(--gutter);
+  color: var(--topo-ink); padding-top: 0.75rem;
+}
+.drop-feature__card {
+  background: var(--black); color: var(--bone); padding: 2rem;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 1.5rem;
+}
+.drop-feature__num {
+  font-family: var(--font-title); font-weight: 800; line-height: 0.9; letter-spacing: -0.03em;
+  font-size: clamp(5rem, 9vw, 9.4rem);
+}
+.drop-feature__label, .drop-feature__mini {
+  font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: rgba(236,232,225,0.75);
+}
+.drop-feature__estado {
+  font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; text-transform: uppercase;
+  color: var(--bordo-light);
+}
+.drop-feature__colores { display: grid; gap: 4px; font-family: var(--font-mono); font-size: 0.8rem; text-transform: uppercase; }
+.drop-feature__cta {
+  display: flex; align-items: center; justify-content: center; min-height: 44px;
+  background: var(--bone); color: var(--black); text-align: center; text-decoration: none; text-transform: uppercase;
+  font-family: var(--font-mono); font-weight: 700; padding: 1rem 1.25rem; transition: background 0.3s, color 0.3s;
+}
+.drop-feature__cta:hover { background: var(--bordo); color: var(--bone); }
+.drop-feature__cta:focus-visible { outline: 2px solid var(--beige); outline-offset: 3px; }
+@media (min-width: 1024px) {
+  /* La figura usa subgrid: la imagen ocupa la fila 1 (la misma que la tarjeta) y el pie la fila 2,
+     así la tarjeta se estira exactamente a la altura de la imagen */
+  .drop-feature { grid-template-columns: 2fr 1fr; grid-template-rows: auto auto; row-gap: 0; align-items: stretch; }
+  .drop-feature__media { grid-column: 1; grid-row: 1 / span 2; display: grid; grid-template-rows: subgrid; }
+  .drop-feature__card {
+    grid-column: 2; grid-row: 1;
+    padding: clamp(1.25rem, 2vw, 2rem); gap: clamp(0.5rem, 1vw, 1.5rem);
+  }
+  .drop-feature__num { font-size: clamp(4rem, 7.5vw, 9.4rem); }
 }
 
-/* ---------- Drop 01 (catálogo desde la API) ---------- */
 .catalog-list-wrap { margin-top: 40px; border-top: 1px solid var(--black); }
 .catalog-status { padding: 20px 0; font-family: var(--font-mono); font-size: 0.85rem; color: var(--topo-ink); }
 .catalog-status.is-error { color: var(--bordo); }
@@ -178,7 +210,6 @@ section {
 .catalog-colors { font-family: var(--font-mono); font-size: 0.75rem; }
 .catalog-item.is-proximamente .lineup-status { background: var(--bordo); border-color: var(--bordo); color: var(--bone); }
 .catalog-item.is-disponible .lineup-status { background: var(--black); border-color: var(--black); color: var(--bone); }
-.catalog .cta-arrow { margin-top: 32px; }
 
 /* ---------- Lista de espera ---------- */
 .waitlist { background: var(--black); color: var(--bone); }
@@ -243,7 +274,6 @@ footer {
 @media (min-width: 1024px) {
   section { padding-top: 140px; padding-bottom: 120px; }
   .section-label { top: 32px; }
-  .drop-interludio { padding-top: 140px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
