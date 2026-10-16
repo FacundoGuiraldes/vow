@@ -1,8 +1,12 @@
 # VOW
 
-Demo de la landing: https://vow-17x.pages.dev
+- **Landing:** https://vow-17x.pages.dev
+- **API:** `https://vow-2i0f.onrender.com` (por ejemplo, [`/api/salud`](https://vow-2i0f.onrender.com/api/salud) o [`/api/productos?drop=1`](https://vow-2i0f.onrender.com/api/productos?drop=1))
 
 [![Tests](https://github.com/FacundoGuiraldes/vow/actions/workflows/tests.yml/badge.svg)](https://github.com/FacundoGuiraldes/vow/actions/workflows/tests.yml)
+[![Monitoreo](https://github.com/FacundoGuiraldes/vow/actions/workflows/monitoreo.yml/badge.svg)](https://github.com/FacundoGuiraldes/vow/actions/workflows/monitoreo.yml)
+
+<!-- TODO: captura de la landing -->
 
 VOW es una marca argentina de ropa y accesorios de gym que vende directo al público. Está en construcción, con lanzamiento previsto para 2027.
 
@@ -17,15 +21,33 @@ Este repositorio contiene el backend y la capa de agentes de IA de la marca. En 
 - **Motor de agentes:** ejecuta agentes sobre el SDK de Anthropic con soporte para herramientas, límite de turnos y conteo de tokens.
 - **Calculadora de costos:** calcula el costo de importación por unidad y el margen a partir de los datos de una orden. Todavía no incluye IVA de importación ni Ingresos Brutos, que quedan pendientes de confirmar con un contador.
 - **Tests y CI:** 25 tests automáticos que corren en GitHub Actions con cada push.
+- **Monitoreo:** un workflow programado revisa cada 10 minutos que la landing y `GET /api/salud` respondan, y cada 6 horas que el catálogo del Drop 01 devuelva productos.
+- **Entorno de desarrollo:** configuración de GitHub Codespaces que instala las dependencias y levanta la API y la landing al arrancar.
 
 ## Arquitectura
 
 ```mermaid
 flowchart LR
     visitante(["Visitante"])
-    landing["Landing de lista de espera<br/>web/ · Vite"]
-    api["API de lista de espera<br/>src/api · Express"]
-    db[("PostgreSQL<br/>tablas lista_espera y productos")]
+
+    subgraph sg_github["GitHub"]
+        repo["Rama main"]
+        ci["Workflow Tests<br/>en cada push"]
+        monitoreo["Workflow Monitoreo<br/>cada 10 min y cada 6 h"]
+    end
+
+    subgraph sg_cloudflare["Cloudflare Pages"]
+        landing["Landing de lista de espera<br/>web/ · Vite"]
+    end
+
+    subgraph sg_render["Render"]
+        api["API de lista de espera y catálogo<br/>src/api · Express"]
+    end
+
+    subgraph sg_neon["Neon · PostgreSQL"]
+        db[("Rama production<br/>tablas lista_espera y productos")]
+        dbdev[("Rama dev")]
+    end
 
     subgraph agentes["Capa de agentes"]
         motor["Motor de agentes<br/>src/core/runAgent.js"]
@@ -38,8 +60,13 @@ flowchart LR
     anthropic["API de Anthropic"]
 
     visitante --> landing
-    landing -->|"POST /api/lista-espera<br/>GET /api/productos"| api
+    landing -->|"GET /api/salud<br/>POST /api/lista-espera<br/>GET /api/productos?drop=1"| api
     api --> db
+    repo -->|"despliegue automático"| landing
+    repo -->|"despliegue automático"| api
+    ci -->|"tests de la API"| dbdev
+    monitoreo -->|"cada 10 min"| landing
+    monitoreo -->|"/api/salud cada 10 min<br/>/api/productos?drop=1 cada 6 h"| api
     motor --> anthropic
     contenido -.-> motor
     soporte -.-> motor
@@ -47,12 +74,31 @@ flowchart LR
 
     classDef existe fill:#ECE8E1,stroke:#0A0A0A,color:#0A0A0A
     classDef planificado fill:#ffffff,stroke:#7A7064,stroke-dasharray:5 5,color:#4F4840
-    class landing,api,db,motor,costos existe
+    class repo,ci,monitoreo,landing,api,db,dbdev,motor,costos existe
     class contenido,soporte,inventario planificado
     style agentes fill:#ffffff,stroke:#7A7064,color:#4F4840
 ```
 
-Los bloques con borde continuo ya existen en el repo. Los bloques con borde punteado están planificados. La landing está publicada en Cloudflare Pages y la API en Render (plan gratuito), con la base de datos en Neon. Por el plan gratuito, el primer pedido después de un rato sin tráfico puede tardar cerca de un minuto; para acortar esa espera, la landing despierta la API al cargar.
+Los bloques con borde continuo ya existen en el repo. Los bloques con borde punteado están planificados.
+
+## Publicación
+
+| Parte | Dónde corre | URL |
+|---|---|---|
+| Landing (`web/`) | Cloudflare Pages | https://vow-17x.pages.dev |
+| API (`src/api`) | Render, plan gratuito | `https://vow-2i0f.onrender.com` (la raíz no tiene ruta; probá [`/api/salud`](https://vow-2i0f.onrender.com/api/salud)) |
+| Base de datos | Neon (PostgreSQL) | No es pública |
+
+Cloudflare Pages y Render despliegan automáticamente cada vez que se actualiza `main`, así que todo lo que se mergea a `main` sale a producción.
+
+Por el plan gratuito, Render apaga la API tras un rato sin tráfico y el primer pedido siguiente puede tardar cerca de un minuto. Para acortar esa espera, la landing despierta la API con `GET /api/salud` al cargar, y el workflow de monitoreo le pega cada 10 minutos.
+
+### Ramas de la base en Neon
+
+- **`production`:** la base que usa la API publicada.
+- **`dev`:** la base para desarrollo y para los tests de la API, tanto en local como en la CI.
+
+Como el despliegue desde `main` es automático, un cambio de esquema (tabla o columna nueva) se aplica primero en `production` con `npm run db-migrar` y recién después se mergea el código que lo usa. La migración solo crea lo que falta, así que se puede correr antes del merge sin romper la versión publicada.
 
 ## Endpoints de la API
 
@@ -86,12 +132,14 @@ La tabla no tiene columnas de precio, stock, material, gramaje ni medidas. Los d
 
 | Capa | Tecnología |
 |---|---|
-| Runtime | Node.js |
-| API | Express |
+| Runtime | Node.js 24 (ESM) |
+| API | Express + `pg` |
 | Base de datos | PostgreSQL (Neon) |
-| Landing | Vite |
+| Landing | Vite + JavaScript, con Lenis y GSAP |
 | Agentes | SDK de Anthropic |
-| CI | GitHub Actions |
+| Tests | `node --test` |
+| CI y monitoreo | GitHub Actions |
+| Hosting | Cloudflare Pages (landing) y Render (API) |
 
 ## Cómo correrlo
 
@@ -122,8 +170,8 @@ cp .env.example .env
 |---|---|
 | `ANTHROPIC_API_KEY` | Clave de la API de Anthropic. La usan el motor de agentes y los scripts `hola` y `prueba`. |
 | `DATABASE_URL` | Cadena de conexión a PostgreSQL. La usan la API, la migración y los tests de la API. |
-| `ALLOWED_ORIGINS` | Orígenes que pueden llamar a la API desde el navegador, separados por coma. En desarrollo tiene que incluir la dirección donde corre Vite. Si queda vacía, ningún sitio puede llamar a la API. |
-| `VITE_API_URL` | URL base de la API que usa la landing. Si queda vacía, la landing llama a `/api/lista-espera` en su mismo dominio. |
+| `ALLOWED_ORIGINS` | Orígenes que pueden llamar a la API desde el navegador, separados por coma. Hace falta cuando la landing llama a la API en otro dominio o puerto (por ejemplo, si `VITE_API_URL` apunta a `http://localhost:3000`, tiene que incluir la dirección donde corre Vite). Si queda vacía, ningún otro sitio puede llamar a la API. |
+| `VITE_API_URL` | URL base de la API que usa la landing. Si queda vacía, la landing llama a `/api/...` en su mismo dominio; en desarrollo, Vite reenvía esas rutas a la API local en el puerto 3000. |
 | `TRUST_PROXY` | Se activa con `1` solo cuando la API corre detrás de un proxy. Así el límite de pedidos usa la IP real del visitante (`X-Forwarded-For`) y no la del proxy. En local se deja vacía. |
 
 La API también acepta `PORT`, que es opcional (por defecto 3000). La landing lee el mismo `.env` de la raíz, y Vite solo expone al navegador las variables que empiezan con `VITE_`.
@@ -134,21 +182,38 @@ La API también acepta `PORT`, que es opcional (por defecto 3000). La landing le
 npm run db-probar
 npm run db-migrar
 npm run db-seed
-npm run servidor
+npm run dev
 ```
 
-En otra terminal, para la landing:
+`npm run dev` levanta en segundo plano la API (puerto 3000) y la landing (puerto 5173), y deja los logs en `.devcontainer/logs/`. Si alguno de los dos puertos ya está ocupado, no vuelve a levantar ese servicio. La landing queda en http://localhost:5173.
+
+También se pueden levantar por separado, cada uno en su terminal:
+
+```bash
+npm run servidor
+```
 
 ```bash
 cd web
 npm run dev
 ```
 
+### En GitHub Codespaces
+
+El repo incluye una configuración en `.devcontainer/`:
+
+- Al crear el Codespace instala las dependencias de la raíz y de `web/` (`npm ci`).
+- Cada vez que arranca corre `.devcontainer/iniciar.sh` (lo mismo que `npm run dev`), así que la API y la landing quedan levantadas.
+- Reenvía los puertos 5173 (Landing) y 3000 (API).
+
+El `.env` no se crea solo: hay que copiarlo de `.env.example` y completarlo, como en local; sin él, la API no se puede conectar a la base. Para abrir la landing desde el navegador, usá la pestaña **Puertos** del Codespace (puerto 5173). Vite ya acepta el dominio `*.app.github.dev` con el que Codespaces reenvía los puertos.
+
 ### Scripts
 
 | Script | Qué hace |
 |---|---|
 | `npm test` | Corre todos los tests con `node --test`. |
+| `npm run dev` | Levanta la API y la landing en segundo plano (`.devcontainer/iniciar.sh`). |
 | `npm run servidor` | Levanta la API (lista de espera y catálogo). |
 | `npm run db-probar` | Verifica la conexión a la base y muestra la versión de PostgreSQL. |
 | `npm run db-migrar` | Crea las tablas `lista_espera` y `productos` si no existen y agrega las columnas nuevas a las tablas existentes. Se puede correr más de una vez. |
@@ -167,7 +232,16 @@ npm test
 
 Son 25 tests: 3 de la calculadora de costos, 13 de la lista de espera y 9 del catálogo. Los de la API necesitan `DATABASE_URL` y antes de empezar corren la migración; los del catálogo también corren el seed. Las dos operaciones se pueden repetir sin duplicar datos. Los de la lista de espera usan emails descartables bajo un dominio `.invalid` y, al terminar, borran los registros que crearon.
 
-En GitHub Actions corren con cada push. La CI toma `DATABASE_URL` de un secreto del repositorio.
+Los tests de la API usan la rama `dev` de Neon: tanto en local como en la CI, `DATABASE_URL` tiene que apuntar a `dev` y nunca a `production`.
+
+## CI y monitoreo
+
+| Workflow | Cuándo corre | Qué hace |
+|---|---|---|
+| [`tests.yml`](.github/workflows/tests.yml) | Con cada push, en cualquier rama | Instala dependencias con Node 24 y corre `npm test`. Toma `DATABASE_URL` (rama `dev`) de un secreto del repositorio. |
+| [`monitoreo.yml`](.github/workflows/monitoreo.yml) | Cada 10 minutos y cada 6 horas (y a mano desde la pestaña Actions) | Cada 10 minutos revisa que la landing cargue y que `GET /api/salud` responda `{ "ok": true }`; de paso, mantiene despierta la API en Render sin tocar la base. Cada 6 horas revisa que `GET /api/productos?drop=1` devuelva al menos un producto. |
+
+El monitoreo necesita el secreto `API_URL` con la URL base de la API; si falta, falla con un aviso que lo indica. GitHub solo ejecuta los workflows programados desde la rama por defecto (`main`).
 
 ## Decisiones de diseño
 
