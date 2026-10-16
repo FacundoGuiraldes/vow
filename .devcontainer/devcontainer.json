@@ -1,0 +1,11 @@
+{
+  "name": "VOW",
+  "image": "mcr.microsoft.com/devcontainers/universal:6",
+  "postCreateCommand": "npm ci && npm ci --prefix web",
+  "postStartCommand": "bash .devcontainer/iniciar.sh",
+  "forwardPorts": [5173, 3000],
+  "portsAttributes": {
+    "5173": { "label": "Landing", "onAutoForward": "notify" },
+    "3000": { "label": "API", "onAutoForward": "silent" }
+  }
+}
