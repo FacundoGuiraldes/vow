@@ -21,6 +21,7 @@ Este repositorio contiene el backend y la capa de agentes de IA de la marca. En 
 - **Motor de agentes:** ejecuta agentes sobre el SDK de Anthropic con soporte para herramientas, límite de turnos y conteo de tokens.
 - **Calculadora de costos:** calcula el costo de importación por unidad y el margen a partir de los datos de una orden. Todavía no incluye IVA de importación ni Ingresos Brutos, que quedan pendientes de confirmar con un contador.
 - **Tests y CI:** 25 tests automáticos que corren en GitHub Actions con cada push.
+- **Tests e2e:** suite de Playwright en TypeScript (smoke, funcionales con la API simulada, accesibilidad con axe e integración contra la base `dev`) en cuatro navegadores.
 - **Monitoreo:** un workflow programado revisa cada 10 minutos que la landing y `GET /api/salud` respondan, y cada 6 horas que el catálogo del Drop 01 devuelva productos.
 - **Entorno de desarrollo:** configuración de GitHub Codespaces que instala las dependencias y levanta la API y la landing al arrancar.
 
@@ -137,7 +138,7 @@ La tabla no tiene columnas de precio, stock, material, gramaje ni medidas. Los d
 | Base de datos | PostgreSQL (Neon) |
 | Landing | Vite + JavaScript, con Lenis y GSAP |
 | Agentes | SDK de Anthropic |
-| Tests | `node --test` |
+| Tests | `node --test` y Playwright (e2e) con axe-core |
 | CI y monitoreo | GitHub Actions |
 | Hosting | Cloudflare Pages (landing) y Render (API) |
 
@@ -214,6 +215,7 @@ El `.env` no se crea solo: hay que copiarlo de `.env.example` y completarlo, com
 |---|---|
 | `npm test` | Corre todos los tests con `node --test`. |
 | `npm run dev` | Levanta la API y la landing en segundo plano (`.devcontainer/iniciar.sh`). |
+| `npm run test:e2e` | Corre la suite e2e de Playwright (ver [Tests e2e](#tests-e2e-playwright)). |
 | `npm run servidor` | Levanta la API (lista de espera y catálogo). |
 | `npm run db-probar` | Verifica la conexión a la base y muestra la versión de PostgreSQL. |
 | `npm run db-migrar` | Crea las tablas `lista_espera` y `productos` si no existen y agrega las columnas nuevas a las tablas existentes. Se puede correr más de una vez. |
@@ -234,11 +236,54 @@ Son 25 tests: 3 de la calculadora de costos, 13 de la lista de espera y 9 del ca
 
 Los tests de la API usan la rama `dev` de Neon: tanto en local como en la CI, `DATABASE_URL` tiene que apuntar a `dev` y nunca a `production`.
 
+### Tests e2e (Playwright)
+
+Suite de punta a punta en [`e2e/`](e2e/), con TypeScript, Page Object Model y fixtures propias. Corre en Chromium, Firefox y WebKit de escritorio y en un perfil móvil (Pixel 7).
+
+```bash
+npx playwright install --with-deps   # la primera vez: navegadores
+E2E_ALLOW_DB_WRITES=dev npm run test:e2e
+```
+
+En local, Playwright levanta la API (puerto 3000) y la landing compilada (`vite preview`, puerto 4173), o reutiliza las que ya estén corriendo.
+
+| Tag | Qué cubre | Contra qué |
+|---|---|---|
+| `@smoke` | La landing carga con el hero, se ven las secciones principales, el catálogo muestra los productos de la API y `/api/salud` responde. Solo lectura. | Local o producción |
+| `@funcional` | Formulario (éxito, email inválido, errores 400/429/500, carga y doble envío), anclas e índice, política de privacidad, catálogo con error o con HTML malicioso, responsive de 360 a 1920 px y `prefers-reduced-motion`. La API está simulada con `page.route`. | Local |
+| `@a11y` | Análisis WCAG 2.1 AA con axe y uso del formulario solo con el teclado. | Local, Chromium |
+| `@integracion` | Alta real en la lista de espera y catálogo real, contra la API local y la base `dev`. | Local, Chromium |
+
+Otros scripts: `npm run test:e2e:smoke`, `npm run test:e2e:ui` (modo interactivo), `npm run test:e2e:report` (abre el último reporte HTML; en Codespaces, desde la pestaña Puertos) y `npm run test:e2e:tipos` (chequeo de tipos).
+
+**Smoke contra producción (solo lectura):**
+
+```bash
+E2E_BASE_URL=https://vow-17x.pages.dev E2E_API_URL=https://vow-2i0f.onrender.com npm run test:e2e:smoke
+```
+
+**Ningún test escribe en producción:**
+
+- Si `E2E_BASE_URL` no es local, la configuración solo corre los `@smoke` y no levanta servidores.
+- Todos los tests cortan cualquier pedido que no sea de lectura hacia una API que no sea local, y en ese caso fallan.
+- La integración solo corre con API local, con `E2E_ALLOW_DB_WRITES=dev` y, si está definida `E2E_PROD_DB_HOST`, solo si `DATABASE_URL` no apunta a ese host. Sin `E2E_ALLOW_DB_WRITES` se saltea.
+- Los emails de prueba son `e2e-<corrida>-<aleatorio>@vow-pruebas.invalid`. Cada test borra exactamente los que creó, y un barrido final borra los de corridas viejas que se hayan cortado (más de 2 horas), sin tocar los de una corrida en curso.
+
+| Variable | Para qué sirve |
+|---|---|
+| `E2E_BASE_URL` | Dónde está la landing. Por defecto, `http://localhost:4173`. |
+| `E2E_API_URL` | URL base de la API. Solo hace falta contra un sitio publicado. |
+| `E2E_ALLOW_DB_WRITES` | Tiene que valer `dev` para que corran los tests de integración. |
+| `E2E_PROD_DB_HOST` | Opcional. Solo el nombre del host de la rama `production` de Neon (por ejemplo, `ep-xxxx.sa-east-1.aws.neon.tech`), nunca la URL completa ni credenciales. Con o sin `-pooler` da igual. |
+
+Para cargar `E2E_PROD_DB_HOST` en GitHub: **Settings > Secrets and variables > Actions > pestaña Variables > New repository variable**, con el nombre `E2E_PROD_DB_HOST` y el host como valor. Es una variable y no un secreto porque no contiene credenciales. Si no está definida, las otras dos condiciones siguen protegiendo.
+
 ## CI y monitoreo
 
 | Workflow | Cuándo corre | Qué hace |
 |---|---|---|
 | [`tests.yml`](.github/workflows/tests.yml) | Con cada push, en cualquier rama | Instala dependencias con Node 24 y corre `npm test`. Toma `DATABASE_URL` (rama `dev`) de un secreto del repositorio. |
+| [`e2e.yml`](.github/workflows/e2e.yml) | En cada pull request (Chromium); los lunes y a mano, con los cuatro navegadores | Chequea los tipos de `e2e/` y corre la suite de Playwright contra la API local y la base `dev`. Guarda los navegadores en caché y, si algo falla, sube el reporte HTML y las trazas como artefactos. |
 | [`monitoreo.yml`](.github/workflows/monitoreo.yml) | Cada 10 minutos y cada 6 horas (y a mano desde la pestaña Actions) | Cada 10 minutos revisa que la landing cargue y que `GET /api/salud` responda `{ "ok": true }`; de paso, mantiene despierta la API en Render sin tocar la base. Cada 6 horas revisa que `GET /api/productos?drop=1` devuelva al menos un producto. |
 
 El monitoreo necesita el secreto `API_URL` con la URL base de la API; si falta, falla con un aviso que lo indica. GitHub solo ejecuta los workflows programados desde la rama por defecto (`main`).
