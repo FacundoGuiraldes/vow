@@ -6,7 +6,7 @@
 [![Tests](https://github.com/FacundoGuiraldes/vow/actions/workflows/tests.yml/badge.svg)](https://github.com/FacundoGuiraldes/vow/actions/workflows/tests.yml)
 [![Monitoreo](https://github.com/FacundoGuiraldes/vow/actions/workflows/monitoreo.yml/badge.svg)](https://github.com/FacundoGuiraldes/vow/actions/workflows/monitoreo.yml)
 
-<!-- TODO: captura de la landing -->
+![Landing de VOW: hero con logo, wordmark y botón Unirse](docs/img/landing.png)
 
 VOW es una marca argentina de ropa y accesorios de gym que vende directo al público. Está en construcción, con lanzamiento previsto para 2027.
 
