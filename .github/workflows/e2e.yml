@@ -1,0 +1,77 @@
+name: E2E
+
+on:
+  pull_request:
+  schedule:
+    - cron: "0 9 * * 1" # lunes 06:00 en Argentina: matriz completa
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # En cada PR alcanza con Chromium; en el horario y a demanda corre la matriz completa.
+      PROYECTOS: ${{ github.event_name == 'pull_request' && '--project=chromium' || '' }}
+      NAVEGADORES: ${{ github.event_name == 'pull_request' && 'chromium' || 'chromium firefox webkit' }}
+      # Base dev (mismo secreto que el workflow de tests) y permiso explícito para escribir en ella.
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      E2E_ALLOW_DB_WRITES: dev
+      # Opcional: nombre del host de la rama production de Neon. Si está definida y coincide con DATABASE_URL,
+      # la integración se niega a correr. Es una variable (no un secreto) y no contiene credenciales.
+      E2E_PROD_DB_HOST: ${{ vars.E2E_PROD_DB_HOST }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+
+      - run: npm ci
+      - run: npm ci --prefix web
+
+      - name: Tipos del proyecto e2e
+        run: npm run test:e2e:tipos
+
+      - name: Versión de Playwright
+        id: pw
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Caché de navegadores
+        id: cache-navegadores
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-${{ env.NAVEGADORES }}
+
+      - name: Instalar navegadores
+        if: steps.cache-navegadores.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps $NAVEGADORES
+
+      - name: Dependencias del sistema (con navegadores en caché)
+        if: steps.cache-navegadores.outputs.cache-hit == 'true'
+        run: npx playwright install-deps $NAVEGADORES
+
+      - name: Tests e2e
+        run: npm run test:e2e -- $PROYECTOS
+
+      - name: Subir reporte y trazas
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-reporte-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          retention-days: 14

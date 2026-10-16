@@ -12,7 +12,12 @@
     "servidor": "node src/api/servidor.js",
     "db-migrar": "node src/db/migrar.js",
     "db-seed": "node src/db/seed-catalogo.js",
-    "dev": "bash .devcontainer/iniciar.sh"
+    "dev": "bash .devcontainer/iniciar.sh",
+    "test:e2e": "playwright test -c e2e/playwright.config.ts",
+    "test:e2e:smoke": "playwright test -c e2e/playwright.config.ts --grep @smoke",
+    "test:e2e:ui": "playwright test -c e2e/playwright.config.ts --ui",
+    "test:e2e:report": "playwright show-report e2e/playwright-report --host 0.0.0.0",
+    "test:e2e:tipos": "tsc -p e2e/tsconfig.json"
   },
   "repository": {
     "type": "git",
@@ -34,5 +39,12 @@
     "express-rate-limit": "^8.7.1",
     "helmet": "^8.3.0",
     "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.19.1",
+    "playwright-core": "1.63.0",
+    "typescript": "6.0.3"
   }
 }
