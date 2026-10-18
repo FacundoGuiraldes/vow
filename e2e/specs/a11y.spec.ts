@@ -7,22 +7,13 @@ import { aislarLanding, mockearListaEspera } from "../support/mocks";
 
 const NORMAS_WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
-// EXCEPCIÓN DOCUMENTADA (hallazgo 3, no se arregla en esta rama): las palabras del manifiesto arrancan con
-// opacidad 0.16 (contraste 1.45:1) y GSAP las revela a medida que se scrollea. Axe mide el estado inicial y
-// marca color-contrast en cada palabra. Con prefers-reduced-motion quedan al 100 %. Por eso el párrafo del
-// manifiesto se analiza con todas las reglas menos color-contrast; el resto de la página, con todas.
-const MANIFIESTO = "#manifest-text";
-
 type Violaciones = Awaited<ReturnType<AxeBuilder["analyze"]>>["violations"];
 
+// Página completa, sin excepciones. Los análisis corren arriba de todo, antes de scrollear, así que el
+// manifiesto se mide en su estado inicial (palabras sin revelar), que es su peor caso de contraste (#17).
 async function analizar(page: Page): Promise<Violaciones> {
-  const pagina = await new AxeBuilder({ page }).withTags(NORMAS_WCAG).exclude(MANIFIESTO).analyze();
-  const manifiesto = await new AxeBuilder({ page })
-    .withTags(NORMAS_WCAG)
-    .include(MANIFIESTO)
-    .disableRules(["color-contrast"])
-    .analyze();
-  return [...pagina.violations, ...manifiesto.violations];
+  const { violations } = await new AxeBuilder({ page }).withTags(NORMAS_WCAG).analyze();
+  return violations;
 }
 
 // Resumen legible de las violaciones para el mensaje de error
@@ -49,10 +40,10 @@ test.describe("Accesibilidad", { tag: "@a11y" }, () => {
     expect(resumir(await analizar(page))).toEqual([]);
   });
 
-  // HALLAZGO 2 (no se arregla en esta rama): el link "Legal" del índice tiene aria-label "Ir a la política de
-  // privacidad", que no contiene el texto visible. Falla WCAG 2.5.3 (Label in Name): quien usa control por voz
-  // y dice "Legal" no lo encuentra. Axe solo lo detecta con la regla experimental label-content-name-mismatch.
-  test.fixme("los links del índice incluyen su texto visible en el nombre accesible (WCAG 2.5.3)", async ({ page }) => {
+  // WCAG 2.5.3 (Label in Name, #16): el nombre accesible de cada control tiene que incluir su texto visible,
+  // para que quien usa control por voz pueda nombrarlo como lo ve. Axe solo lo revisa con la regla experimental
+  // label-content-name-mismatch, que no entra en los tags WCAG: por eso se pide aparte, sobre toda la página.
+  test("los controles incluyen su texto visible en el nombre accesible (WCAG 2.5.3)", async ({ page }) => {
     const { violations } = await new AxeBuilder({ page }).withRules(["label-content-name-mismatch"]).analyze();
 
     expect(resumir(violations)).toEqual([]);
