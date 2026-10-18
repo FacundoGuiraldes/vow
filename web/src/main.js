@@ -310,6 +310,17 @@ function showFieldError(input, text) {
   input.focus();
 }
 
+// Origen de la visita para medir canales (p. ej. el QR de cada gimnasio: https://sitio/?origen=gym-olivos).
+// Se lee una sola vez al cargar. Solo minúsculas, números, guion y guion bajo, hasta 50 caracteres;
+// si falta o no cumple, se usa 'landing' (el valor de siempre).
+const DEFAULT_ORIGIN = 'landing';
+const ORIGIN_FORMAT = /^[a-z0-9_-]{1,50}$/;
+function readOrigin() {
+  const raw = new URLSearchParams(location.search).get('origen')?.trim().toLowerCase() ?? '';
+  return ORIGIN_FORMAT.test(raw) ? raw : DEFAULT_ORIGIN;
+}
+const visitOrigin = readOrigin();
+
 async function postWaitlist(payload) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -342,7 +353,7 @@ form.addEventListener('submit', async e => {
   setLoading(true);
 
   try {
-    const res = await postWaitlist({ email, instagram: igInput.value, origen: 'landing' });
+    const res = await postWaitlist({ email, instagram: igInput.value, origen: visitOrigin });
 
     // 200 = anotado. La API responde igual si el mail ya estaba, así que el mensaje es el mismo
     if (res.ok) {
