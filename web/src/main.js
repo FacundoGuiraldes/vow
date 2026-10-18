@@ -181,6 +181,8 @@ fetch(HEALTH_ENDPOINT, { cache: 'no-store' }).catch(() => {});
 // El servidor gratuito puede tardar cerca de un minuto en despertar: aviso a los 8 s y corte a los 60 s
 const CATALOG_SLOW_MS = 8000;
 const CATALOG_TIMEOUT_MS = 60000;
+// Texto visible cuando la API responde bien pero el drop todavía no tiene productos cargados
+const CATALOG_EMPTY_TEXT = 'El Drop 01 se abre pronto. Anotate en la lista y sos el primero en enterarte.';
 const CATALOG_STATUS_LABELS = { concepto: 'CONCEPTO', proximamente: 'PRÓXIMAMENTE', disponible: 'DISPONIBLE' };
 
 const catalogStatus = document.getElementById('catalogo-estado');
@@ -253,9 +255,15 @@ async function loadCatalog() {
     if (!Array.isArray(productos)) throw new Error('Respuesta inválida');
 
     catalogList.replaceChildren(...productos.map(renderCatalogItem));
-    catalogList.hidden = false;
     dropCount.textContent = String(productos.length).padStart(2, '0');
-    setCatalogStatus(`Drop 01: ${productos.length} productos en desarrollo.`, { visuallyHidden: true });
+    if (productos.length === 0) {
+      // Sin productos: lista oculta y mensaje visible (antes solo lo leían los lectores de pantalla)
+      catalogList.hidden = true;
+      setCatalogStatus(CATALOG_EMPTY_TEXT);
+    } else {
+      catalogList.hidden = false;
+      setCatalogStatus(`Drop 01: ${productos.length} productos en desarrollo.`, { visuallyHidden: true });
+    }
     ScrollTrigger.refresh();
   } catch (err) {
     console.error('[VOW] No se pudo cargar el Drop 01:', err.message);
