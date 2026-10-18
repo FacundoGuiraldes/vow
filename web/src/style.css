@@ -233,7 +233,8 @@ section[tabindex="-1"]:focus { outline: none; }
   font-family: var(--font-title); font-weight: 800; font-size: clamp(1.5rem, 5vw, 3.5rem);
   line-height: 1.1; text-transform: uppercase; max-width: 22em;
 }
-.word { opacity: 0.16; display: inline-block; margin-right: 0.3em; transition: opacity 0.1s; }
+/* Opacidad inicial 0.4: contraste 3.3:1 sobre el negro (mínimo AA para texto grande: 3:1, que se alcanza desde 0.372) */
+.word { opacity: 0.4; display: inline-block; margin-right: 0.3em; transition: opacity 0.1s; }
 .no-motion .word { opacity: 1; }
 
 /* ---------- Listado de productos (lo dibuja el catálogo del Drop 01) ---------- */
