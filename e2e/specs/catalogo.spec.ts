@@ -18,13 +18,11 @@ test.describe("Catálogo del Drop 01", { tag: "@funcional" }, () => {
     await expect(catalogo.contador("—")).toBeVisible();
   });
 
-  // HALLAZGO (no se arregla en esta rama): con `productos: []` la landing no muestra ningún mensaje visible.
-  // El estado queda solo para lectores de pantalla ("Drop 01: 0 productos en desarrollo.", con clase sr-only)
-  // y la lista queda vacía, así que el visitante ve la sección sin explicación. Pendiente decidir el texto.
-  test.fixme("sin productos muestra un mensaje visible de catálogo vacío", async ({ page, landing, catalogo }) => {
+  test("sin productos muestra un mensaje visible de catálogo vacío", async ({ page, landing, catalogo }) => {
     await mockearCatalogo(page, []);
     await landing.abrir();
 
+    await expect(catalogo.estado).toHaveText(/El Drop 01 se abre pronto/);
     const caja = await catalogo.estado.boundingBox();
     expect(caja?.width ?? 0, "el mensaje de estado no tiene que ser solo para lectores de pantalla").toBeGreaterThan(1);
     await expect(catalogo.contador("00")).toBeVisible();
