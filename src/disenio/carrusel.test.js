@@ -59,3 +59,16 @@ test("una línea demasiado larga se frena en vez de entregarse cortada", { skip:
   const larga = [{ lineas: ["Una línea muchísimo más larga que el margen permitido"], fondo: "#000", tinta: "#fff", apoyo: "#888" }];
   await assert.rejects(() => generar(mkdtempSync(join(tmpdir(), "carrusel-largo-")), larga), /se sale del margen/);
 });
+
+test("las láminas pueden decir 2027 (año del lanzamiento) pero no otra cifra", () => {
+  const lamina = (texto) => [{ lineas: [texto], fondo: "#000", tinta: "#fff", apoyo: "#888" }];
+  assert.deepEqual(revisarLaminas(lamina("Drop 01 en 2027.")), []);
+  const problemas = revisarLaminas(lamina("Somos 500."));
+  assert.equal(problemas.length, 1);
+  assert.equal(problemas[0].fragmento, "500");
+});
+
+test("la presentación dice el año del lanzamiento en la última lámina", () => {
+  const ultima = CARRUSELES.presentacion.laminas.at(-1);
+  assert.ok(ultima.lineas.join(" ").includes("2027"));
+});

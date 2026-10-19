@@ -5,7 +5,7 @@ import { readFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { chromium } from "playwright-core";
-import { revisarReglas, revisarTextoAlPublico } from "../agents/reglas-marca.js";
+import { cifrasNoPermitidas, revisarReglas, revisarTextoAlPublico } from "../agents/reglas-marca.js";
 
 const aqui = dirname(fileURLToPath(import.meta.url));
 const raiz = join(aqui, "..", "..");
@@ -30,12 +30,12 @@ const presentacion = [
   { espaciado: 0.02, lineas: ["Una marca", "argentina de", "ropa y", "accesorios", "para entrenar."], tamano: 72, fondo: COLOR.negro, tinta: COLOR.hueso, apoyo: COLOR.topo },
   { espaciado: 0.02, lineas: [{ texto: "VOW", flecha: true }, "Promesa."], fondo: COLOR.hueso, tinta: COLOR.negro, apoyo: COLOR.topo },
   { espaciado: 0.02, lineas: ["Simples a", "propósito.", "Diseño hecho", "con criterio."], tamano: 80, fondo: COLOR.negro, tinta: COLOR.hueso, apoyo: COLOR.topo },
-  { espaciado: 0.02, lineas: ["Drop 01 en", "desarrollo.", "Anotate en la", "lista de", "espera."], tamano: 72, fondo: COLOR.beige, tinta: COLOR.negro, apoyo: COLOR.negro, cierre: "Link en la bio" },
+  { espaciado: 0.02, lineas: ["Drop 01", "en 2027.", "Anotate en la", "lista de", "espera."], tamano: 72, fondo: COLOR.beige, tinta: COLOR.negro, apoyo: COLOR.negro, cierre: "Link en la bio" },
 ];
 
 export const CARRUSELES = {
   promesa: { laminas: promesa, salida: join(raiz, "docs", "piezas", "2026-10-27-laminas") },
-  presentacion: { laminas: presentacion, salida: join(raiz, "docs", "piezas", "2026-10-22-laminas") },
+  presentacion: { laminas: presentacion, salida: join(raiz, "docs", "piezas", "2026-10-19-laminas") },
 };
 export const LAMINAS = promesa; // compatibilidad: el primer carrusel
 
@@ -44,7 +44,11 @@ const textoDeLinea = (linea) => (typeof linea === "string" ? linea : linea.texto
 export function revisarLaminas(laminas = LAMINAS) {
   return laminas.flatMap((l, i) => {
     const texto = [...l.lineas.map(textoDeLinea), l.cierre ?? ""].join(" ");
-    return [...revisarReglas(texto), ...revisarTextoAlPublico(texto)].map((p) => ({ lamina: i + 1, ...p }));
+    return [
+      ...revisarReglas(texto),
+      ...revisarTextoAlPublico(texto),
+      ...cifrasNoPermitidas(texto).map((cifra) => ({ regla: "cifra que no está en los datos", fragmento: cifra })), // solo 01 y 2027
+    ].map((p) => ({ lamina: i + 1, ...p }));
   });
 }
 

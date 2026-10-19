@@ -75,8 +75,11 @@ const NUMERACION_DE_PARTES = /(?<!\p{L})(l[aá]minas?|slides?|stor(?:y|ies)|paso
 const MARCADORES_DE_LISTA = /(?<![\p{L}\p{N}.,])\d+\)(?=\s)|^[ \t]*\d+\.(?=\s)/gmu;
 
 // Regla "toda cifra que aparece existe en los datos cargados": cualquier número del texto
-// tiene que estar en la lista de cifras permitidas (por defecto solo "01", de "Drop 01").
-export function cifrasNoPermitidas(texto, permitidas = ["01"]) {
+// tiene que estar en la lista de cifras permitidas.
+// Hoy solo hay dos datos reales: "01" (de "Drop 01") y "2027" (el año del lanzamiento, definido por Facundo).
+export const CIFRAS_PERMITIDAS = ["01", "2027"];
+
+export function cifrasNoPermitidas(texto, permitidas = CIFRAS_PERMITIDAS) {
   if (typeof texto !== "string") return [];
   // Numerar las partes de una pieza ("Lámina 2", "Story 3", "Paso 1") no es una cifra de la marca
   const sinNumeracion = texto.replace(NUMERACION_DE_PARTES, "").replace(MARCADORES_DE_LISTA, "");

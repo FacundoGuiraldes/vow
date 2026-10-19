@@ -1,6 +1,6 @@
 # Carrusel · 27/10/2026 · pilar promesa
 
-**Estado:** aprobado por Facundo (textos). Láminas generadas en `docs/piezas/2026-10-27-laminas/` (falta su aprobación final).
+**Estado:** aprobado por Facundo (textos). Sale **después** del carrusel de presentación (19/10). Láminas generadas en `docs/piezas/2026-10-27-laminas/` (falta su aprobación final).
 
 ## Láminas
 1. Cumplite a vos primero

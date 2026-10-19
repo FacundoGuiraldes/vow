@@ -7,6 +7,7 @@ Este archivo es la fuente única de cómo habla y cómo se ve VOW. Todo contenid
 - Marca argentina de indumentaria y accesorios para entrenar (prendas técnicas, grips, straps). Es una marca independiente, propia de Facundo.
 - Idea central: **la promesa**. Algo que te prometés a vos mismo y cumplís. Es un compromiso con uno mismo, no un texto: no se muestra escrita en papel ni se propone un ritual de escribirla.
 - Sobre la palabra "voto": es el nombre interno de la idea (así se llamó al principio y aparece en el manifiesto de la landing), pero se evita en la comunicación porque suena a elecciones. Se dice "promesa".
+- Lanzamiento: el Drop 01 sale en **2027** (definido por Facundo). Se puede decir en las piezas y en el Instagram; es la única fecha pública y no se agregan meses ni días.
 - Bio de Instagram (@vow_ar), definida por Facundo: **"Una promesa con vos. Indumentaria y accesorios fitness. Lista de espera"**. Se dice "con vos" y no "para vos": la promesa la hace uno consigo mismo, la marca no se la hace a nadie.
 - En una frase: **simplicidad estética para quienes disfrutan entrenar y verse bien haciéndolo, sin dejar de ser simples.**
 

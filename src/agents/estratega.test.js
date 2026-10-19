@@ -505,3 +505,16 @@ test("informa cuántos intentos hicieron falta", async () => {
   const fallo = await planificarSemana(pedido, { cliente: clienteEnSecuencia([{ texto: true }]), leer: leerFalso, listar: async () => [] });
   assert.equal(fallo.intentos, 2);
 });
+
+test("el año del lanzamiento (2027) se puede usar en los textos, pero otro año no", () => {
+  const con = (anio) => planValido([piezaValida({ epigrafe: `Drop 01 en ${anio}. Anotate en la lista: link en la bio.` })]);
+  assert.equal(validarPlan(con(2027), { semanaInicio: SEMANA, piezas: 1 }).ok, true);
+  const otro = validarPlan(con(2028), { semanaInicio: SEMANA, piezas: 1 });
+  assert.equal(otro.ok, false);
+  assert.ok(otro.errores.some((e) => e.includes('la cifra "2028"')), otro.errores.join(" | "));
+});
+
+test("el prompt del Estratega le dice que 2027 es el único número permitido además de 01", async () => {
+  const { texto } = await construirSistema(leerFalso, { listar: async () => [] });
+  assert.ok(texto.includes('salvo "01" de "Drop 01" y "2027", el año del lanzamiento'));
+});
