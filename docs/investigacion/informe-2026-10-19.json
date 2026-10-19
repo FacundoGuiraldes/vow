@@ -1,0 +1,155 @@
+{
+  "resumen": "En las 5 cuentas, el carrusel tiene mayor mediana de reacciones sobre seguidores que el reel. Los reels, en cambio, son los únicos que traen vistas, y esas vistas incluyen las pagas. En Fuark (la cuenta argentina), los carruseles de frase superan a los de oferta: mediana de 0.384% contra casi 0%. Los reels sin oferta en la primera línea superan a los de cuotas, envío o código. Las vistas de Gymshark están partidas en dos grupos: el mismo texto aparece con 595.909 vistas y con 13.076, así que no sirven como referencia orgánica. Las 5 ideas de formato dependen de imagen o sonido, que los datos no traen, y ninguna se puede medir. Además, tres chocan con el cerebro de marca: usan producto físico, escritura de la promesa o un gimnasio.",
+  "hallazgos": [
+    {
+      "titulo": "El carrusel genera más reacciones que el reel en las 5 cuentas",
+      "evidencia": "Medianas de reacciones sobre seguidores, carrusel contra reel: Fuark 0.323% contra 0.046%; Gymshark 0.296% contra 0.002%; YoungLA 0.312% contra 0.275% (solo 4 reels); Darcsport 0.474% contra 0.225%; Vanquish 0.062% contra 0.034%. Ejemplos dentro de una misma cuenta: en Fuark, un carrusel llegó a 1.264% y un reel de cuotas a 0.027%. En Gymshark, el carrusel 'Adapt Solid is here' tuvo 0.592% y un reel con el mismo texto repetido tuvo 0.002%. Salvedad: el reel puede llegar a gente que no sigue la cuenta y el carrusel no tiene vistas, así que no se puede comparar el alcance. Además, 7 de las 25 publicaciones de Fuark no traen likes (campo nulo, 5 de ellas reels), por lo que la mediana de reels de Fuark probablemente esté subestimada.",
+      "enlaces": [
+        "https://www.instagram.com/p/Deep29igN4S/",
+        "https://www.instagram.com/reel/DekQfK9uIuX/",
+        "https://www.instagram.com/p/DePiGbqCKid/",
+        "https://www.instagram.com/reel/DehxGslhl4A/",
+        "https://www.instagram.com/p/DeRut5ajrIp/"
+      ],
+      "confianza": "media"
+    },
+    {
+      "titulo": "Fuark: los carruseles de frase rinden mucho más que los carruseles de oferta",
+      "evidencia": "Fuark tiene 7 carruseles de frase de 49 a 98 palabras, sin hashtags. Sus reacciones van de 0.149% a 1.264%, con mediana de 0.384% (cálculo propio sobre esos 7). Los mejores: 'Todos quieren llegar al resultado, pero pocos se animan a vivir el día uno.' con 1.264% y 'Dejá de perseguir a quienes no tienen miedo de perderte.' con 0.671%. Los carruseles de oferta o stock van de 0 a 0.011%: 'Nuevas en stock - 6 cuotas sin intereses' tuvo 0.011% y 'Nuevas en stock ⚔️ código 10% FUARK10' tuvo 0.006%. Otros 2 carruseles de oferta marcan 0% porque no traen likes, así que no son comparables. La muestra es chica (7 contra 4). Además, el tono de Fuark es motivacional genérico, que el cerebro de marca de VOW descarta. Lo transferible es el formato de afirmación corta, no ese tono.",
+      "enlaces": [
+        "https://www.instagram.com/p/Deep29igN4S/",
+        "https://www.instagram.com/p/DeRut5ajrIp/",
+        "https://www.instagram.com/p/Dej09TUFPxn/",
+        "https://www.instagram.com/p/DehPyz5FIaf/",
+        "https://www.instagram.com/p/DeehkEtgN6z/",
+        "https://www.instagram.com/p/DeeMZdFAC-d/"
+      ],
+      "confianza": "media"
+    },
+    {
+      "titulo": "Fuark: los reels sin oferta en la primera línea tienen más vistas que los de cuotas, envío o códigos",
+      "evidencia": "Fuark tiene 6 reels con oferta en la primera línea (cuotas, envío gratis, código, 'solo por hoy'). Sus vistas van de 1.366% a 14.7%, con mediana de 2.82% (cálculo propio). El caso más alto es el de prenda gratis con código EXTRA (14.7%), que tiene 0 reacciones (likes nulos); como las vistas incluyen las pagas, no se puede saber si fue impulsado. Los reels de texto expresivo corto, sin oferta, tienen vistas de 3.651% a 20.101%, con mediana de 6.961% (7 reels, cálculo propio; excluí 'Levantado un carrito fuerte' porque es ambiguo). Los mejores fueron 'Todo es felicidad 😍' con 20.101% de vistas y 0.48% de reacciones, y 'Entrenar se siente increíble' con 14.144% y 0.369%. En YoungLA, que tiene solo 4 reels, los dos de humor tuvieron 36.605% y 20.261% de vistas, contra 7.846% y 8.166% de los reels de evento o producto. La muestra es muy chica.",
+      "enlaces": [
+        "https://www.instagram.com/reel/DedPMaCMzNd/",
+        "https://www.instagram.com/reel/DecVxrlAnxA/",
+        "https://www.instagram.com/reel/DeSe8lxO5k_/",
+        "https://www.instagram.com/reel/DejnGDih2yg/",
+        "https://www.instagram.com/reel/DepNUu6M8dg/",
+        "https://www.instagram.com/reel/DeT-0SxhUiY/",
+        "https://www.instagram.com/reel/DeITzBCvZMk/",
+        "https://www.instagram.com/reel/DemvCoctvUa/",
+        "https://www.instagram.com/reel/DeNnfGKNDL5/"
+      ],
+      "confianza": "baja"
+    },
+    {
+      "titulo": "Gymshark: las vistas de los reels están partidas en dos grupos con el mismo texto",
+      "evidencia": "De 17 reels, 7 tienen entre 595.909 y 1.457.379 vistas (6.852% a 16.757%) y 10 tienen entre 4.073 y 31.915 vistas (0.047% a 0.367%). Los textos se repiten con resultados opuestos. 'New season. New routines. Same commitment.' tuvo 595.909 vistas (6.852%) en un reel y 13.076 (0.15%), 11.596 (0.133%) y 9.174 (0.105%) en otros tres. 'Three months of showing up.' tuvo 853.523 vistas (9.814%) en un reel y 16.746 (0.193%) y 13.898 (0.16%) en otros dos. 'The only competition is you.' tuvo 1.043.083 (11.993%) y 11.916 (0.137%). La mediana de vistas de 0.193% esconde esa división. El texto no explica la diferencia. Puede ser impulso pago o distinta distribución, pero los datos no lo dicen. Las vistas de Gymshark no sirven como referencia orgánica.",
+      "enlaces": [
+        "https://www.instagram.com/reel/DemtG1Kodh4/",
+        "https://www.instagram.com/reel/Deh369FhOxc/",
+        "https://www.instagram.com/reel/DeCp1TqoMGs/",
+        "https://www.instagram.com/reel/DeM2FaZhZVY/",
+        "https://www.instagram.com/reel/DeAWYeEI-9y/",
+        "https://www.instagram.com/reel/DeAIfMLBQ5o/"
+      ],
+      "confianza": "alta"
+    },
+    {
+      "titulo": "Primeras líneas de lo que mejor rinde: frases cortas y afirmativas, no anuncios con entusiasmo",
+      "evidencia": "El mayor rendimiento en reacciones de todo el set es de Darcsport. 'How Soon They Forget.' (12 palabras) tuvo 7.529% de reacciones, 'Shhhhh' tuvo 2.474% y '¿Tienes corazón?' (2 palabras) tuvo 1.205%. Darcsport repite un mismo concepto en varias piezas (corazón y 'Don't Die Wondering'). Un mismo texto no garantiza el resultado: 'THIS IS DARC SPORT - THIS IS BODYBUILDING' tuvo 6.244% de vistas en un reel y 17.26% en otro. En Fuark, lo mejor son frases afirmativas o reflexivas. En YoungLA, lo mejor son anuncios de reposición en mayúsculas con emojis: 'Warrior Compressions Are FINALLY Restocking' con 1.492% y 'BAGGY AHH SWEATS ARE RESTOCKINGG' con 1.35%. Ese estilo no encaja con VOW. El caso de 7.529% es una sola publicación y los datos no dicen por qué rindió así.",
+      "enlaces": [
+        "https://www.instagram.com/p/DeW9LMvnBid/",
+        "https://www.instagram.com/p/DeDMoZIPEjr/",
+        "https://www.instagram.com/p/DeH8dUcATuU/",
+        "https://www.instagram.com/reel/DeZ9ellyzBZ/",
+        "https://www.instagram.com/reel/DeaZI5xvS1Y/",
+        "https://www.instagram.com/p/DePpXkpj4Nb/",
+        "https://www.instagram.com/p/DeSGtcKFg7q/"
+      ],
+      "confianza": "baja"
+    },
+    {
+      "titulo": "Diferencias entre la cuenta argentina y las del exterior",
+      "evidencia": "Fuark tiene 25 publicaciones entre el 09-10 y el 18-10. Cada reel lleva 3 o 4 hashtags, y los carruseles de frase no llevan ninguno. En Gymshark, YoungLA, Darcsport y Vanquish ningún dato muestra hashtags, salvo 2 en un post de Vanquish. Fuark mezcla frases con muchas ofertas (cuotas, envío, códigos, prenda gratis). Las cuentas del exterior comunican más campaña de marca, lanzamiento y reposición. En vistas de reels sobre seguidores, Fuark tiene una mediana de 6.07%, contra 3.028% de Vanquish y 10.035% de Darcsport. La mediana de 14.213% de YoungLA sale de solo 4 reels. La de Gymshark (0.193%) no es comparable por el reparto en dos grupos. En reacciones de reels, Fuark tiene 0.046%, contra 0.225% de Darcsport y 0.275% de YoungLA. Esa cifra está subestimada porque 5 de sus 14 reels no traen likes. En carruseles, Fuark (0.323%) queda parecido a YoungLA (0.312%) y Gymshark (0.296%).",
+      "enlaces": [
+        "https://www.instagram.com/p/Deep29igN4S/",
+        "https://www.instagram.com/reel/DedPMaCMzNd/",
+        "https://www.instagram.com/reel/DekQfK9uIuX/",
+        "https://www.instagram.com/reel/DeM0No1uKgV/",
+        "https://www.instagram.com/reel/DeZ09pXhlui/"
+      ],
+      "confianza": "media"
+    }
+  ],
+  "hipotesis": [
+    {
+      "id": "macro-detalle-tactil",
+      "veredicto": "no se puede medir con estos datos",
+      "explicacion": "La idea depende de la imagen (primer plano, macro), del sonido (ambiente sin música) y de los primeros 0,5 segundos. Los datos solo traen números, tipo, fecha, enlace y la primera línea del texto. Faltaría ver el contenido visual y sonoro de los reels de referencia y la retención de los primeros segundos. Los reels de Gymshark que citamos muestran el patrón de vistas partido en dos grupos, pero no se sabe qué se ve en ellos. Tampoco hay forma de saber cuáles son macros. Compatibilidad con el cerebro de marca: mostrar una costura o una tela exige producto físico, que VOW todavía no tiene. Sería mostrar lo que no existe.",
+      "enlaces": [
+        "https://www.instagram.com/reel/DeFO19mINe9/",
+        "https://www.instagram.com/reel/DeM2FaZhZVY/"
+      ],
+      "confianza": "alta"
+    },
+    {
+      "id": "texto-en-bloque-fondo-negro",
+      "veredicto": "no se puede medir con estos datos",
+      "explicacion": "El formato se define por el fondo negro, la tipografía, la animación palabra por palabra y el sonido grave. Nada de eso figura en los datos. Hay una pista indirecta sobre el texto en sí, pero no sobre el formato. En Fuark, las frases afirmativas en carrusel tienen mediana de 0.384% de reacciones, contra casi 0% de las ofertas. En Darcsport, las frases muy cortas tienen picos, como 'How Soon They Forget.' con 7.529%. No sabemos si esas piezas usan fondo negro ni si son bloques de texto. Los reels de Darcsport con 'THIS IS DARC SPORT' van de 6.244% a 17.26% de vistas, así que el texto solo no define el resultado. Faltaría el diseño visual de esas piezas y el audio. El formato es compatible con el cerebro de marca: sobrio, afirmativo y sin explicar la marca. Los ganchos tendrían que ser nuevos, no los de la lista aprobada.",
+      "enlaces": [
+        "https://www.instagram.com/p/DeW9LMvnBid/",
+        "https://www.instagram.com/p/Deep29igN4S/",
+        "https://www.instagram.com/reel/DeZ9ellyzBZ/",
+        "https://www.instagram.com/reel/DeaZI5xvS1Y/"
+      ],
+      "confianza": "media"
+    },
+    {
+      "id": "ritual-previo",
+      "veredicto": "no se puede medir con estos datos",
+      "explicacion": "La idea depende de tomas fijas, de qué se ve (cordones, hebilla de strap, escritura a mano) y del ritmo. Los datos no traen nada de eso. No hay forma de saber si algún reel de referencia usa ese tipo de plano. Faltaría la descripción visual de las piezas y la retención. Además, choca con el cerebro de marca en dos puntos. La parte de escribir algo a mano en un cuaderno o una etiqueta contradice la regla de que la promesa no se escribe, ni en papel ni en la etiqueta. Ajustar la hebilla de un strap exige producto físico, que todavía no hay. La versión de los cordones sí sería compatible.",
+      "enlaces": [
+        "https://www.instagram.com/reel/DecVxrlAnxA/",
+        "https://www.instagram.com/p/DeaEgXYS5fN/"
+      ],
+      "confianza": "alta"
+    },
+    {
+      "id": "prueba-de-estres-tela",
+      "veredicto": "no se puede medir con estos datos",
+      "explicacion": "El formato es una demostración visual de producto. Los datos no dicen qué muestra cada reel. Los reels de producto de Vanquish y Gymshark tienen texto en la primera línea, pero no sabemos si son pruebas de tela. Faltaría el contenido visual y alguna etiqueta del tipo de pieza, y si el reel es de pago. Además, necesita una prenda real, y VOW no tiene producto físico por ahora. La demostración tendría que ser verdadera y poder probarse, según las reglas duras. Hoy no es viable ni es posible medirla.",
+      "enlaces": [
+        "https://www.instagram.com/reel/DeFO19mINe9/"
+      ],
+      "confianza": "alta"
+    },
+    {
+      "id": "pov-gimnasio-6am",
+      "veredicto": "no se puede medir con estos datos",
+      "explicacion": "La idea depende de la cámara en primera persona, la luz y el contexto. Los datos no traen imagen ni hora de publicación. Hay un reel de Fuark con un atleta, 'Entrenar se siente increíble', con 14.144% de vistas y 0.369% de reacciones. No hay forma de saber si es POV ni si transcurre de madrugada. Faltaría el contenido visual de los reels de referencia y la retención. En cuanto a la marca, mostrar un gimnasio no es incompatible en sí, pero hay que cuidar que no parezca que VOW pertenece a ese lugar (regla 7). Tampoco se nombrarían barras ni pesas.",
+      "enlaces": [
+        "https://www.instagram.com/reel/DecVxrlAnxA/",
+        "https://www.instagram.com/reel/DedPMaCMzNd/"
+      ],
+      "confianza": "alta"
+    }
+  ],
+  "recomendaciones_para_estratega": [
+    "Probar carruseles de frase afirmativa, corta y sobria. Es el formato con más respaldo en los datos de Fuark (mediana de 0.384%) y se alinea con 'afirmar en vez de explicar'. Hay que escribir ganchos nuevos, en voseo, sin motivación vacía ni resultados físicos, y sin copiar la lista aprobada. Cerrar cada pieza con una sola acción: anotarse en la lista de espera.",
+    "Probar el texto en bloque sobre fondo negro como carrusel y como reel corto, para poder comparar ambos. Es compatible con la marca, y los datos no permiten predecir su rendimiento. Medir con las mismas métricas (reacciones sobre seguidores).",
+    "Mantener una idea central repetida en varias piezas, como hace Darcsport, que tiene la mejor mediana de reacciones de carruseles (0.474%). Para VOW sería la promesa. Es una prueba, no una certeza.",
+    "No poner ofertas, cuotas ni urgencia en la primera línea. En Fuark esos reels tienen mediana de 2.82% de vistas. Además, 'solo por hoy' y 'últimas horas' están prohibidos si la escasez no es real.",
+    "No tomar como referencia las vistas de Gymshark ni de ningún reel con muchas vistas sin saber si hubo pauta. Comparar siempre con la mediana por tipo de cada cuenta.",
+    "Descartar o rediseñar tres ideas hasta que haya producto o criterio de marca: la prueba de estrés de tela y el macro de costura (exigen prenda real) y el ritual previo con escritura a mano (choca con la regla de que la promesa no se escribe). El ritual de atarse los cordones, sin escribir nada, sí podría probarse. El POV de las 6 AM tampoco choca con la marca si no parece un gimnasio propio.",
+    "Si se quiere medir los formatos visuales, hace falta un dato que hoy no existe: una etiqueta manual del tipo de plano de cada reel de referencia, o las métricas de retención de los reels propios de VOW."
+  ],
+  "limites": [
+    "Muestra chica: entre 4 y 20 publicaciones por tipo y por cuenta, en un período de 1 a 3 semanas. YoungLA tiene solo 4 reels y 1 imagen; Vanquish, 1 imagen. Las medianas son frágiles y los porcentajes de reacciones son sensibles a un solo caso.",
+    "Las vistas existen solo en reels e incluyen las pagas. Los datos no distinguen cuáles fueron impulsadas, y las de Gymshark parecen partidas en dos grupos. El carrusel no tiene vistas, así que no se puede comparar alcance entre tipos.",
+    "Fuark tiene 7 de 25 publicaciones sin likes (campo nulo), 5 de ellas reels. Esas publicaciones figuran con 0% o casi 0% de reacciones, y eso subestima las medianas de reacciones de Fuark, sobre todo en reels.",
+    "Los datos no traen imagen, sonido, música, los primeros segundos del video, guardados ni compartidos. Por eso ninguna de las 5 ideas de formato se pudo medir. Tampoco traen la hora de publicación, solo la fecha.",
+    "Solo hay la primera línea del texto, no el texto completo, así que no se puede analizar el cuerpo del mensaje.",
+    "Se quitó 1 enlace que la IA citó y no estaba en los datos (https://www.instagram.com/reel/DrQ7XptRxY/). Las cifras del texto las escribió la IA y no se verificaron con código: leerlas como guía."
+  ]
+}

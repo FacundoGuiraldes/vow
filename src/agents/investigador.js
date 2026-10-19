@@ -142,6 +142,22 @@ export function validarInforme(informe, { hipotesis = [], enlacesConocidos = new
   return { ok: errores.length === 0, errores };
 }
 
+// A veces la IA copia mal un enlace (le falta o le sobra una letra). Un enlace que no está en los datos
+// nunca se muestra: se quita, se avisa en los límites del informe y se vuelve a validar. Si al quitarlo
+// una conclusión se queda sin evidencia suficiente, el informe igual se rechaza.
+export function depurarEnlaces(informe, enlacesConocidos) {
+  if (!informe || typeof informe !== "object") return { informe, quitados: [] };
+  const copia = structuredClone(informe);
+  const quitados = [];
+  const limpiar = (lista) => (Array.isArray(lista) ? lista.filter((e) => (enlacesConocidos.has(e) ? true : (quitados.push(e), false))) : lista);
+  for (const h of Array.isArray(copia.hallazgos) ? copia.hallazgos : []) if (h) h.enlaces = limpiar(h.enlaces);
+  for (const h of Array.isArray(copia.hipotesis) ? copia.hipotesis : []) if (h) h.enlaces = limpiar(h.enlaces);
+  if (quitados.length > 0 && Array.isArray(copia.limites)) {
+    copia.limites = [...copia.limites, `Se quitaron ${quitados.length} enlace(s) que la IA citó y no estaban en los datos: ${quitados.join(", ")}.`];
+  }
+  return { informe: copia, quitados };
+}
+
 export async function construirSistemaInvestigador(leer = (ruta) => readFile(ruta, "utf8")) {
   const cerebro = await leer(RUTA_CEREBRO);
   return `Sos el investigador de contenido de VOW, marca argentina de indumentaria y accesorios para entrenar. Analizás datos reales de cuentas de Instagram de marcas de referencia y ponés a prueba ideas de formatos para captar la atención del público de VOW. Solo informás: una persona decide qué se hace con tu informe.
@@ -204,8 +220,10 @@ export async function analizarMercado({ datos, hipotesis }, { cliente, modelo = 
   }
   if (!bloque) return { ok: false, informe: null, errores: ["La respuesta no trajo el informe en el formato esperado."], uso };
 
-  const { ok, errores } = validarInforme(bloque.input, { hipotesis, enlacesConocidos: enlacesDeLosDatos(datos) });
-  return { ok, informe: ok ? bloque.input : null, errores, uso, propuesta: bloque.input };
+  const enlacesConocidos = enlacesDeLosDatos(datos);
+  const { informe: depurado, quitados } = depurarEnlaces(bloque.input, enlacesConocidos);
+  const { ok, errores } = validarInforme(depurado, { hipotesis, enlacesConocidos });
+  return { ok, informe: ok ? depurado : null, errores, uso, propuesta: bloque.input, enlacesQuitados: quitados };
 }
 
 // Versión legible del informe, para leer en el resumen de GitHub o en un archivo
