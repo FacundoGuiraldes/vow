@@ -5,7 +5,7 @@ Este archivo es la fuente única de cómo habla y cómo se ve VOW. Todo contenid
 ## 1. Qué es VOW
 
 - Marca argentina de indumentaria y accesorios para entrenar (prendas técnicas, grips, straps). Es una marca independiente, propia de Facundo.
-- Idea central: **la promesa**. Una frase que escribís vos, para vos, y cumplís. La etiqueta interior de cada prenda es donde se escribe.
+- Idea central: **la promesa**. Algo que te prometés a vos mismo y cumplís. Es un compromiso con uno mismo, no un texto: no se muestra escrita en papel ni se propone un ritual de escribirla.
 - Sobre la palabra "voto": es el nombre interno de la idea (así se llamó al principio y aparece en el manifiesto de la landing), pero se evita en la comunicación porque suena a elecciones. Se dice "promesa".
 - En una frase: **simplicidad estética para quienes disfrutan entrenar y verse bien haciéndolo, sin dejar de ser simples.**
 
@@ -54,6 +54,7 @@ Cómo se resuelve la tensión entre "verse bien" y "no presumir": lo estético e
 - Inglés innecesario: "gains", "grind", "no pain no gain", "aesthetic". Se dice "estética".
 - "Drop" solo como parte del nombre del lanzamiento ("Drop 01"), porque así se llama en la landing y es parte de la marca. En el resto del texto, "lanzamiento".
 - Voz que no sea de vos.
+- Elementos del gimnasio como barras, mancuernas, pesas o discos: nombrarlos suena forzado. Grips, straps y prendas (el producto) sí se nombran.
 
 ## 6. Estética
 
@@ -93,10 +94,12 @@ Cómo se resuelve la tensión entre "verse bien" y "no presumir": lo estético e
 - Corto: de 3 a 8 palabras, 12 como máximo.
 - En imperativo y en voseo ("Escribí", "Entrená", "Cumplila"), concreto y sin adornos.
 - Habla de lo que la persona hace o se compromete a hacer, no de lo que la marca todavía no tiene.
+- Le habla a quien mira y le da algo (una idea, un gesto, una razón para sumarse). No explica la marca por dentro: paleta, tipografías y manual son para quien diseña, no para quien sigue la cuenta.
 
 **Aprobados por Facundo:**
 - "Escribí tu promesa. Después cumplila."
 - "Lo que firmás con vos no se rompe"
+- "Firmá lo que vas a sostener"
 - "Llevá tu compromiso pegado a la piel"
 - "El trabajo diario no busca aplausos"
 - "Construí en silencio. Que hable el tiempo"
@@ -113,6 +116,8 @@ Cómo se resuelve la tensión entre "verse bien" y "no presumir": lo estético e
 - "Cómo escribir una promesa que puedas cumplir." Suena a tutorial o consejo: VOW no le explica a la gente cómo vivir.
 - "Todavía no hay prenda para mostrarte. Hay una idea." Anuncia lo que falta: una marca no muestra su ausencia de producto.
 - "Nadie te está mirando. Entrená igual." No lo convence.
+- "Sacá lo que sobra" (un carrusel que explica la paleta). No tiene fuerza ni compromiso, y explica la marca por dentro.
+- "Tu palabra primero. Después la barra." Nombra un elemento del gimnasio.
 
 **Qué tienen en común los aprobados:** afirman en vez de explicar, hablan de compromiso, constancia o calidad, y tienen un ritmo corto y seco. Se pueden usar tal cual, pero el Estratega tiene que crear ganchos nuevos en el mismo estilo, no repetir esta lista.
 

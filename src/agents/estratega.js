@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { revisarReglas, cifrasNoPermitidas } from "./reglas-marca.js";
+import { revisarReglas, revisarTextoAlPublico, cifrasNoPermitidas } from "./reglas-marca.js";
 
 // Estratega: propone el plan de contenido de UNA semana para @vow_ar.
 // Propone y nada más: no publica. Una persona aprueba cada pieza.
@@ -70,6 +70,15 @@ const sumarDias = (fechaISO, dias) => {
 };
 
 const esFechaISO = (valor) => typeof valor === "string" && /^\d{4}-\d{2}-\d{2}$/.test(valor) && !Number.isNaN(Date.parse(valor));
+
+// Lo que ve la gente: no incluye el guion, que son instrucciones de producción
+const textosAlPublico = (pieza) => [
+  pieza.gancho,
+  pieza.epigrafe,
+  pieza.cta,
+  ...(Array.isArray(pieza.texto_en_pantalla) ? pieza.texto_en_pantalla : []),
+  ...(Array.isArray(pieza.ganchos_alternativos) ? pieza.ganchos_alternativos : []),
+];
 
 const textosDeLaPieza = (pieza) => [
   pieza.gancho,
@@ -168,6 +177,13 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
     if (pieza.pilar === "producto en uso" && !recursos.producto) errores.push(`${etiqueta}: pide "producto en uso" pero todavía no hay producto.`);
     if (pieza.pilar === "gente que entrena" && !recursos.gente) errores.push(`${etiqueta}: pide "gente que entrena" pero no hay personas confirmadas.`);
 
+    for (const texto of textosAlPublico(pieza)) {
+      for (const { regla, fragmento } of revisarTextoAlPublico(texto)) errores.push(`${etiqueta}: ${regla} ("${fragmento}").`);
+    }
+    // Los recursos también pueden pedir papel y lapicera
+    for (const recurso of Array.isArray(pieza.recursos) ? pieza.recursos : []) {
+      for (const { regla, fragmento } of revisarReglas(recurso)) errores.push(`${etiqueta}: ${regla} en los recursos ("${fragmento}").`);
+    }
     for (const texto of textosDeLaPieza(pieza)) {
       for (const { regla, fragmento } of revisarReglas(texto)) errores.push(`${etiqueta}: ${regla} ("${fragmento}").`);
       for (const cifra of cifrasNoPermitidas(texto, cifrasPermitidas)) errores.push(`${etiqueta}: la cifra "${cifra}" no está en los datos cargados.`);
@@ -201,6 +217,9 @@ Reglas:
 - Los ganchos tienen que ser potentes y sobrios, como pide la sección 8 del cerebro de marca: afirmaciones cortas de 3 a 8 palabras, en imperativo, que comprometen. Nunca tono de tutorial, de consejo ni de lo que falta.
 - Los ganchos de la sección 8 son ejemplos de estilo. A lo sumo UNO de los ganchos principales del plan puede ser uno de los aprobados; todos los demás tienen que ser creados por vos. Los ganchos alternativos son siempre nuevos: ni copias ni paráfrasis de los ejemplos.
 - Cada pieza trae un gancho principal y 4 alternativos distintos entre sí. Las piezas de una misma semana tienen que ser de pilares distintos.
+- La promesa es algo que una persona se hace a sí misma y cumple. No es un texto escrito: nunca propongas escribirla a mano ni mostrar papel, lapicera o cartulina.
+- Nunca nombres elementos del gimnasio (barras, mancuernas, pesas, discos, kettlebells, fierros). Suenan forzados. El producto (grips, straps, prendas) sí se puede nombrar cuando hay producto.
+- Cada pieza le habla a quien la mira y le da algo: una idea, un gesto, una razón para sumarse. No explica la marca por dentro (paleta, tipografías, manual de marca). Si una pieza de diseño o de proceso solo sirve para un diseñador, no la propongas.
 - En "justificacion" explicá por qué la pieza encaja con la marca o con una referencia.
 
 === CEREBRO DE MARCA ===
