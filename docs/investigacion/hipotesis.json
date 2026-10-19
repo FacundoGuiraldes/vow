@@ -1,0 +1,40 @@
+{
+  "nota": "Ideas de formatos para captar la atención, pasadas por Facundo (salieron de otra IA y no están verificadas). El Investigador las pone a prueba con datos reales: ninguna se da por buena ni se descarta de antemano.",
+  "hipotesis": [
+    {
+      "id": "macro-detalle-tactil",
+      "nombre": "Macro de detalle táctil",
+      "estilo": "Gymshark / ropa técnica",
+      "descripcion": "Primer plano extremo (macro) de una costura bajo tensión máxima o de una gota de agua o sudor rebotando en la tela, sin música de fondo, solo sonido ambiente (ASMR).",
+      "porque_frenaria": "Rompe la saturación de caras y cuerpos mostrando calidad de material en los primeros 0,5 segundos."
+    },
+    {
+      "id": "texto-en-bloque-fondo-negro",
+      "nombre": "Texto en bloque sobre fondo negro, sin voz",
+      "estilo": "Darcsport / manifiesto",
+      "descripcion": "Fondo negro o gris carbón con una sola frase corta en tipografía blanca de trazo firme, que aparece palabra por palabra, con un sonido grave y seco.",
+      "porque_frenaria": "Obliga a leer. Sin ruido visual ni música fuerte, contrasta con el caos habitual de Explorar."
+    },
+    {
+      "id": "ritual-previo",
+      "nombre": "El ritual previo a entrenar",
+      "estilo": "YoungLA / estética urbana",
+      "descripcion": "Tomas planas y fijas de alguien atándose los cordones, ajustando la hebilla de un strap o escribiendo algo a mano en un cuaderno o etiqueta antes de salir a la calle.",
+      "porque_frenaria": "Apela al hábito diario: genera identificación por la preparación y la disciplina, sin mostrar la rutina de ejercicio."
+    },
+    {
+      "id": "prueba-de-estres-tela",
+      "nombre": "Prueba de estrés de la tela (expectativa vs. realidad)",
+      "estilo": "prueba de producto",
+      "descripcion": "Alguien estirando una calza o remera al límite frente a la cámara para mostrar que no se transparenta ni se deforma bajo carga real.",
+      "porque_frenaria": "Resuelve una objeción de compra crítica de forma visual e instantánea en el primer segundo."
+    },
+    {
+      "id": "pov-gimnasio-6am",
+      "nombre": "POV entrando al gimnasio a las 6 AM",
+      "estilo": "primera persona",
+      "descripcion": "Plano secuencia desde los ojos del atleta abriendo la puerta del gimnasio cuando todavía está oscuro o vacío.",
+      "porque_frenaria": "Conecta con la mentalidad de quienes entrenan en silencio antes de que empiece el día."
+    }
+  ]
+}

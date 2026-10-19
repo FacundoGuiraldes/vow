@@ -5,3 +5,4 @@ e2e/test-results/
 e2e/playwright-report/
 docs/planes/*-simulado.json
 docs/investigacion/datos-*.json
+docs/investigacion/informe-*-simulado.*

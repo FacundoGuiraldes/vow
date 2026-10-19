@@ -19,7 +19,8 @@
     "test:e2e:report": "playwright show-report e2e/playwright-report --host 0.0.0.0",
     "test:e2e:tipos": "tsc -p e2e/tsconfig.json",
     "plan": "node src/plan.js",
-    "investigar": "node src/investigar-datos.js"
+    "investigar": "node src/investigar-datos.js",
+    "analizar": "node src/investigar-analisis.js"
   },
   "repository": {
     "type": "git",
