@@ -1,0 +1,113 @@
+name: Plan semanal
+
+# Genera el plan de contenido de una semana con el Estratega (usa la API de Anthropic: gasta plata).
+# Solo se lanza a mano desde Actions > Plan semanal > Run workflow, y solo desde main.
+# El resultado queda en el resumen de la corrida y como archivo descargable. No se publica ni se guarda en el repo.
+
+on:
+  workflow_dispatch:
+    inputs:
+      semana:
+        description: "Lunes de la semana a planificar (AAAA-MM-DD)"
+        required: true
+        type: string
+      fase:
+        description: "Fase del proyecto"
+        required: true
+        type: choice
+        default: base
+        options:
+          - base
+          - expectativa
+          - cuenta-regresiva
+      producto:
+        description: "Ya hay producto físico para mostrar"
+        required: true
+        type: boolean
+        default: false
+      gente:
+        description: "Hay personas que entrenan confirmadas para aparecer"
+        required: true
+        type: boolean
+        default: false
+      notas:
+        description: "Notas para el Estratega (opcional)"
+        required: false
+        type: string
+        default: ""
+
+concurrency:
+  group: plan-semanal
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    # La clave de API solo se usa desde main
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # Los datos que escribe la persona pasan por variables de entorno, no dentro del script
+      SEMANA: ${{ inputs.semana }}
+      FASE: ${{ inputs.fase }}
+      PRODUCTO: ${{ inputs.producto }}
+      GENTE: ${{ inputs.gente }}
+      NOTAS: ${{ inputs.notas }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Secreto ANTHROPIC_API_KEY configurado
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error title=Falta ANTHROPIC_API_KEY::Cargala en Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Generar el plan
+        run: |
+          args=(--semana "$SEMANA" --fase "$FASE")
+          if [ "$PRODUCTO" = "true" ]; then args+=(--producto); fi
+          if [ "$GENTE" = "true" ]; then args+=(--gente); fi
+          if [ -n "$NOTAS" ]; then args+=(--notas "$NOTAS"); fi
+          set -o pipefail
+          npm run plan -- "${args[@]}" 2>&1 | tee salida.txt
+
+      - name: Resumen de la corrida
+        if: always()
+        run: |
+          {
+            echo "## Plan de la semana del $SEMANA"
+            echo
+            echo '```'
+            cat salida.txt 2>/dev/null || echo "Sin salida."
+            echo '```'
+            if [ -f "docs/planes/plan-$SEMANA.json" ]; then
+              echo
+              echo "### Plan completo (JSON)"
+              echo '```json'
+              cat "docs/planes/plan-$SEMANA.json"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Guardar el plan como archivo descargable
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plan-${{ inputs.semana }}
+          path: |
+            docs/planes/*.json
+            salida.txt
+          if-no-files-found: ignore
+          retention-days: 14
