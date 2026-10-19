@@ -20,6 +20,15 @@ on:
           - base
           - expectativa
           - cuenta-regresiva
+      piezas:
+        description: "Cantidad de piezas de la semana"
+        required: true
+        type: choice
+        default: "2"
+        options:
+          - "1"
+          - "2"
+          - "3"
       producto:
         description: "Ya hay producto físico para mostrar"
         required: true
@@ -54,6 +63,7 @@ jobs:
       # Los datos que escribe la persona pasan por variables de entorno, no dentro del script
       SEMANA: ${{ inputs.semana }}
       FASE: ${{ inputs.fase }}
+      PIEZAS: ${{ inputs.piezas }}
       PRODUCTO: ${{ inputs.producto }}
       GENTE: ${{ inputs.gente }}
       NOTAS: ${{ inputs.notas }}
@@ -76,7 +86,7 @@ jobs:
 
       - name: Generar el plan
         run: |
-          args=(--semana "$SEMANA" --fase "$FASE")
+          args=(--semana "$SEMANA" --fase "$FASE" --piezas "$PIEZAS")
           if [ "$PRODUCTO" = "true" ]; then args+=(--producto); fi
           if [ "$GENTE" = "true" ]; then args+=(--gente); fi
           if [ -n "$NOTAS" ]; then args+=(--notas "$NOTAS"); fi

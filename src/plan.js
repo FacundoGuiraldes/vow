@@ -7,7 +7,7 @@ import { planificarSemana } from "./agents/estratega.js";
 // Uso:
 //   npm run plan -- --semana 2026-10-26                 (llama a Claude: gasta plata)
 //   npm run plan -- --semana 2026-10-26 --simulado      (no llama a nada: prueba el flujo gratis)
-// Opciones: --fase base|expectativa|cuenta-regresiva (por defecto base),
+// Opciones: --fase base|expectativa|cuenta-regresiva (por defecto base), --piezas N (por defecto 2),
 //           --producto (ya hay producto físico), --gente (hay personas confirmadas), --notas "texto"
 
 const { values } = parseArgs({
@@ -17,6 +17,7 @@ const { values } = parseArgs({
     producto: { type: "boolean", default: false },
     gente: { type: "boolean", default: false },
     notas: { type: "string", default: "" },
+    piezas: { type: "string", default: "2" },
     simulado: { type: "boolean", default: false },
   },
 });
@@ -75,6 +76,7 @@ const resultado = await planificarSemana(
     fase: values.fase,
     recursos: { producto: values.producto, gente: values.gente },
     notas: values.notas,
+    piezas: Number(values.piezas),
   },
   { cliente }
 );
