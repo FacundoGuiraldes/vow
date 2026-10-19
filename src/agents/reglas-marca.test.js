@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { revisarReglas, revisarTextoAlPublico, cifrasNoPermitidas } from "./reglas-marca.js";
+import { revisarReglas, revisarGuion, revisarTextoAlPublico, cifrasNoPermitidas } from "./reglas-marca.js";
 
 const reglasDe = (texto) => revisarReglas(texto).map((p) => p.regla);
 
@@ -79,4 +79,14 @@ test("lo que ve el público no explica la marca por dentro", () => {
   assert.deepEqual(revisarTextoAlPublico("Beige y bordó: nuestra paleta").map((p) => p.regla), ["explica la marca por dentro"]);
   assert.deepEqual(revisarTextoAlPublico("La tipografía es Unbounded").length, 1);
   assert.deepEqual(revisarTextoAlPublico("Firmá lo que vas a sostener"), []);
+});
+
+test("el guion puede nombrar algo para descartarlo, pero no para pedirlo", () => {
+  const reglas = (t) => revisarGuion(t).map((p) => p.regla);
+  assert.deepEqual(reglas("No aparece papel, lapicera ni nada escrito a mano."), []);
+  assert.deepEqual(reglas("Tercera lámina: el link. No se habla de lo que todavía no hay."), []);
+  assert.deepEqual(reglas("Entran unas manos que escriben con lapicera."), ["promesa en papel"]);
+  assert.deepEqual(reglas("Primera lámina: todavía no hay prenda, pero llega."), ["anuncia lo que falta"]);
+  // el resto de las reglas no se perdona nunca, ni con negación
+  assert.deepEqual(reglas("No es una pieza para decir modo bestia."), ["presumir"]);
 });

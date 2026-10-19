@@ -321,3 +321,10 @@ test("las instrucciones dicen que la promesa es de uno mismo y que no se nombran
   assert.match(texto, /elementos del gimnasio/);
   assert.match(texto, /le habla a quien la mira/i);
 });
+
+test("un guion que aclara qué no aparece se acepta; uno que lo pide se rechaza", () => {
+  const bien = validarPlan(planValido([piezaValida({ guion: "Solo texto sobre fondo hueso. No aparece papel ni lapicera, y no se habla de lo que todavía no hay." })]), { semanaInicio: SEMANA });
+  assert.equal(bien.ok, true, bien.errores.join(" | "));
+  const mal = validarPlan(planValido([piezaValida({ guion: "Unas manos escriben con lapicera sobre papel." })]), { semanaInicio: SEMANA });
+  assert.ok(mal.errores.some((e) => e.includes("promesa en papel")));
+});

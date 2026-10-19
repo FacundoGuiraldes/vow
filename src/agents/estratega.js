@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { revisarReglas, revisarTextoAlPublico, cifrasNoPermitidas } from "./reglas-marca.js";
+import { revisarReglas, revisarGuion, revisarTextoAlPublico, cifrasNoPermitidas } from "./reglas-marca.js";
 
 // Estratega: propone el plan de contenido de UNA semana para @vow_ar.
 // Propone y nada más: no publica. Una persona aprueba cada pieza.
@@ -185,7 +185,8 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
       for (const { regla, fragmento } of revisarReglas(recurso)) errores.push(`${etiqueta}: ${regla} en los recursos ("${fragmento}").`);
     }
     for (const texto of textosDeLaPieza(pieza)) {
-      for (const { regla, fragmento } of revisarReglas(texto)) errores.push(`${etiqueta}: ${regla} ("${fragmento}").`);
+      const revisar = texto === pieza.guion ? revisarGuion : revisarReglas;
+      for (const { regla, fragmento } of revisar(texto)) errores.push(`${etiqueta}: ${regla} ("${fragmento}").`);
       for (const cifra of cifrasNoPermitidas(texto, cifrasPermitidas)) errores.push(`${etiqueta}: la cifra "${cifra}" no está en los datos cargados.`);
     }
   });
