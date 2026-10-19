@@ -408,3 +408,9 @@ test("una propuesta que repite una pieza definida se rechaza al planificar", asy
   assert.equal(r.ok, false);
   assert.ok(r.errores.some((e) => e.includes("ya definida")));
 });
+
+test("un guion con pasos numerados como 1) 2) 3) no se rechaza por cifras", () => {
+  const guion = "Reel corto de texto. 1) Aparece el gancho. 2) Entra la segunda frase. 3) Tercera frase. 4) Cierre sobre fondo hueso.";
+  const r = validarPlan(planValido([piezaValida({ guion })]), { semanaInicio: SEMANA });
+  assert.equal(r.ok, true, r.errores.join(" | "));
+});
