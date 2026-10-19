@@ -51,7 +51,17 @@ export async function correrEvalsOnline({ pedidos, crearCliente, planificar = pl
         );
         const costo = costoUSD(r.uso);
         gastadoUSD += costo;
-        resultados.push({ id, estado: r.ok ? "aprobado" : "rechazado", errores: r.errores ?? [], uso: r.uso, costoUSD: costo, ms: reloj() - inicio });
+        resultados.push({
+          id,
+          estado: r.ok ? "aprobado" : "rechazado",
+          errores: r.errores ?? [],
+          uso: r.uso,
+          costoUSD: costo,
+          ms: reloj() - inicio,
+          intentos: r.intentos ?? null,
+          // Lo que la IA propuso y se rechazó: sin esto un rechazo es un número sin contexto y no se puede investigar
+          propuesta: r.ok ? null : r.propuesta ?? null,
+        });
       } catch (error) {
         // Un corte de red o un error de la API no es un plan malo: se cuenta aparte
         resultados.push({ id, estado: "error-tecnico", errores: [error.message], uso: { entrada: 0, salida: 0 }, costoUSD: 0, ms: reloj() - inicio });

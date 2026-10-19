@@ -85,12 +85,13 @@ const textosAlPublico = (pieza) => [
   ...(Array.isArray(pieza.ganchos_alternativos) ? pieza.ganchos_alternativos : []),
 ];
 
+// Cada texto con el campo del que sale, para que un error diga dónde está el problema
 const textosDeLaPieza = (pieza) => [
-  pieza.gancho,
-  pieza.guion,
-  pieza.epigrafe,
-  pieza.cta,
-  ...(Array.isArray(pieza.texto_en_pantalla) ? pieza.texto_en_pantalla : []),
+  ["gancho", pieza.gancho],
+  ["guion", pieza.guion],
+  ["epigrafe", pieza.epigrafe],
+  ["cta", pieza.cta],
+  ...(Array.isArray(pieza.texto_en_pantalla) ? pieza.texto_en_pantalla : []).map((t) => ["texto_en_pantalla", t]),
 ];
 
 // Compara ganchos sin tildes, mayúsculas ni puntuación
@@ -138,7 +139,12 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
   const frasesUsadas = new Set(piezasDefinidas.flatMap((p) => p.frases ?? []).map(normalizar));
   if (!plan || typeof plan !== "object") return { ok: false, errores: ["El plan no es un objeto."] };
   if (typeof plan.resumen !== "string" || plan.resumen.trim() === "") errores.push("Falta el resumen.");
-  if (!Array.isArray(plan.piezas) || plan.piezas.length === 0) {
+  if (!Array.isArray(plan.piezas)) {
+    // Distinto de un plan vacío: sirve para saber qué mandó la IA (por ejemplo un texto en vez de una lista)
+    const recibido = plan.piezas === undefined ? "no vino" : `llegó como ${Array.isArray(plan.piezas) ? "lista" : typeof plan.piezas}`;
+    return { ok: false, errores: [...errores, `El plan no tiene piezas: "piezas" ${recibido}.`] };
+  }
+  if (plan.piezas.length === 0) {
     return { ok: false, errores: [...errores, "El plan no tiene piezas."] };
   }
   if (plan.piezas.length > MAXIMO_PIEZAS) errores.push(`Hay más de ${MAXIMO_PIEZAS} piezas.`);
@@ -199,10 +205,10 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
     for (const recurso of Array.isArray(pieza.recursos) ? pieza.recursos : []) {
       for (const { regla, fragmento } of revisarReglas(recurso)) errores.push(`${etiqueta}: ${regla} en los recursos ("${fragmento}").`);
     }
-    for (const texto of textosDeLaPieza(pieza)) {
-      const revisar = texto === pieza.guion ? revisarGuion : revisarReglas;
-      for (const { regla, fragmento } of revisar(texto)) errores.push(`${etiqueta}: ${regla} ("${fragmento}").`);
-      for (const cifra of cifrasNoPermitidas(texto, cifrasPermitidas)) errores.push(`${etiqueta}: la cifra "${cifra}" no está en los datos cargados.`);
+    for (const [campo, texto] of textosDeLaPieza(pieza)) {
+      const revisar = campo === "guion" ? revisarGuion : revisarReglas;
+      for (const { regla, fragmento } of revisar(texto)) errores.push(`${etiqueta} (${campo}): ${regla} ("${fragmento}").`);
+      for (const cifra of cifrasNoPermitidas(texto, cifrasPermitidas)) errores.push(`${etiqueta} (${campo}): la cifra "${cifra}" no está en los datos cargados.`);
     }
   });
 
@@ -298,10 +304,12 @@ export async function planificarSemana({ semanaInicio, fase, recursos = {}, nota
   const mensajes = [{ role: "user", content: `${pedido}\n\nRespondé llamando a la herramienta proponer_plan. No escribas nada fuera de la herramienta.` }];
   const uso = { entrada: 0, salida: 0 }; // cuánto se consumió, para controlar el gasto
   let bloque = null;
+  let intentos = 0;
   let cortada = false; // la respuesta se quedó sin espacio antes de terminar el plan
   let maxTokens = MAX_TOKENS_ESTRATEGA;
 
   for (let intento = 1; intento <= INTENTOS_MAXIMOS && !bloque; intento++) {
+    intentos++;
     const respuesta = await cliente.messages.create({
       model: modelo,
       max_tokens: maxTokens,
@@ -331,9 +339,9 @@ export async function planificarSemana({ semanaInicio, fase, recursos = {}, nota
 
   if (!bloque) {
     const motivo = cortada ? "La respuesta se cortó por el límite de tokens: el plan quedó incompleto." : "La respuesta no trajo el plan en el formato esperado.";
-    return { ok: false, plan: null, errores: [motivo], uso };
+    return { ok: false, plan: null, errores: [motivo], uso, intentos };
   }
 
   const { ok, errores } = validarPlan(bloque.input, { semanaInicio, recursos, piezas, ganchosConocidos, piezasDefinidas });
-  return { ok, plan: ok ? bloque.input : null, errores, uso, propuesta: bloque.input };
+  return { ok, plan: ok ? bloque.input : null, errores, uso, propuesta: bloque.input, intentos };
 }
