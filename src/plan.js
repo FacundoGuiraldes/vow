@@ -3,6 +3,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import Anthropic from "@anthropic-ai/sdk";
 import { planificarSemana } from "./agents/estratega.js";
+import { crearClienteSimulado } from "./agents/cliente-simulado.js";
+import { resumenDePlan } from "./agents/resumen-plan.js";
 
 // Uso:
 //   npm run plan -- --semana 2026-10-26                 (llama a Claude: gasta plata)
@@ -27,42 +29,7 @@ if (!values.semana) {
   process.exit(1);
 }
 
-// Cliente que no llama a Claude: devuelve un plan de ejemplo que cumple las reglas
-const clienteSimulado = {
-  messages: {
-    create: async () => ({
-      content: [
-        {
-          type: "tool_use",
-          id: "simulado",
-          name: "proponer_plan",
-          input: {
-            resumen: "Plan de ejemplo (modo simulado, no usa IA).",
-            piezas: [
-              {
-                fecha: values.semana,
-                formato: "reel",
-                pilar: "proceso",
-                gancho: "Una cosa por vez.",
-                ganchos_alternativos: ["Hecho con calma. Hecho bien.", "Cada detalle cuenta.", "Lo simple se sostiene."],
-                guion: "Video corto de texto sobre fondo hueso, una frase por vez.",
-                texto_en_pantalla: ["Una cosa por vez.", "Sin apuro. Sin ruido."],
-                epigrafe: "Se hace despacio y se hace bien. Anotate en la lista: link en la bio.",
-                palabras_clave: ["proceso", "constancia"],
-                cta: "Anotate en la lista de espera.",
-                recursos: ["Diseño en colores de marca"],
-                justificacion: "Muestra el criterio de trabajo de la marca sin mostrar producto.",
-              },
-            ],
-          },
-        },
-      ],
-      usage: { input_tokens: 0, output_tokens: 0 },
-    }),
-  },
-};
-
-let cliente = clienteSimulado;
+let cliente = crearClienteSimulado(values.semana);
 if (!values.simulado) {
   if (!process.env.ANTHROPIC_API_KEY) {
     console.error("Falta ANTHROPIC_API_KEY en el .env. Para probar sin gastar, agregá --simulado.");
@@ -96,10 +63,4 @@ await mkdir(carpeta, { recursive: true });
 const archivo = new URL(`plan-${values.semana}${values.simulado ? "-simulado" : ""}.json`, carpeta);
 await writeFile(archivo, JSON.stringify(resultado.plan, null, 2) + "\n");
 console.log(`Plan guardado en docs/planes/${archivo.pathname.split("/").pop()}`);
-console.log(`\n${resultado.plan.resumen}\n`);
-for (const pieza of resultado.plan.piezas) {
-  console.log(`${pieza.fecha} · ${pieza.formato} · ${pieza.pilar}\n  Gancho: ${pieza.gancho}`);
-  for (const alternativo of pieza.ganchos_alternativos ?? []) console.log(`    · ${alternativo}`);
-  console.log(`  Por qué: ${pieza.justificacion}`);
-  if (pieza.referencias?.length) console.log(`  Referencias: ${pieza.referencias.join(", ")}`);
-}
+console.log(`\n${resumenDePlan(resultado.plan)}`);

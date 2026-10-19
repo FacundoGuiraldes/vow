@@ -6,3 +6,4 @@ e2e/playwright-report/
 docs/planes/*-simulado.json
 docs/investigacion/datos-*.json
 docs/investigacion/informe-*-simulado.*
+docs/ejecuciones/*-simulado.json
