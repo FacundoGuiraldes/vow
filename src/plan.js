@@ -44,6 +44,7 @@ const clienteSimulado = {
                 formato: "carrusel",
                 pilar: "promesa",
                 gancho: "Una promesa para vos.",
+                ganchos_alternativos: ["Prometé poco. Cumplí todo.", "Tu firma, tu ley.", "Lo escrito se cumple."],
                 guion: "Tres láminas de texto sobre fondo hueso.",
                 texto_en_pantalla: ["Una promesa para vos.", "La escribís vos. Nadie más la lee."],
                 epigrafe: "Es lo que sostiene todo lo demás. Anotate en la lista: link en la bio.",
@@ -98,4 +99,5 @@ console.log(`Plan guardado en docs/planes/${archivo.pathname.split("/").pop()}`)
 console.log(`\n${resultado.plan.resumen}\n`);
 for (const pieza of resultado.plan.piezas) {
   console.log(`${pieza.fecha} · ${pieza.formato} · ${pieza.pilar}\n  Gancho: ${pieza.gancho}`);
+  for (const alternativo of pieza.ganchos_alternativos ?? []) console.log(`    · ${alternativo}`);
 }
