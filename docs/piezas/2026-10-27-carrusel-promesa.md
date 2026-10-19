@@ -1,6 +1,6 @@
 # Carrusel · 27/10/2026 · pilar promesa
 
-**Estado:** aprobado por Facundo (textos). Falta el diseño.
+**Estado:** aprobado por Facundo (textos). Láminas generadas en `docs/piezas/2026-10-27-laminas/` (falta su aprobación final).
 
 ## Láminas
 1. Cumplite a vos primero
@@ -19,5 +19,5 @@ Lo que te prometés a vos no necesita público. Anotate en la lista de espera.
 Anotarse en la lista de espera (link en la bio).
 
 ## Pendiente
-- Armar el diseño de las 5 láminas.
+- Regenerar las láminas con `npm run laminas` si cambia algún texto.
 - Publicar solo con aprobación final de Facundo.
