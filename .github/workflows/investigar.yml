@@ -1,0 +1,80 @@
+name: Investigar cuentas de referencia
+
+# Baja los datos PÚBLICOS de las cuentas de docs/marca/cuentas-referencia.json con la API oficial de Meta
+# (solo lectura) y calcula el rendimiento de cada publicación. No usa IA, no gasta plata y no publica nada.
+# Solo se lanza a mano desde Actions > Investigar cuentas de referencia > Run workflow, y solo desde main.
+# Los datos quedan en el resumen y como archivo descargable (14 días); no se guardan en el repo.
+
+on:
+  workflow_dispatch:
+    inputs:
+      limite:
+        description: "Publicaciones a leer por cuenta"
+        required: true
+        type: choice
+        default: "25"
+        options:
+          - "10"
+          - "25"
+          - "50"
+
+concurrency:
+  group: investigar
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  investigar:
+    # El token de Instagram solo se usa desde main
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      INSTAGRAM_TOKEN: ${{ secrets.INSTAGRAM_TOKEN }}
+      INSTAGRAM_USER_ID: ${{ secrets.INSTAGRAM_USER_ID }}
+      LIMITE: ${{ inputs.limite }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Secretos de Instagram configurados
+        run: |
+          if [ -z "$INSTAGRAM_TOKEN" ] || [ -z "$INSTAGRAM_USER_ID" ]; then
+            echo "::error title=Faltan secretos::Cargá INSTAGRAM_TOKEN e INSTAGRAM_USER_ID en Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Bajar y calcular
+        run: |
+          set -o pipefail
+          npm run investigar -- --limite "$LIMITE" 2>&1 | tee salida.txt
+
+      - name: Resumen de la corrida
+        if: always()
+        run: |
+          {
+            echo "## Cuentas de referencia"
+            echo
+            echo '```'
+            cat salida.txt 2>/dev/null || echo "Sin salida."
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Guardar los datos como archivo descargable
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: datos-instagram
+          path: |
+            docs/investigacion/datos-*.json
+            salida.txt
+          if-no-files-found: ignore
+          retention-days: 14
