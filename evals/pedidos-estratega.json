@@ -1,0 +1,11 @@
+{
+  "descripcion": "Pedidos variados para el Estratega. Cada uno cubre una situación distinta del proyecto (con y sin producto, con y sin gente, distinta fase y cantidad de piezas). Se usan en `npm run evals:online`.",
+  "pedidos": [
+    { "id": "base-1-pieza-sin-producto", "semana": "2026-11-02", "fase": "base", "piezas": 1, "recursos": {} },
+    { "id": "base-2-piezas-sin-producto", "semana": "2026-11-02", "fase": "base", "piezas": 2, "recursos": {} },
+    { "id": "expectativa-2-piezas-con-nota", "semana": "2026-11-09", "fase": "expectativa", "piezas": 2, "recursos": {}, "notas": "Se acerca el lanzamiento: mostrar que hay criterio detrás de cada decisión." },
+    { "id": "expectativa-con-producto", "semana": "2026-11-16", "fase": "expectativa", "piezas": 2, "recursos": { "producto": true } },
+    { "id": "base-con-gente", "semana": "2026-11-23", "fase": "base", "piezas": 2, "recursos": { "gente": true } },
+    { "id": "cuenta-regresiva-3-piezas", "semana": "2026-11-30", "fase": "cuenta-regresiva", "piezas": 3, "recursos": { "producto": true, "gente": true } }
+  ]
+}
