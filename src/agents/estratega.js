@@ -1,4 +1,5 @@
 import { readdir, readFile } from "node:fs/promises";
+import { leerPiezasDefinidas, diasEntre } from "./piezas-definidas.js";
 import { revisarReglas, revisarGuion, revisarTextoAlPublico, cifrasNoPermitidas } from "./reglas-marca.js";
 
 // Estratega: propone el plan de contenido de UNA semana para @vow_ar.
@@ -128,9 +129,10 @@ function revisarGancho(gancho, etiqueta, { reglas = true } = {}) {
 
 // Revisa que el plan tenga la forma pedida y cumpla las reglas de marca.
 // Devuelve { ok, errores }. Si hay algún error, el plan se descarta (no se guarda).
-export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitidas = ["01"], piezas = PIEZAS_POR_DEFECTO, ganchosConocidos = [] } = {}) {
+export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitidas = ["01"], piezas = PIEZAS_POR_DEFECTO, ganchosConocidos = [], piezasDefinidas = [] } = {}) {
   const errores = [];
   const conocidos = new Set(ganchosConocidos.map(normalizar));
+  const frasesUsadas = new Set(piezasDefinidas.flatMap((p) => p.frases ?? []).map(normalizar));
   if (!plan || typeof plan !== "object") return { ok: false, errores: ["El plan no es un objeto."] };
   if (typeof plan.resumen !== "string" || plan.resumen.trim() === "") errores.push("Falta el resumen.");
   if (!Array.isArray(plan.piezas) || plan.piezas.length === 0) {
@@ -171,6 +173,15 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
         errores.push(...revisarGancho(alternativo, nombre));
       });
     }
+    // No repetir lo que ya está decidido: ni sus frases ni su formato y pilar en fechas cercanas
+    for (const texto of [pieza.gancho, ...(pieza.ganchos_alternativos ?? []), ...(Array.isArray(pieza.texto_en_pantalla) ? pieza.texto_en_pantalla : [])]) {
+      if (typeof texto === "string" && frasesUsadas.has(normalizar(texto))) errores.push(`${etiqueta}: reutiliza una frase de una pieza ya definida ("${texto}").`);
+    }
+    for (const definida of piezasDefinidas) {
+      if (definida.formato === pieza.formato && definida.pilar === pieza.pilar && esFechaISO(pieza.fecha) && definida.fecha && diasEntre(pieza.fecha, definida.fecha) <= 7) {
+        errores.push(`${etiqueta}: repite el formato (${pieza.formato}) y el pilar (${pieza.pilar}) de la pieza ya definida del ${definida.fecha}.`);
+      }
+    }
     // Una sola acción: anotarse en la lista de espera
     if (typeof pieza.cta === "string" && !/lista/i.test(pieza.cta)) errores.push(`${etiqueta}: la acción final tiene que ser anotarse en la lista.`);
 
@@ -208,9 +219,9 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
 
 // Último informe del Investigador (docs/investigacion/informe-AAAA-MM-DD.md), si hay uno.
 // Si no hay, o no se puede leer, el Estratega trabaja solo con la marca y las referencias.
-export async function leerUltimoInforme({ leer = (ruta) => readFile(ruta, "utf8"), listar = () => readdir(RUTA_INVESTIGACION) } = {}) {
+export async function leerUltimoInforme({ leer = (ruta) => readFile(ruta, "utf8"), listar = (carpeta) => readdir(carpeta) } = {}) {
   try {
-    const nombres = (await listar()).filter((n) => /^informe-\d{4}-\d{2}-\d{2}\.md$/.test(n)).sort();
+    const nombres = (await listar(RUTA_INVESTIGACION)).filter((n) => /^informe-\d{4}-\d{2}-\d{2}\.md$/.test(n)).sort();
     if (nombres.length === 0) return null;
     const nombre = nombres.at(-1);
     return { nombre, texto: await leer(new URL(nombre, RUTA_INVESTIGACION)) };
@@ -220,14 +231,25 @@ export async function leerUltimoInforme({ leer = (ruta) => readFile(ruta, "utf8"
 }
 
 export async function construirSistema(leer = (ruta) => readFile(ruta, "utf8"), { listar } = {}) {
-  const [cerebro, referencias, informe] = await Promise.all([leer(RUTA_CEREBRO), leer(RUTA_REFERENCIAS), leerUltimoInforme({ leer, listar })]);
+  const [cerebro, referencias, informe, piezas] = await Promise.all([
+    leer(RUTA_CEREBRO),
+    leer(RUTA_REFERENCIAS),
+    leerUltimoInforme({ leer, listar }),
+    leerPiezasDefinidas({ leer, listar }),
+  ]);
   const bloqueInvestigacion = informe
     ? `
 
 === INVESTIGACIÓN DE MERCADO (${informe.nombre}) ===
 ${informe.texto}`
     : "";
-  return { cerebro, texto: `Sos el estratega de contenido de VOW, marca argentina de indumentaria y accesorios para entrenar. Proponés el plan de contenido de una semana para su perfil de Instagram. Solo proponés: una persona aprueba cada pieza antes de que salga.
+  const bloquePiezas = piezas.length
+    ? `
+
+=== PIEZAS YA DEFINIDAS ===
+${piezas.map((p) => p.texto.trim()).join("\n\n---\n\n")}`
+    : "";
+  return { cerebro, piezas, texto: `Sos el estratega de contenido de VOW, marca argentina de indumentaria y accesorios para entrenar. Proponés el plan de contenido de una semana para su perfil de Instagram. Solo proponés: una persona aprueba cada pieza antes de que salga.
 
 Reglas:
 - Todo lo que escribas sigue el cerebro de marca de abajo. Si algo lo contradice, gana el cerebro de marca.
@@ -242,13 +264,14 @@ Reglas:
 - Nunca nombres elementos del gimnasio (barras, mancuernas, pesas, discos, kettlebells, fierros). Suenan forzados. El producto (grips, straps, prendas) sí se puede nombrar cuando hay producto.
 - Cada pieza le habla a quien la mira y le da algo: una idea, un gesto, una razón para sumarse. No explica la marca por dentro (paleta, tipografías, manual de marca). Si una pieza de diseño o de proceso solo sirve para un diseñador, no la propongas.
 - En "justificacion" explicá por qué la pieza encaja con la marca o con una referencia.
+- Si abajo hay PIEZAS YA DEFINIDAS, son piezas ya decididas: no repitas su idea, no uses su formato y pilar en fechas cercanas (una semana) y no reutilices sus frases. Las piezas que se piden se suman a las definidas.
 - Si abajo hay una INVESTIGACIÓN DE MERCADO, apoyate en ella: elegí formatos y estilos que los datos respaldan y evitá los que contradicen. Cuando una pieza se apoye en un hallazgo, nombralo por su título en "justificacion". La investigación es una guía con muestra chica, no una verdad: nunca gana sobre el cerebro de marca, no copies piezas ni textos de las marcas estudiadas y no uses sus cifras en los textos de la pieza.
 
 === CEREBRO DE MARCA ===
 ${cerebro}
 
 === MARCAS DE REFERENCIA ===
-${referencias}${bloqueInvestigacion}` };
+${referencias}${bloqueInvestigacion}${bloquePiezas}` };
 }
 
 // Pide el plan de una semana. `cliente` se inyecta para poder probar sin gastar plata.
@@ -256,11 +279,14 @@ export async function planificarSemana({ semanaInicio, fase, recursos = {}, nota
   if (!esFechaISO(semanaInicio)) throw new Error("semanaInicio tiene que ser AAAA-MM-DD.");
   if (!cliente) throw new Error("Falta el cliente de Anthropic.");
 
-  const { cerebro, texto: system } = await construirSistema(leer, { listar });
+  const { cerebro, texto: system, piezas: piezasDefinidas } = await construirSistema(leer, { listar });
+  const hasta = sumarDias(semanaInicio, 6);
+  const definidasEnLaSemana = piezasDefinidas.filter((p) => p.fecha && p.fecha >= semanaInicio && p.fecha <= hasta);
   const { conocidos: ganchosConocidos } = extraerGanchosConocidos(cerebro);
   const pedido = [
     `Armá el plan de la semana que empieza el ${semanaInicio} (hasta el ${sumarDias(semanaInicio, 6)}).`,
     `Fase del proyecto: ${fase}.`,
+    definidasEnLaSemana.length ? `Esa semana ya hay definidas: ${definidasEnLaSemana.map((p) => `${p.formato} del ${p.fecha} (pilar ${p.pilar})`).join("; ")}. No las repitas.` : "",
     `Recursos disponibles: producto físico: ${recursos.producto ? "sí" : "no"}; personas que entrenan confirmadas: ${recursos.gente ? "sí" : "no"}.`,
     `Cantidad de piezas: ${piezas}. Pocas y fuertes: si no hay material real, es mejor menos piezas que rellenar.`,
     notas ? `Notas: ${notas}` : "",
@@ -292,6 +318,6 @@ export async function planificarSemana({ semanaInicio, fase, recursos = {}, nota
 
   if (!bloque) return { ok: false, plan: null, errores: ["La respuesta no trajo el plan en el formato esperado."], uso };
 
-  const { ok, errores } = validarPlan(bloque.input, { semanaInicio, recursos, piezas, ganchosConocidos });
+  const { ok, errores } = validarPlan(bloque.input, { semanaInicio, recursos, piezas, ganchosConocidos, piezasDefinidas });
   return { ok, plan: ok ? bloque.input : null, errores, uso, propuesta: bloque.input };
 }

@@ -41,17 +41,17 @@ const clienteSimulado = {
             piezas: [
               {
                 fecha: values.semana,
-                formato: "carrusel",
-                pilar: "promesa",
-                gancho: "Una promesa para vos.",
-                ganchos_alternativos: ["Prometé poco. Cumplí todo.", "Tu firma, tu ley.", "Lo escrito se cumple."],
-                guion: "Tres láminas de texto sobre fondo hueso.",
-                texto_en_pantalla: ["Una promesa para vos.", "La escribís vos. Nadie más la lee."],
-                epigrafe: "Es lo que sostiene todo lo demás. Anotate en la lista: link en la bio.",
-                palabras_clave: ["promesa", "constancia"],
+                formato: "reel",
+                pilar: "proceso",
+                gancho: "Una cosa por vez.",
+                ganchos_alternativos: ["Hecho con calma. Hecho bien.", "Cada detalle cuenta.", "Lo simple se sostiene."],
+                guion: "Video corto de texto sobre fondo hueso, una frase por vez.",
+                texto_en_pantalla: ["Una cosa por vez.", "Sin apuro. Sin ruido."],
+                epigrafe: "Se hace despacio y se hace bien. Anotate en la lista: link en la bio.",
+                palabras_clave: ["proceso", "constancia"],
                 cta: "Anotate en la lista de espera.",
                 recursos: ["Diseño en colores de marca"],
-                justificacion: "Presenta la idea central de la marca sin mostrar producto.",
+                justificacion: "Muestra el criterio de trabajo de la marca sin mostrar producto.",
               },
             ],
           },
@@ -100,4 +100,6 @@ console.log(`\n${resultado.plan.resumen}\n`);
 for (const pieza of resultado.plan.piezas) {
   console.log(`${pieza.fecha} · ${pieza.formato} · ${pieza.pilar}\n  Gancho: ${pieza.gancho}`);
   for (const alternativo of pieza.ganchos_alternativos ?? []) console.log(`    · ${alternativo}`);
+  console.log(`  Por qué: ${pieza.justificacion}`);
+  if (pieza.referencias?.length) console.log(`  Referencias: ${pieza.referencias.join(", ")}`);
 }

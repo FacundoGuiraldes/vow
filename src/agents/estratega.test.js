@@ -367,3 +367,44 @@ test("el informe real del repo llega al Estratega", async () => {
   assert.match(texto, /=== INVESTIGACIÓN DE MERCADO \(informe-\d{4}-\d{2}-\d{2}\.md\) ===/);
   assert.match(texto, /## Hallazgos/);
 });
+
+const definida = { nombre: "2026-10-27-carrusel-promesa.md", formato: "carrusel", fecha: "2026-10-27", pilar: "promesa", frases: ["Cumplite a vos primero", "Lo que firmás con vos no se rompe"], texto: "# Carrusel · 27/10/2026 · pilar promesa" };
+
+test("no repite el formato y el pilar de una pieza ya definida en fechas cercanas", () => {
+  const repetida = validarPlan(planValido([piezaValida({ fecha: "2026-10-28", formato: "carrusel", pilar: "promesa" })]), { semanaInicio: "2026-10-26", piezasDefinidas: [definida] });
+  assert.ok(repetida.errores.some((e) => e.includes("ya definida del 2026-10-27")));
+  const otroPilar = validarPlan(planValido([piezaValida({ fecha: "2026-10-28", formato: "carrusel", pilar: "proceso" })]), { semanaInicio: "2026-10-26", piezasDefinidas: [definida] });
+  assert.ok(!otroPilar.errores.some((e) => e.includes("ya definida")));
+  const otraSemana = validarPlan(planValido([piezaValida({ fecha: "2026-11-09", formato: "carrusel", pilar: "promesa" })]), { semanaInicio: "2026-11-09", piezasDefinidas: [definida] });
+  assert.ok(!otraSemana.errores.some((e) => e.includes("ya definida")));
+});
+
+test("no reutiliza las frases de una pieza ya definida, ni como gancho, alternativo ni texto en pantalla", () => {
+  const principal = validarPlan(planValido([piezaValida({ gancho: "Cumplite a vos primero" })]), { semanaInicio: SEMANA, piezasDefinidas: [definida] });
+  assert.ok(principal.errores.some((e) => e.includes("reutiliza una frase")));
+  const alternativo = validarPlan(planValido([piezaValida({ ganchos_alternativos: ["Prometé poco. Cumplí todo.", "Tu firma no se negocia.", "Lo que firmás con vos no se rompe", "Una línea. Un compromiso."] })]), { semanaInicio: SEMANA, piezasDefinidas: [definida] });
+  assert.ok(alternativo.errores.some((e) => e.includes("reutiliza una frase")));
+  const enPantalla = validarPlan(planValido([piezaValida({ texto_en_pantalla: ["Cumplite a vos primero.", "Otra"] })]), { semanaInicio: SEMANA, piezasDefinidas: [definida] });
+  assert.ok(enPantalla.errores.some((e) => e.includes("reutiliza una frase")));
+});
+
+test("el Estratega conoce las piezas definidas: están en las instrucciones y en el pedido de esa semana", async () => {
+  const listar = async (carpeta) => (String(carpeta).includes("piezas") ? ["2026-10-27-carrusel-promesa.md"] : []);
+  const leer = async (ruta) => (String(ruta).includes("carrusel-promesa") ? "# Carrusel · 27/10/2026 · pilar promesa\n\n## Láminas\n1. Cumplite a vos primero\n" : "CONTENIDO");
+  const { texto } = await construirSistema(leer, { listar });
+  assert.match(texto, /=== PIEZAS YA DEFINIDAS ===\n# Carrusel · 27\/10\/2026/);
+  assert.match(texto, /no repitas su idea/);
+  const cliente = clienteFalso(planValido([piezaValida({ fecha: "2026-10-30", formato: "reel", pilar: "proceso", gancho: "Construí sin que te vean" })]));
+  const r = await planificarSemana({ semanaInicio: "2026-10-26", fase: "base", recursos: {}, piezas: 1 }, { cliente, leer, listar });
+  assert.ok(cliente.pedidos[0].messages[0].content.includes("Esa semana ya hay definidas: carrusel del 2026-10-27 (pilar promesa)"));
+  assert.equal(r.ok, true, (r.errores ?? []).join(" | "));
+});
+
+test("una propuesta que repite una pieza definida se rechaza al planificar", async () => {
+  const listar = async (carpeta) => (String(carpeta).includes("piezas") ? ["2026-10-27-carrusel-promesa.md"] : []);
+  const leer = async (ruta) => (String(ruta).includes("carrusel-promesa") ? "# Carrusel · 27/10/2026 · pilar promesa\n\n## Láminas\n1. Cumplite a vos primero\n" : "CONTENIDO");
+  const cliente = clienteFalso(planValido([piezaValida({ fecha: "2026-10-28", formato: "carrusel", pilar: "promesa" })]));
+  const r = await planificarSemana({ semanaInicio: "2026-10-26", fase: "base", recursos: {}, piezas: 1 }, { cliente, leer, listar });
+  assert.equal(r.ok, false);
+  assert.ok(r.errores.some((e) => e.includes("ya definida")));
+});
