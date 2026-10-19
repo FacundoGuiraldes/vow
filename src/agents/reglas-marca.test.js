@@ -54,3 +54,9 @@ test("las cifras solo se aceptan si están en los datos permitidos", () => {
   assert.deepEqual(cifrasNoPermitidas("Probamos 5 straps y 3,5 kilos"), ["5", "3,5"]);
   assert.deepEqual(cifrasNoPermitidas("Probamos 5 straps", ["5"]), []);
 });
+
+test("rechaza anunciar lo que falta", () => {
+  assert.deepEqual(reglasDe("Todavía no hay prenda para mostrarte"), ["anuncia lo que falta"]);
+  assert.deepEqual(reglasDe("Todavía no tenemos stock"), ["anuncia lo que falta"]);
+  assert.deepEqual(revisarReglas("Todavía estamos diseñando la etiqueta"), []);
+});

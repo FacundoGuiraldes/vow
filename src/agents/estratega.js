@@ -10,6 +10,10 @@ export const PILARES = ["promesa", "proceso", "producto en uso", "gente que entr
 export const MAXIMO_PIEZAS = 5;
 const INTENTOS_MAXIMOS = 2;
 const LARGO_MAXIMO_GANCHO = 140;
+export const PALABRAS_MAXIMAS_GANCHO = 12; // un gancho fuerte es corto
+export const PIEZAS_POR_DEFECTO = 2; // sin producto, mejor pocas y buenas que rellenar
+// Ganchos que suenan a tutorial o a lista de consejos (descartado por Facundo)
+const TONO_TUTORIAL = /^\s*(c[oó]mo|tips?\b|consejos?\b|pasos?\b|gu[ií]a\b|\d+\s+(cosas|tips|pasos|razones|formas|ideas))/i;
 const RUTA_CEREBRO = new URL("../../docs/marca/cerebro-de-marca.md", import.meta.url);
 const RUTA_REFERENCIAS = new URL("../../docs/marca/referencias.md", import.meta.url);
 
@@ -70,7 +74,7 @@ const textosDeLaPieza = (pieza) => [
 
 // Revisa que el plan tenga la forma pedida y cumpla las reglas de marca.
 // Devuelve { ok, errores }. Si hay algún error, el plan se descarta (no se guarda).
-export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitidas = ["01"] } = {}) {
+export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitidas = ["01"], piezas = PIEZAS_POR_DEFECTO } = {}) {
   const errores = [];
   if (!plan || typeof plan !== "object") return { ok: false, errores: ["El plan no es un objeto."] };
   if (typeof plan.resumen !== "string" || plan.resumen.trim() === "") errores.push("Falta el resumen.");
@@ -78,6 +82,7 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
     return { ok: false, errores: [...errores, "El plan no tiene piezas."] };
   }
   if (plan.piezas.length > MAXIMO_PIEZAS) errores.push(`Hay más de ${MAXIMO_PIEZAS} piezas.`);
+  if (plan.piezas.length > piezas) errores.push(`Se pidieron ${piezas} piezas y el plan trae ${plan.piezas.length}.`);
 
   const desde = semanaInicio;
   const hasta = semanaInicio ? sumarDias(semanaInicio, 6) : null;
@@ -98,6 +103,11 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
     }
     if (typeof pieza.gancho === "string" && pieza.gancho.length > LARGO_MAXIMO_GANCHO) {
       errores.push(`${etiqueta}: el gancho supera ${LARGO_MAXIMO_GANCHO} caracteres.`);
+    }
+    if (typeof pieza.gancho === "string") {
+      const palabras = pieza.gancho.trim().split(/\s+/).length;
+      if (palabras > PALABRAS_MAXIMAS_GANCHO) errores.push(`${etiqueta}: el gancho tiene ${palabras} palabras (máximo ${PALABRAS_MAXIMAS_GANCHO}).`);
+      if (TONO_TUTORIAL.test(pieza.gancho)) errores.push(`${etiqueta}: el gancho suena a tutorial o consejo ("${pieza.gancho}").`);
     }
     // Una sola acción: anotarse en la lista de espera
     if (typeof pieza.cta === "string" && !/lista/i.test(pieza.cta)) errores.push(`${etiqueta}: la acción final tiene que ser anotarse en la lista.`);
@@ -125,6 +135,7 @@ Reglas:
 - Nunca inventes cifras, pruebas, stock, fechas ni opiniones. No uses números en los textos salvo "01" de "Drop 01".
 - Solo podés proponer piezas que se puedan hacer con los recursos disponibles que te indican. Si no hay producto, no propongas mostrar producto.
 - Las referencias son inspiración, no datos para citar. No copies sus textos ni sus ideas al pie de la letra.
+- Los ganchos tienen que ser potentes y sobrios, como pide la sección 8 del cerebro de marca: afirmaciones cortas de 3 a 8 palabras, en imperativo, que comprometen. Nunca tono de tutorial, de consejo ni de lo que falta.
 - En "justificacion" explicá por qué la pieza encaja con la marca o con una referencia.
 
 === CEREBRO DE MARCA ===
@@ -135,7 +146,7 @@ ${referencias}`;
 }
 
 // Pide el plan de una semana. `cliente` se inyecta para poder probar sin gastar plata.
-export async function planificarSemana({ semanaInicio, fase, recursos = {}, notas = "" }, { cliente, modelo = MODELO_ESTRATEGA, leer } = {}) {
+export async function planificarSemana({ semanaInicio, fase, recursos = {}, notas = "", piezas = PIEZAS_POR_DEFECTO }, { cliente, modelo = MODELO_ESTRATEGA, leer } = {}) {
   if (!esFechaISO(semanaInicio)) throw new Error("semanaInicio tiene que ser AAAA-MM-DD.");
   if (!cliente) throw new Error("Falta el cliente de Anthropic.");
 
@@ -144,7 +155,7 @@ export async function planificarSemana({ semanaInicio, fase, recursos = {}, nota
     `Armá el plan de la semana que empieza el ${semanaInicio} (hasta el ${sumarDias(semanaInicio, 6)}).`,
     `Fase del proyecto: ${fase}.`,
     `Recursos disponibles: producto físico: ${recursos.producto ? "sí" : "no"}; personas que entrenan confirmadas: ${recursos.gente ? "sí" : "no"}.`,
-    "Ritmo propuesto: 3 piezas (2 reels y 1 carrusel).",
+    `Cantidad de piezas: ${piezas}. Pocas y fuertes: si no hay material real, es mejor menos piezas que rellenar.`,
     notas ? `Notas: ${notas}` : "",
   ].filter(Boolean).join("\n");
 
@@ -174,6 +185,6 @@ export async function planificarSemana({ semanaInicio, fase, recursos = {}, nota
 
   if (!bloque) return { ok: false, plan: null, errores: ["La respuesta no trajo el plan en el formato esperado."], uso };
 
-  const { ok, errores } = validarPlan(bloque.input, { semanaInicio, recursos });
+  const { ok, errores } = validarPlan(bloque.input, { semanaInicio, recursos, piezas });
   return { ok, plan: ok ? bloque.input : null, errores, uso, propuesta: bloque.input };
 }

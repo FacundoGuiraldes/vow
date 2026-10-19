@@ -36,7 +36,8 @@ Cómo se resuelve la tensión entre "verse bien" y "no presumir": lo estético e
 ## 4. Cómo habla
 
 - **Voseo rioplatense, siempre:** entrená, anotate, sumate, fijate. Nunca "tú", "usted" ni español neutro.
-- Frases cortas. Directo y tranquilo, sin gritar.
+- Frases cortas. Directo, sin gritar.
+- **Fuerza y compromiso:** afirmaciones cortas, en imperativo, que asumen un compromiso. La fuerza está en lo que dice y en lo que calla, no en el volumen: sin adornos, sin signos de exclamación, sin mayúsculas gritadas.
 - Poco o ningún emoji. Sin signos de exclamación en cadena. Sin mayúsculas gritadas (salvo títulos de diseño).
 - Lunfardo con moderación: si suena forzado, no se usa.
 - Cada pieza termina con **una sola** acción: anotarse en la lista de espera.
@@ -85,14 +86,27 @@ Cómo se resuelve la tensión entre "verse bien" y "no presumir": lo estético e
 6. No se reposta contenido de terceros.
 7. VOW no se presenta como parte de ningún gimnasio ni local.
 
-## 8. Ejemplos de gancho (primeros 3 segundos)
+## 8. Ganchos (primeros 3 segundos)
 
-- "Nadie te está mirando. Entrená igual."
-- "Construí, no figures." *(a revisar: ¿"figurar" suena bien o hay otra palabra?)*
+**Cómo tiene que ser un gancho de VOW:**
+- Potente y sobrio a la vez: una afirmación que compromete, no una explicación.
+- Corto: de 3 a 8 palabras, 12 como máximo.
+- En imperativo y en voseo ("Escribí", "Entrená", "Cumplila"), concreto y sin adornos.
+- Habla de lo que la persona hace o se compromete a hacer, no de lo que la marca todavía no tiene.
+
+**Aprobado por Facundo:**
 - "Escribí tu promesa. Después cumplila."
+
+**En la misma línea, sin aprobar todavía:**
+- "Nadie te está mirando. Entrená igual."
 - "Así se cose la etiqueta que nadie ve."
 - "Entrá a la lista antes de que abra."
 - "El precio es este. Sin trucos."
+- "Construí, no figures." *(a revisar: ¿"figurar" suena bien o hay otra palabra?)*
+
+**Descartados por Facundo (no repetir el estilo):**
+- "Cómo escribir una promesa que puedas cumplir." Suena a tutorial o consejo: VOW no le explica a la gente cómo vivir.
+- "Todavía no hay prenda para mostrarte. Hay una idea." Anuncia lo que falta: una marca no muestra su ausencia de producto.
 
 ## 9. Por confirmar
 

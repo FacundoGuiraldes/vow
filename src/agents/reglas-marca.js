@@ -21,6 +21,8 @@ const REGLAS = [
     regla: "no está en voseo",
     patron: /(?<!\p{L})(tú|usted|ustedes|ud|tienes|puedes|eres|quieres|debes|hazlo)(?!\p{L})/iu,
   },
+  // Anunciar lo que falta (descartado por Facundo): una marca no muestra que no tiene producto
+  { regla: "anuncia lo que falta", patron: /todav[ií]a no (hay|tenemos|llega|lleg[oó]|existe)|no hay (prenda|producto|stock)\b/i },
   // Cadenas de signos de exclamación
   { regla: "exceso de exclamaciones", patron: /!{2,}/ },
   // "Drop" suelto: solo se acepta "Drop 01"

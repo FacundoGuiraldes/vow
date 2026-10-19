@@ -171,3 +171,53 @@ test("exige una fecha de inicio válida y un cliente", async () => {
   await assert.rejects(() => planificarSemana({ ...pedido, semanaInicio: "mañana" }, { cliente: clienteFalso({}) }), /AAAA-MM-DD/);
   await assert.rejects(() => planificarSemana(pedido, {}), /cliente/);
 });
+
+test("acepta el gancho aprobado por Facundo", () => {
+  const r = validarPlan(planValido([piezaValida({ gancho: "Escribí tu promesa. Después cumplila." })]), { semanaInicio: SEMANA });
+  assert.equal(r.ok, true, r.errores.join(" | "));
+});
+
+test("rechaza los ganchos que Facundo descartó (tutorial y anunciar lo que falta)", () => {
+  const tutorial = validarPlan(planValido([piezaValida({ gancho: "Cómo escribir una promesa que puedas cumplir." })]), { semanaInicio: SEMANA });
+  assert.match(tutorial.errores.join(" "), /suena a tutorial/);
+
+  const falta = validarPlan(planValido([piezaValida({ gancho: "Todavía no hay prenda para mostrarte. Hay una idea." })]), { semanaInicio: SEMANA });
+  assert.match(falta.errores.join(" "), /anuncia lo que falta/);
+});
+
+test("rechaza ganchos con tono de lista de consejos", () => {
+  for (const gancho of ["5 tips para entrenar", "Tips para empezar", "Guía para tu promesa"]) {
+    const r = validarPlan(planValido([piezaValida({ gancho })]), { semanaInicio: SEMANA });
+    assert.match(r.errores.join(" "), /suena a tutorial|cifra/, gancho);
+  }
+});
+
+test("un gancho largo no es un gancho fuerte: máximo 12 palabras", () => {
+  const largo = "Escribí una promesa para vos y para nadie más porque nadie la va a leer jamás";
+  const r = validarPlan(planValido([piezaValida({ gancho: largo })]), { semanaInicio: SEMANA });
+  assert.equal(r.ok, false);
+  assert.match(r.errores.join(" "), /palabras \(máximo 12\)/);
+});
+
+test("respeta la cantidad de piezas pedida (por defecto 2)", () => {
+  const tres = planValido([piezaValida(), piezaValida({ fecha: "2026-10-21" }), piezaValida({ fecha: "2026-10-22" })]);
+  const porDefecto = validarPlan(tres, { semanaInicio: SEMANA });
+  assert.match(porDefecto.errores.join(" "), /Se pidieron 2 piezas y el plan trae 3/);
+  assert.equal(validarPlan(tres, { semanaInicio: SEMANA, piezas: 3 }).ok, true);
+});
+
+test("le informa a la IA cuántas piezas pedir", async () => {
+  const cliente = clienteFalso(planValido());
+  await planificarSemana({ ...pedido, piezas: 1 }, { cliente, leer: leerFalso });
+  assert.match(cliente.pedidos[0].messages[0].content, /Cantidad de piezas: 1/);
+  const porDefecto = clienteFalso(planValido());
+  await planificarSemana(pedido, { cliente: porDefecto, leer: leerFalso });
+  assert.match(porDefecto.pedidos[0].messages[0].content, /Cantidad de piezas: 2/);
+});
+
+test("las instrucciones incluyen el estilo de ganchos de la marca", async () => {
+  const sistema = await construirSistema();
+  assert.match(sistema, /Fuerza y compromiso/);
+  assert.match(sistema, /Escribí tu promesa\. Después cumplila\./);
+  assert.match(sistema, /Descartados por Facundo/);
+});
