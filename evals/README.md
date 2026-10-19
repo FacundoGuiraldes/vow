@@ -40,4 +40,4 @@ npm run evals:online -- --guardar-linea-base  # guarda este resultado como refer
 - **Tope de gasto** (`--tope-usd`): si se llega a ese número, el resto de los pedidos se omite.
 - **Errores técnicos aparte**: un corte de red no cuenta como plan malo.
 - **Línea base** (`linea-base-online.json`): se compara cada corrida contra la última que aceptaste. Como la IA varía, solo avisa si la tasa de aprobación baja más de 15 puntos o el costo por plan sube más de 50 %.
-- Los informes completos quedan en `evals/resultados/` (no se suben al repo). Desde GitHub: Actions > **Evals con IA real**.
+- Los informes completos quedan en `evals/resultados/` (no se suben al repo) e incluyen, de cada plan rechazado, **lo que la IA propuso** y cuántos intentos hizo: sin eso un rechazo es solo un número. Desde GitHub: Actions > **Evals con IA real**.

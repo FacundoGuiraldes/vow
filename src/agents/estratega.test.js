@@ -471,3 +471,37 @@ test("el motivo del fallo es el del último intento: cortada una vez y después 
   assert.equal(r.ok, false);
   assert.deepEqual(r.errores, ["La respuesta no trajo el plan en el formato esperado."]);
 });
+
+test("los errores de reglas y cifras dicen en qué campo de la pieza está el problema", () => {
+  const plan = planValido([piezaValida({ guion: "Texto del 27/10 sobre fondo hueso.", epigrafe: "Somos 500. Anotate en la lista: link en la bio.", texto_en_pantalla: ["Dominá la barra.", "Sin apuro."] })]);
+  const { errores } = validarPlan(plan, { semanaInicio: SEMANA, piezas: 1 });
+  assert.ok(errores.some((e) => e.includes("Pieza 1 (guion): la cifra \"27\"")), errores.join(" | "));
+  assert.ok(errores.some((e) => e.includes("Pieza 1 (epigrafe): la cifra \"500\"")), errores.join(" | "));
+  assert.ok(errores.some((e) => e.includes("Pieza 1 (texto_en_pantalla): nombra elementos del gimnasio")), errores.join(" | "));
+});
+
+test("un guion con un papel negado se perdona pero el mismo texto en el epígrafe no, aunque sean iguales", () => {
+  const frase = "No aparece lapicera.";
+  const enGuion = validarPlan(planValido([piezaValida({ guion: frase })]), { semanaInicio: SEMANA, piezas: 1 });
+  assert.equal(enGuion.errores.filter((e) => e.includes("promesa en papel")).length, 0);
+  const enEpigrafe = validarPlan(planValido([piezaValida({ guion: frase, epigrafe: `${frase} Anotate en la lista: link en la bio.` })]), { semanaInicio: SEMANA, piezas: 1 });
+  assert.ok(enEpigrafe.errores.some((e) => e.includes("(epigrafe): promesa en papel")), enEpigrafe.errores.join(" | "));
+});
+
+test("distingue un plan sin la lista de piezas de uno con la lista vacía", () => {
+  const sin = validarPlan({ resumen: "x" }, { semanaInicio: SEMANA });
+  assert.deepEqual(sin.errores, ['El plan no tiene piezas: "piezas" no vino.']);
+  const comoTexto = validarPlan({ resumen: "x", piezas: "[{\"fecha\":\"2026-10-20\"}]" }, { semanaInicio: SEMANA });
+  assert.deepEqual(comoTexto.errores, ['El plan no tiene piezas: "piezas" llegó como string.']);
+  const vacia = validarPlan({ resumen: "x", piezas: [] }, { semanaInicio: SEMANA });
+  assert.deepEqual(vacia.errores, ["El plan no tiene piezas."]);
+});
+
+test("informa cuántos intentos hicieron falta", async () => {
+  const uno = await planificarSemana(pedido, { cliente: clienteEnSecuencia([{ input: planValido() }]), leer: leerFalso, listar: async () => [] });
+  assert.equal(uno.intentos, 1);
+  const dos = await planificarSemana(pedido, { cliente: clienteEnSecuencia([{ input: { resumen: "a medias" }, stop_reason: "max_tokens" }, { input: planValido() }]), leer: leerFalso, listar: async () => [] });
+  assert.equal(dos.intentos, 2);
+  const fallo = await planificarSemana(pedido, { cliente: clienteEnSecuencia([{ texto: true }]), leer: leerFalso, listar: async () => [] });
+  assert.equal(fallo.intentos, 2);
+});

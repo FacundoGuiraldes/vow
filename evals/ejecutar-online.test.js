@@ -110,3 +110,13 @@ test("compararConLineaBase sin línea base no falla y lo avisa", () => {
   assert.equal(r.ok, true);
   assert.equal(r.sinBase, true);
 });
+
+test("un plan rechazado guarda lo que propuso la IA y cuántos intentos hizo; uno aprobado no guarda la propuesta", async () => {
+  const propuesta = { resumen: "x", piezas: "texto en vez de lista" };
+  const planificar = falso({ "2026-11-02": { ...bueno(), intentos: 1, propuesta: { resumen: "bien" } }, "2026-11-09": { ...malo(["El plan no tiene piezas."]), intentos: 2, propuesta } });
+  const { resultados } = await correrEvalsOnline({ pedidos: pedidos.slice(0, 2), crearCliente, planificar });
+  assert.equal(resultados[0].propuesta, null);
+  assert.equal(resultados[0].intentos, 1);
+  assert.deepEqual(resultados[1].propuesta, propuesta);
+  assert.equal(resultados[1].intentos, 2);
+});
