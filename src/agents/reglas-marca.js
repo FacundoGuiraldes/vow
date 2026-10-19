@@ -73,3 +73,19 @@ export function cifrasNoPermitidas(texto, permitidas = ["01"]) {
   const numeros = texto.match(/\d+(?:[.,]\d+)?/g) ?? [];
   return numeros.filter((numero) => !permitidas.includes(numero));
 }
+
+// En el guion (instrucciones de producción) es válido nombrar algo para descartarlo:
+// "No aparece papel ni lapicera" o "no se habla de lo que todavía no hay" no son una infracción.
+// Solo se perdona en estas reglas, y solo si la oración tiene una negación aparte del fragmento marcado.
+const REGLAS_PERDONABLES_EN_GUION = new Set(["promesa en papel", "anuncia lo que falta"]);
+const NEGACION = /(?<!\p{L})(no|ni|sin|nunca|evitar)(?!\p{L})/iu;
+
+function oracionNegada(texto, fragmento) {
+  const oracion = texto.split(/(?<=[.!?;:])\s+/).find((o) => o.toLowerCase().includes(fragmento.toLowerCase()));
+  if (!oracion) return false;
+  return NEGACION.test(oracion.replace(new RegExp(fragmento.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"), ""));
+}
+
+export function revisarGuion(texto) {
+  return revisarReglas(texto).filter((p) => !(REGLAS_PERDONABLES_EN_GUION.has(p.regla) && oracionNegada(texto, p.fragmento)));
+}
