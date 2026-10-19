@@ -21,6 +21,7 @@
     "test:e2e:tipos": "tsc -p e2e/tsconfig.json",
     "plan": "node src/plan.js",
     "semana": "node src/semana.js",
+    "evals": "node evals/ejecutar.js",
     "investigar": "node src/investigar-datos.js",
     "analizar": "node src/investigar-analisis.js"
   },

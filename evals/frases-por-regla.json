@@ -1,0 +1,28 @@
+{
+  "descripcion": "Frases que cada regla de marca tiene que detectar (una por cada palabra o expresión de la regla) y frases comunes que no tienen que disparar ninguna. Complementa los casos de evals/casos-revisor.json.",
+  "disparan": {
+    "motivación vacía": ["Entrená sin excusas.", "Tu mejor versión te espera.", "Sé la mejor versión de vos.", "Nada es imposible."],
+    "promesa de resultados físicos": ["Quemá grasa rápido.", "Ganá músculo en semanas.", "Bajá de peso con VOW.", "Evitá lesiones.", "Evitá las lesiones.", "Te hace más fuerte.", "Tu cuerpo soñado."],
+    "urgencia falsa": ["Últimas unidades.", "Solo hoy.", "No te lo pierdas.", "Última chance.", "Se agota ya."],
+    "presumir": ["Mostrá tu físico.", "Modo bestia.", "Un crack.", "Sos una bestia."],
+    "inglés innecesario": ["Más gain.", "Todos los gains.", "Puro grind.", "No pain no gain.", "No pain, no gain.", "Un look aesthetic."],
+    "no está en voseo": ["Tú decides.", "Usted decide.", "Ustedes deciden.", "Ud. decide.", "Tienes constancia.", "Puedes empezar.", "Eres constante.", "Quieres cumplir.", "Debes cumplir.", "Hazlo hoy."],
+    "anuncia lo que falta": ["Todavía no hay prendas.", "Todavía no tenemos fecha.", "Todavía no llega.", "Todavía no llegó.", "Todavía no existe.", "No hay prenda.", "No hay producto.", "No hay stock."],
+    "nombra elementos del gimnasio": ["La barra.", "Las barras.", "Una mancuerna.", "Las mancuernas.", "Las pesas.", "Una kettlebell.", "Las kettlebells.", "Los fierros.", "Los hierros.", "Un disco de peso.", "Los discos de peso."],
+    "promesa en papel": ["Escribila a mano.", "Con lapicera.", "Con birome.", "Con lápiz.", "En una cartulina."],
+    "exceso de exclamaciones": ["Cumplí!!"],
+    "\"drop\" fuera de \"Drop 01\"": ["Llega el drop.", "Los drops."]
+  },
+  "no_disparan": [
+    "Lo que pesa, se sostiene.",
+    "Tu palabra pesa más que cualquier plan.",
+    "Cumplite a vos primero.",
+    "Lo que firmás con vos no se rompe.",
+    "El trabajo diario no busca aplausos.",
+    "Construí en silencio. Que hable el tiempo.",
+    "Anotate en la lista de espera.",
+    "Drop 01 en desarrollo.",
+    "Tus grips, tus straps, tu promesa.",
+    "Una promesa con vos."
+  ]
+}

@@ -23,10 +23,10 @@ const REGLAS = [
   },
   // Anunciar lo que falta (descartado por Facundo): una marca no muestra que no tiene producto
   { regla: "anuncia lo que falta", patron: /todav[ií]a no (hay|tenemos|llega|lleg[oó]|existe)|no hay (prenda|producto|stock)\b/i },
-  // Elementos del gimnasio (descartado por Facundo): nombrarlos suena forzado. Grips y straps son el producto y sí se pueden nombrar.
+  // Elementos del gimnasio (descartado por Facundo): nombrarlos suena forzado. Grips y straps son el producto y sí se pueden nombrar. "pesa" (el verbo) no se marca: solo "pesas".
   {
     regla: "nombra elementos del gimnasio",
-    patron: /(?<!\p{L})(barras?|mancuernas?|pesas?|kettlebells?|fierros?|hierros?|discos? de peso)(?!\p{L})/iu,
+    patron: /(?<!\p{L})(barras?|mancuernas?|pesas|kettlebells?|fierros?|hierros?|discos? de peso)(?!\p{L})/iu,
   },
   // La promesa es de uno consigo mismo, no un papel (corregido por Facundo)
   { regla: "promesa en papel", patron: /a mano|lapicera|birome|l[aá]piz|cartulina/i },
@@ -35,6 +35,9 @@ const REGLAS = [
   // "Drop" suelto: solo se acepta "Drop 01"
   { regla: '"drop" fuera de "Drop 01"', patron: /\bdrops?\b(?!\s*0?1\b)/i },
 ];
+
+// Los nombres de las reglas, para que las evals comprueben que cada una tiene al menos un caso que la dispara
+export const NOMBRES_DE_REGLAS = REGLAS.map((r) => r.regla);
 
 const MAXIMO_EMOJIS = 1;
 
