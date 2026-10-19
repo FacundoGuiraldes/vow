@@ -1,13 +1,15 @@
 # Carrusel · 19/10/2026 · pilar lanzamiento
 
-**Estado:** textos definidos con Facundo; láminas generadas en `docs/piezas/2026-10-19-laminas/` (falta su aprobación final). Es la **primera** publicación de la cuenta, porque explica qué es VOW; el carrusel de la promesa (27/10) sale después. La fecha es tentativa: si se publica otro día, se actualiza acá.
+**Estado:** carrusel de 7 láminas (la presentación más dos láminas de la promesa que Facundo eligió); textos definidos con Facundo; láminas generadas en `docs/piezas/2026-10-19-laminas/` (falta su aprobación final). Es la **primera** publicación de la cuenta, porque explica qué es VOW; las otras dos láminas de la promesa ("Cumplite a vos primero" y "El trabajo diario no busca aplausos") quedan para una pieza de la semana del 2/11. La fecha es tentativa: si se publica otro día, se actualiza acá.
 
 ## Láminas
 1. Esto es VOW.
 2. Una marca argentina de ropa y accesorios para entrenar.
 3. VOW → Promesa.
-4. Simples a propósito. Diseño hecho con criterio.
-5. Drop 01 en 2027. Anotate en la lista de espera.
+4. Lo que firmás con vos no se rompe.
+5. Construí en silencio. Que hable el tiempo.
+6. Simples a propósito. Diseño hecho con criterio.
+7. Drop 01 en 2027. Anotate en la lista de espera.
 
 ## Diseño
 Mismo sistema que el carrusel de la promesa: una frase por lámina, fondos hueso y negro alternados y beige para el cierre, mucho espacio vacío, sin producto ni personas. La lámina 3 usa la flecha de marca en bordó como único acento.

@@ -29,6 +29,8 @@ const presentacion = [
   { espaciado: 0.02, lineas: ["Esto es", "VOW."], fondo: COLOR.hueso, tinta: COLOR.negro, apoyo: COLOR.topo },
   { espaciado: 0.02, lineas: ["Una marca", "argentina de", "ropa y", "accesorios", "para entrenar."], tamano: 72, fondo: COLOR.negro, tinta: COLOR.hueso, apoyo: COLOR.topo },
   { espaciado: 0.02, lineas: [{ texto: "VOW", flecha: true }, "Promesa."], fondo: COLOR.hueso, tinta: COLOR.negro, apoyo: COLOR.topo },
+  { lineas: ["Lo que", "firmás", "con vos", "no se", "rompe"], fondo: COLOR.negro, tinta: COLOR.hueso, apoyo: COLOR.topo },
+  { lineas: ["Construí", "en silencio.", "Que hable", "el tiempo"], fondo: COLOR.hueso, tinta: COLOR.negro, apoyo: COLOR.topo },
   { espaciado: 0.02, lineas: ["Simples a", "propósito.", "Diseño hecho", "con criterio."], tamano: 80, fondo: COLOR.negro, tinta: COLOR.hueso, apoyo: COLOR.topo },
   { espaciado: 0.02, lineas: ["Drop 01", "en 2027.", "Anotate en la", "lista de", "espera."], tamano: 72, fondo: COLOR.beige, tinta: COLOR.negro, apoyo: COLOR.negro, cierre: "Link en la bio" },
 ];
