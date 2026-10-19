@@ -329,3 +329,11 @@ test("un guion que aclara qué no aparece se acepta; uno que lo pide se rechaza"
   const mal = validarPlan(planValido([piezaValida({ guion: "Unas manos escriben con lapicera sobre papel." })]), { semanaInicio: SEMANA });
   assert.ok(mal.errores.some((e) => e.includes("promesa en papel")));
 });
+
+test("un guion que numera las láminas no se rechaza por cifras", () => {
+  const guion = "Carrusel tipográfico. Lámina 1: el gancho. Lámina 2: una frase. Lámina 3: cierre con la invitación a la lista.";
+  const r = validarPlan(planValido([piezaValida({ guion })]), { semanaInicio: SEMANA });
+  assert.equal(r.ok, true, r.errores.join(" | "));
+  const inventada = validarPlan(planValido([piezaValida({ guion: "Lámina 1: mostramos 5 straps." })]), { semanaInicio: SEMANA });
+  assert.ok(inventada.errores.some((e) => e.includes('la cifra "5"')));
+});

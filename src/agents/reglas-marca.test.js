@@ -90,3 +90,9 @@ test("el guion puede nombrar algo para descartarlo, pero no para pedirlo", () =>
   // el resto de las reglas no se perdona nunca, ni con negación
   assert.deepEqual(reglas("No es una pieza para decir modo bestia."), ["presumir"]);
 });
+
+test("numerar las láminas o escenas no cuenta como una cifra, pero una cifra suelta sí", () => {
+  assert.deepEqual(cifrasNoPermitidas("Lámina 1: el gancho. Lámina 2: la frase. Story 3 y 4. Paso 5."), []);
+  assert.deepEqual(cifrasNoPermitidas("Lámina 2: probamos 5 straps"), ["5"]);
+  assert.deepEqual(cifrasNoPermitidas("Slide 1 a 3 con Drop 01"), []);
+});
