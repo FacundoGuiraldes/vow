@@ -13,6 +13,7 @@
     "db-migrar": "node src/db/migrar.js",
     "db-seed": "node src/db/seed-catalogo.js",
     "dev": "bash .devcontainer/iniciar.sh",
+    "foto-perfil": "CHROMIUM_PATH=/opt/pw-browsers/chromium node src/disenio/foto-perfil.js",
     "laminas": "CHROMIUM_PATH=/opt/pw-browsers/chromium node src/disenio/carrusel.js",
     "test:e2e": "playwright test -c e2e/playwright.config.ts",
     "test:e2e:smoke": "playwright test -c e2e/playwright.config.ts --grep @smoke",
