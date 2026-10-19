@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { revisarReglas, revisarGuion, revisarTextoAlPublico, cifrasNoPermitidas } from "./reglas-marca.js";
 
 // Estratega: propone el plan de contenido de UNA semana para @vow_ar.
@@ -18,6 +18,7 @@ export const PIEZAS_POR_DEFECTO = 2; // sin producto, mejor pocas y buenas que r
 const TONO_TUTORIAL = /^\s*(c[oó]mo|tips?\b|consejos?\b|pasos?\b|gu[ií]a\b|\d+\s+(cosas|tips|pasos|razones|formas|ideas))/i;
 const RUTA_CEREBRO = new URL("../../docs/marca/cerebro-de-marca.md", import.meta.url);
 const RUTA_REFERENCIAS = new URL("../../docs/marca/referencias.md", import.meta.url);
+const RUTA_INVESTIGACION = new URL("../../docs/investigacion/", import.meta.url);
 
 // El formato de salida se le pide a la IA con una "herramienta" cuyo esquema es este.
 // Así la respuesta llega como datos y no como texto libre que haya que interpretar.
@@ -205,8 +206,27 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
   return { ok: errores.length === 0, errores };
 }
 
-export async function construirSistema(leer = (ruta) => readFile(ruta, "utf8")) {
-  const [cerebro, referencias] = await Promise.all([leer(RUTA_CEREBRO), leer(RUTA_REFERENCIAS)]);
+// Último informe del Investigador (docs/investigacion/informe-AAAA-MM-DD.md), si hay uno.
+// Si no hay, o no se puede leer, el Estratega trabaja solo con la marca y las referencias.
+export async function leerUltimoInforme({ leer = (ruta) => readFile(ruta, "utf8"), listar = () => readdir(RUTA_INVESTIGACION) } = {}) {
+  try {
+    const nombres = (await listar()).filter((n) => /^informe-\d{4}-\d{2}-\d{2}\.md$/.test(n)).sort();
+    if (nombres.length === 0) return null;
+    const nombre = nombres.at(-1);
+    return { nombre, texto: await leer(new URL(nombre, RUTA_INVESTIGACION)) };
+  } catch {
+    return null;
+  }
+}
+
+export async function construirSistema(leer = (ruta) => readFile(ruta, "utf8"), { listar } = {}) {
+  const [cerebro, referencias, informe] = await Promise.all([leer(RUTA_CEREBRO), leer(RUTA_REFERENCIAS), leerUltimoInforme({ leer, listar })]);
+  const bloqueInvestigacion = informe
+    ? `
+
+=== INVESTIGACIÓN DE MERCADO (${informe.nombre}) ===
+${informe.texto}`
+    : "";
   return { cerebro, texto: `Sos el estratega de contenido de VOW, marca argentina de indumentaria y accesorios para entrenar. Proponés el plan de contenido de una semana para su perfil de Instagram. Solo proponés: una persona aprueba cada pieza antes de que salga.
 
 Reglas:
@@ -222,20 +242,21 @@ Reglas:
 - Nunca nombres elementos del gimnasio (barras, mancuernas, pesas, discos, kettlebells, fierros). Suenan forzados. El producto (grips, straps, prendas) sí se puede nombrar cuando hay producto.
 - Cada pieza le habla a quien la mira y le da algo: una idea, un gesto, una razón para sumarse. No explica la marca por dentro (paleta, tipografías, manual de marca). Si una pieza de diseño o de proceso solo sirve para un diseñador, no la propongas.
 - En "justificacion" explicá por qué la pieza encaja con la marca o con una referencia.
+- Si abajo hay una INVESTIGACIÓN DE MERCADO, apoyate en ella: elegí formatos y estilos que los datos respaldan y evitá los que contradicen. Cuando una pieza se apoye en un hallazgo, nombralo por su título en "justificacion". La investigación es una guía con muestra chica, no una verdad: nunca gana sobre el cerebro de marca, no copies piezas ni textos de las marcas estudiadas y no uses sus cifras en los textos de la pieza.
 
 === CEREBRO DE MARCA ===
 ${cerebro}
 
 === MARCAS DE REFERENCIA ===
-${referencias}` };
+${referencias}${bloqueInvestigacion}` };
 }
 
 // Pide el plan de una semana. `cliente` se inyecta para poder probar sin gastar plata.
-export async function planificarSemana({ semanaInicio, fase, recursos = {}, notas = "", piezas = PIEZAS_POR_DEFECTO }, { cliente, modelo = MODELO_ESTRATEGA, leer } = {}) {
+export async function planificarSemana({ semanaInicio, fase, recursos = {}, notas = "", piezas = PIEZAS_POR_DEFECTO }, { cliente, modelo = MODELO_ESTRATEGA, leer, listar } = {}) {
   if (!esFechaISO(semanaInicio)) throw new Error("semanaInicio tiene que ser AAAA-MM-DD.");
   if (!cliente) throw new Error("Falta el cliente de Anthropic.");
 
-  const { cerebro, texto: system } = await construirSistema(leer);
+  const { cerebro, texto: system } = await construirSistema(leer, { listar });
   const { conocidos: ganchosConocidos } = extraerGanchosConocidos(cerebro);
   const pedido = [
     `Armá el plan de la semana que empieza el ${semanaInicio} (hasta el ${sumarDias(semanaInicio, 6)}).`,
