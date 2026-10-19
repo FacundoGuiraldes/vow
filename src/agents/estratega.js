@@ -8,12 +8,15 @@ export const MODELO_ESTRATEGA = "claude-sonnet-5-5";
 export const FORMATOS = ["reel", "carrusel", "imagen", "story"];
 export const PILARES = ["promesa", "proceso", "producto en uso", "gente que entrena", "lanzamiento"];
 export const MAXIMO_PIEZAS = 5;
+const INTENTOS_MAXIMOS = 2;
 const LARGO_MAXIMO_GANCHO = 140;
 const RUTA_CEREBRO = new URL("../../docs/marca/cerebro-de-marca.md", import.meta.url);
 const RUTA_REFERENCIAS = new URL("../../docs/marca/referencias.md", import.meta.url);
 
-// El formato de salida se le exige a la IA con una "herramienta" cuyo esquema es este.
+// El formato de salida se le pide a la IA con una "herramienta" cuyo esquema es este.
 // Así la respuesta llega como datos y no como texto libre que haya que interpretar.
+// Con Claude Sonnet 5.5 la API NO acepta obligar el uso de una herramienta (tool_choice "tool" o "any"
+// devuelven un error 400): se usa "auto", se le pide en el mensaje y, si no la usa, se reintenta una vez.
 export const HERRAMIENTA_PLAN = {
   name: "proponer_plan",
   description: "Devuelve el plan de contenido de la semana para el perfil de Instagram de VOW.",
@@ -145,19 +148,30 @@ export async function planificarSemana({ semanaInicio, fase, recursos = {}, nota
     notas ? `Notas: ${notas}` : "",
   ].filter(Boolean).join("\n");
 
-  const respuesta = await cliente.messages.create({
-    model: modelo,
-    max_tokens: 4096,
-    system,
-    messages: [{ role: "user", content: pedido }],
-    tools: [HERRAMIENTA_PLAN],
-    tool_choice: { type: "tool", name: HERRAMIENTA_PLAN.name },
-  });
+  const mensajes = [{ role: "user", content: `${pedido}\n\nRespondé llamando a la herramienta proponer_plan. No escribas nada fuera de la herramienta.` }];
+  const uso = { entrada: 0, salida: 0 }; // cuánto se consumió, para controlar el gasto
+  let bloque = null;
 
-  // Cuánto se consumió, para controlar el gasto
-  const uso = { entrada: respuesta.usage?.input_tokens ?? 0, salida: respuesta.usage?.output_tokens ?? 0 };
+  for (let intento = 1; intento <= INTENTOS_MAXIMOS && !bloque; intento++) {
+    const respuesta = await cliente.messages.create({
+      model: modelo,
+      max_tokens: 4096,
+      system,
+      messages: mensajes,
+      tools: [HERRAMIENTA_PLAN],
+      tool_choice: { type: "auto" },
+    });
+    uso.entrada += respuesta.usage?.input_tokens ?? 0;
+    uso.salida += respuesta.usage?.output_tokens ?? 0;
 
-  const bloque = respuesta.content?.find((b) => b.type === "tool_use" && b.name === HERRAMIENTA_PLAN.name);
+    bloque = respuesta.content?.find((b) => b.type === "tool_use" && b.name === HERRAMIENTA_PLAN.name) ?? null;
+    if (!bloque) {
+      // La IA contestó con texto: se le recuerda que tiene que usar la herramienta
+      mensajes.push({ role: "assistant", content: respuesta.content ?? [] });
+      mensajes.push({ role: "user", content: "Tenés que responder llamando a la herramienta proponer_plan." });
+    }
+  }
+
   if (!bloque) return { ok: false, plan: null, errores: ["La respuesta no trajo el plan en el formato esperado."], uso };
 
   const { ok, errores } = validarPlan(bloque.input, { semanaInicio, recursos });
