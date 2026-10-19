@@ -5,7 +5,8 @@ Este archivo es la fuente única de cómo habla y cómo se ve VOW. Todo contenid
 ## 1. Qué es VOW
 
 - Marca argentina de indumentaria y accesorios para entrenar (prendas técnicas, grips, straps). Es una marca independiente, propia de Facundo.
-- Idea central: **el voto**. Una promesa que escribís vos, por vos, y cumplís. La etiqueta interior de cada prenda es donde se escribe.
+- Idea central: **la promesa**. Una frase que escribís vos, para vos, y cumplís. La etiqueta interior de cada prenda es donde se escribe.
+- Sobre la palabra "voto": es el nombre interno de la idea (así se llamó al principio y aparece en el manifiesto de la landing), pero se evita en la comunicación porque suena a elecciones. Se dice "promesa".
 - En una frase: **simplicidad estética para quienes disfrutan entrenar y verse bien haciéndolo, sin dejar de ser simples.**
 
 ## 2. Para quién
@@ -42,7 +43,7 @@ Cómo se resuelve la tensión entre "verse bien" y "no presumir": lo estético e
 
 ## 5. Palabras
 
-**Sí:** voto, construir, constancia, sobrio, simple, preciso, lista, stock real, hecho para entrenar, estética cuidada.
+**Sí:** promesa, construir, constancia, sobrio, simple, preciso, lista, stock real, hecho para entrenar, estética cuidada.
 
 **No (nunca en una pieza):**
 - Motivación vacía: "sin excusas", "tu mejor versión", "nada es imposible".
@@ -88,7 +89,7 @@ Cómo se resuelve la tensión entre "verse bien" y "no presumir": lo estético e
 
 - "Nadie te está mirando. Entrená igual."
 - "Construí, no figures." *(a revisar: ¿"figurar" suena bien o hay otra palabra?)*
-- "Escribí tu voto. Después cumplilo."
+- "Escribí tu promesa. Después cumplila."
 - "Así se cose la etiqueta que nadie ve."
 - "Entrá a la lista antes de que abra."
 - "El precio es este. Sin trucos."
