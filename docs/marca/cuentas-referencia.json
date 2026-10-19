@@ -1,0 +1,10 @@
+{
+  "nota": "Cuentas de Instagram que estudia el Investigador. Tienen que ser cuentas profesionales y públicas. Para sumar una, agregá una línea y probá con `npm run investigar`.",
+  "cuentas": [
+    { "usuario": "fuarkok", "marca": "Fuark", "pais": "Argentina" },
+    { "usuario": "gymshark", "marca": "Gymshark", "pais": "Reino Unido" },
+    { "usuario": "youngla", "marca": "YoungLA", "pais": "Estados Unidos" },
+    { "usuario": "darcsport", "marca": "Darcsport", "pais": "Estados Unidos" },
+    { "usuario": "vqfit", "marca": "Vanquish Fitness", "pais": "Reino Unido" }
+  ]
+}
