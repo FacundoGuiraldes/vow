@@ -18,10 +18,10 @@ const FLECHA = { flecha: true }; // se dibuja como imagen vectorial (la tipograf
 // `espaciado`: separación entre letras en em (0 por defecto).
 // Cada línea es un texto, o { texto, flecha: true } para un texto seguido de la flecha de marca.
 const promesa = [
-  { lineas: ["Cumplite", "a vos", "primero"], fondo: COLOR.hueso, tinta: COLOR.negro, apoyo: COLOR.topo },
-  { lineas: ["Lo que", "firmás", "con vos", "no se", "rompe"], fondo: COLOR.negro, tinta: COLOR.hueso, apoyo: COLOR.topo },
-  { lineas: ["El trabajo", "diario no", "busca", "aplausos"], fondo: COLOR.hueso, tinta: COLOR.negro, apoyo: COLOR.topo },
-  { lineas: ["Construí", "en silencio.", "Que hable", "el tiempo"], fondo: COLOR.negro, tinta: COLOR.hueso, apoyo: COLOR.topo },
+  { lineas: ["Cumplite", "a vos", "primero"], fondo: COLOR.negro, tinta: COLOR.hueso, apoyo: COLOR.topo },
+  { lineas: ["Lo que", "firmás", "con vos", "no se", "rompe"], fondo: COLOR.hueso, tinta: COLOR.negro, apoyo: COLOR.topo },
+  { lineas: ["El trabajo", "diario no", "busca", "aplausos"], fondo: COLOR.negro, tinta: COLOR.hueso, apoyo: COLOR.topo },
+  { lineas: ["Construí", "en silencio.", "Que hable", "el tiempo"], fondo: COLOR.hueso, tinta: COLOR.negro, apoyo: COLOR.topo },
   { lineas: ["Anotate en", "la lista", "de espera."], fondo: COLOR.beige, tinta: COLOR.negro, apoyo: COLOR.negro, cierre: "Link en la bio" },
 ];
 

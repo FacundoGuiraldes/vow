@@ -10,7 +10,7 @@
 5. Anotate en la lista de espera.
 
 ## Diseño
-Carrusel tipográfico: una frase por lámina, fondo hueso y negro alternados, bordó solo como acento mínimo. Mucho espacio vacío, sin ilustraciones, sin producto, sin personas. Tipografías y colores de la landing (ver `docs/marca/cerebro-de-marca.md`, sección 6).
+Carrusel tipográfico: una frase por lámina, fondo negro y hueso alternados (la portada es negra, para que en la grilla contraste con la presentación, que es clara), bordó solo como acento mínimo. Mucho espacio vacío, sin ilustraciones, sin producto, sin personas. Tipografías y colores de la landing (ver `docs/marca/cerebro-de-marca.md`, sección 6).
 
 ## Epígrafe
 Lo que te prometés a vos no necesita público. Anotate en la lista de espera.

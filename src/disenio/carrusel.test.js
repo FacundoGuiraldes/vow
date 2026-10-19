@@ -72,3 +72,13 @@ test("la presentación dice el año del lanzamiento en la última lámina", () =
   const ultima = CARRUSELES.presentacion.laminas.at(-1);
   assert.ok(ultima.lineas.join(" ").includes("2027"));
 });
+
+test("las portadas de los dos carruseles tienen fondos distintos, para que la grilla del perfil alterne claro y oscuro", () => {
+  assert.notEqual(CARRUSELES.promesa.laminas[0].fondo, CARRUSELES.presentacion.laminas[0].fondo);
+});
+
+test("dentro de cada carrusel, las láminas 1 a 4 alternan fondo claro y oscuro", () => {
+  for (const { laminas } of Object.values(CARRUSELES)) {
+    for (let i = 1; i < 4; i++) assert.notEqual(laminas[i].fondo, laminas[i - 1].fondo);
+  }
+});
