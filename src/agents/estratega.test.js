@@ -236,10 +236,10 @@ const conocidosReales = async () => {
 
 test("lee del cerebro de marca los ganchos aprobados, pendientes y descartados", async () => {
   const { aprobados, conocidos } = await conocidosReales();
-  assert.equal(aprobados.length, 9);
+  assert.equal(aprobados.length, 8);
   assert.ok(aprobados.includes("Cumplite a vos primero"));
   assert.ok(aprobados.includes("Para los que cumplen"));
-  assert.ok(aprobados.includes("Escribí tu promesa. Después cumplila."));
+  assert.ok(!aprobados.includes("Escribí tu promesa. Después cumplila."), "pasó a descartados");
   assert.ok(aprobados.includes("Firmá lo que vas a sostener"));
   assert.ok(conocidos.includes("Nadie te está mirando. Entrená igual."), "los descartados también cuentan como conocidos");
   assert.ok(conocidos.length > aprobados.length);
