@@ -34,13 +34,11 @@ const fuente = (paquete, archivo) =>
 const marca = readFileSync(join(raiz, "web", "src", "assets", "logo-mark.svg"), "utf8");
 
 export function htmlDeLamina(lamina, indice, total) {
-  const n = (x) => String(x).padStart(2, "0");
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><style>
 @font-face{font-family:"Unbounded";font-weight:800;src:url(data:font/woff2;base64,${fuente("unbounded", "unbounded-latin-800-normal.woff2")}) format("woff2")}
 @font-face{font-family:"Space Mono";font-weight:400;src:url(data:font/woff2;base64,${fuente("space-mono", "space-mono-latin-400-normal.woff2")}) format("woff2")}
 *{margin:0;padding:0;box-sizing:border-box}
 body{width:1080px;height:1350px;background:${lamina.fondo};color:${lamina.tinta};position:relative;overflow:hidden}
-.et{position:absolute;top:96px;left:96px;right:96px;display:flex;justify-content:space-between;font:400 26px "Space Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:${lamina.apoyo}}
 h1{position:absolute;left:96px;right:96px;bottom:300px;font:800 100px/1.08 "Unbounded",sans-serif;letter-spacing:0;word-spacing:.1em;text-transform:uppercase}
 h1 span{display:block}
 .acento{position:absolute;left:96px;bottom:238px;width:72px;height:6px;background:${COLOR.bordo}}
@@ -48,7 +46,6 @@ h1 span{display:block}
 .pie svg{height:64px;width:auto;color:${lamina.tinta}}
 .pie p{font:400 26px "Space Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:${lamina.tinta}}
 </style></head><body>
-<div class="et"><span>${n(indice + 1)} / ${n(total)}</span></div>
 <h1>${lamina.lineas.map((l) => `<span>${l}</span>`).join("")}</h1>
 <div class="acento"></div>
 <div class="pie">${marca}${lamina.cierre ? `<p>${lamina.cierre}</p>` : ""}</div>
