@@ -100,6 +100,7 @@ Cómo se resuelve la tensión entre "verse bien" y "no presumir": lo estético e
 - "Escribí tu promesa. Después cumplila."
 - "Lo que firmás con vos no se rompe"
 - "Firmá lo que vas a sostener"
+- "Cumplite a vos primero"
 - "Llevá tu compromiso pegado a la piel"
 - "El trabajo diario no busca aplausos"
 - "Construí en silencio. Que hable el tiempo"
