@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { revisarReglas, cifrasNoPermitidas } from "./reglas-marca.js";
+import { revisarReglas, revisarTextoAlPublico, cifrasNoPermitidas } from "./reglas-marca.js";
 
 const reglasDe = (texto) => revisarReglas(texto).map((p) => p.regla);
 
@@ -59,4 +59,24 @@ test("rechaza anunciar lo que falta", () => {
   assert.deepEqual(reglasDe("Todavía no hay prenda para mostrarte"), ["anuncia lo que falta"]);
   assert.deepEqual(reglasDe("Todavía no tenemos stock"), ["anuncia lo que falta"]);
   assert.deepEqual(revisarReglas("Todavía estamos diseñando la etiqueta"), []);
+});
+
+test("rechaza nombrar elementos del gimnasio, pero no el producto", () => {
+  for (const texto of ["Tu palabra primero. Después la barra.", "Sin mancuernas no hay promesa", "Más pesas", "Los fierros no mienten"]) {
+    assert.deepEqual(reglasDe(texto), ["nombra elementos del gimnasio"], texto);
+  }
+  assert.deepEqual(revisarReglas("Grips y straps hechos para entrenar"), []);
+  assert.deepEqual(revisarReglas("Una barrera menos"), []);
+});
+
+test("la promesa no se escribe a mano ni en papel", () => {
+  assert.deepEqual(reglasDe("Escribila a mano con lapicera"), ["promesa en papel"]);
+  assert.deepEqual(reglasDe("Una cartulina beige"), ["promesa en papel"]);
+  assert.deepEqual(revisarReglas("Escribí tu promesa. Después cumplila."), []);
+});
+
+test("lo que ve el público no explica la marca por dentro", () => {
+  assert.deepEqual(revisarTextoAlPublico("Beige y bordó: nuestra paleta").map((p) => p.regla), ["explica la marca por dentro"]);
+  assert.deepEqual(revisarTextoAlPublico("La tipografía es Unbounded").length, 1);
+  assert.deepEqual(revisarTextoAlPublico("Firmá lo que vas a sostener"), []);
 });

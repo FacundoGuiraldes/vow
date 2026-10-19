@@ -23,6 +23,13 @@ const REGLAS = [
   },
   // Anunciar lo que falta (descartado por Facundo): una marca no muestra que no tiene producto
   { regla: "anuncia lo que falta", patron: /todav[ií]a no (hay|tenemos|llega|lleg[oó]|existe)|no hay (prenda|producto|stock)\b/i },
+  // Elementos del gimnasio (descartado por Facundo): nombrarlos suena forzado. Grips y straps son el producto y sí se pueden nombrar.
+  {
+    regla: "nombra elementos del gimnasio",
+    patron: /(?<!\p{L})(barras?|mancuernas?|pesas?|kettlebells?|fierros?|hierros?|discos? de peso)(?!\p{L})/iu,
+  },
+  // La promesa es de uno consigo mismo, no un papel (corregido por Facundo)
+  { regla: "promesa en papel", patron: /a mano|lapicera|birome|l[aá]piz|cartulina/i },
   // Cadenas de signos de exclamación
   { regla: "exceso de exclamaciones", patron: /!{2,}/ },
   // "Drop" suelto: solo se acepta "Drop 01"
@@ -30,6 +37,17 @@ const REGLAS = [
 ];
 
 const MAXIMO_EMOJIS = 1;
+
+// Lo que ve la gente no explica la marca por dentro (paleta, tipografías, manual): le habla a quien mira.
+// Estas palabras sí pueden aparecer en el guion, que son instrucciones de producción, pero no en lo que se publica.
+const MARCA_POR_DENTRO = /paleta|tipograf[ií]a|unbounded|space (mono|grotesk)|manual de marca|gu[ií]a de estilo|identidad visual/i;
+
+// Devuelve problemas para un texto que va a ver el público (gancho, texto en pantalla, epígrafe).
+export function revisarTextoAlPublico(texto) {
+  if (typeof texto !== "string") return [];
+  const coincidencia = texto.match(MARCA_POR_DENTRO);
+  return coincidencia ? [{ regla: "explica la marca por dentro", fragmento: coincidencia[0] }] : [];
+}
 
 // Devuelve una lista de problemas (vacía si el texto cumple las reglas).
 export function revisarReglas(texto) {

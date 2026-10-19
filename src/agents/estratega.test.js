@@ -236,9 +236,10 @@ const conocidosReales = async () => {
 
 test("lee del cerebro de marca los ganchos aprobados, pendientes y descartados", async () => {
   const { aprobados, conocidos } = await conocidosReales();
-  assert.equal(aprobados.length, 7);
+  assert.equal(aprobados.length, 8);
   assert.ok(aprobados.includes("Para los que cumplen"));
   assert.ok(aprobados.includes("Escribí tu promesa. Después cumplila."));
+  assert.ok(aprobados.includes("Firmá lo que vas a sostener"));
   assert.ok(conocidos.includes("Nadie te está mirando. Entrená igual."), "los descartados también cuentan como conocidos");
   assert.ok(conocidos.length > aprobados.length);
 });
@@ -297,4 +298,26 @@ test("las instrucciones piden ganchos nuevos y alternativos", async () => {
   const { texto } = await construirSistema();
   assert.match(texto, /A lo sumo UNO de los ganchos principales/);
   assert.match(texto, /4 alternativos/);
+});
+
+test("rechaza piezas que explican la marca por dentro, pero lo deja en el guion", () => {
+  const dentro = validarPlan(planValido([piezaValida({ texto_en_pantalla: ["Nuestra paleta: beige y bordó."] })]), { semanaInicio: SEMANA });
+  assert.equal(dentro.ok, false);
+  assert.ok(dentro.errores.some((e) => e.includes("explica la marca por dentro")));
+  const enGuion = validarPlan(planValido([piezaValida({ guion: "Cada slide muestra un color de la paleta, con Unbounded para el título." })]), { semanaInicio: SEMANA });
+  assert.equal(enGuion.ok, true, enGuion.errores.join(" | "));
+});
+
+test("rechaza ganchos alternativos con elementos del gimnasio y recursos de papel y lapicera", () => {
+  const gym = validarPlan(planValido([piezaValida({ ganchos_alternativos: ["Prometé poco. Cumplí todo.", "Tu palabra. Después la barra.", "Una línea. Un compromiso.", "Lo escrito se cumple."] })]), { semanaInicio: SEMANA });
+  assert.ok(gym.errores.some((e) => e.includes("nombra elementos del gimnasio")));
+  const papel = validarPlan(planValido([piezaValida({ recursos: ["Lapicera negra", "Cartulina beige"] })]), { semanaInicio: SEMANA });
+  assert.ok(papel.errores.some((e) => e.includes("promesa en papel en los recursos")));
+});
+
+test("las instrucciones dicen que la promesa es de uno mismo y que no se nombran elementos del gym", async () => {
+  const { texto } = await construirSistema(leerFalso);
+  assert.match(texto, /a sí misma y cumple/);
+  assert.match(texto, /elementos del gimnasio/);
+  assert.match(texto, /le habla a quien la mira/i);
 });
