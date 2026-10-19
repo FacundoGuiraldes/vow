@@ -30,6 +30,10 @@ const clienteFalso = (input, usage = { input_tokens: 1200, output_tokens: 800 })
     messages: {
       create: async (pedido) => {
         pedidos.push(pedido);
+        // Igual que la API real con Sonnet 5.5: no acepta forzar una herramienta
+        if (["tool", "any"].includes(pedido.tool_choice?.type)) {
+          throw new Error('400 tool_choice: type "tool" and "any" are not supported for this model.');
+        }
         return {
           content: input === null ? [{ type: "text", text: "hola" }] : [{ type: "tool_use", id: "t1", name: "proponer_plan", input }],
           usage,
@@ -51,11 +55,13 @@ test("un plan válido se acepta y informa cuántos tokens usó", async () => {
   assert.deepEqual(r.uso, { entrada: 1200, salida: 800 });
 });
 
-test("le exige a la IA el formato con la herramienta y le pasa la marca y las referencias", async () => {
+test("le pide el formato con la herramienta en modo auto (Sonnet 5.5 no acepta forzarla) y le pasa la marca y las referencias", async () => {
   const cliente = clienteFalso(planValido());
   await planificarSemana(pedido, { cliente, leer: leerFalso });
   const enviado = cliente.pedidos[0];
-  assert.deepEqual(enviado.tool_choice, { type: "tool", name: HERRAMIENTA_PLAN.name });
+  // La API real rechaza "tool" y "any" con este modelo (error 400): tiene que ser "auto"
+  assert.deepEqual(enviado.tool_choice, { type: "auto" });
+  assert.match(enviado.messages[0].content, /llamando a la herramienta proponer_plan/);
   assert.equal(enviado.tools[0].name, "proponer_plan");
   assert.match(enviado.system, /CEREBRO-DE-PRUEBA/);
   assert.match(enviado.system, /REFERENCIAS-DE-PRUEBA/);
@@ -69,11 +75,25 @@ test("el sistema lee los archivos reales de marca", async () => {
   assert.match(sistema, /Vanquish/);
 });
 
-test("si la respuesta no trae el plan en el formato esperado, se descarta", async () => {
-  const r = await planificarSemana(pedido, { cliente: clienteFalso(null), leer: leerFalso });
+test("si la respuesta no trae el plan en el formato esperado, reintenta una vez y después lo descarta", async () => {
+  const cliente = clienteFalso(null);
+  const r = await planificarSemana(pedido, { cliente, leer: leerFalso });
   assert.equal(r.ok, false);
   assert.equal(r.plan, null);
   assert.match(r.errores[0], /formato esperado/);
+  assert.equal(cliente.pedidos.length, 2, "un intento y un reintento");
+  assert.deepEqual(r.uso, { entrada: 2400, salida: 1600 }, "se suma el gasto de los dos intentos");
+});
+
+test("si la primera respuesta es texto y la segunda trae el plan, se acepta", async () => {
+  const respuestas = [
+    { content: [{ type: "text", text: "Acá va el plan..." }], usage: { input_tokens: 100, output_tokens: 50 } },
+    { content: [{ type: "tool_use", id: "t2", name: "proponer_plan", input: planValido() }], usage: { input_tokens: 150, output_tokens: 700 } },
+  ];
+  const cliente = { messages: { create: async () => respuestas.shift() } };
+  const r = await planificarSemana(pedido, { cliente, leer: leerFalso });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.uso, { entrada: 250, salida: 750 });
 });
 
 test("un plan sin piezas o con campos que faltan se rechaza", () => {
