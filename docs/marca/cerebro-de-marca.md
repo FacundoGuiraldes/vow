@@ -94,11 +94,16 @@ Cómo se resuelve la tensión entre "verse bien" y "no presumir": lo estético e
 - En imperativo y en voseo ("Escribí", "Entrená", "Cumplila"), concreto y sin adornos.
 - Habla de lo que la persona hace o se compromete a hacer, no de lo que la marca todavía no tiene.
 
-**Aprobado por Facundo:**
+**Aprobados por Facundo:**
 - "Escribí tu promesa. Después cumplila."
+- "Lo que firmás con vos no se rompe"
+- "Llevá tu compromiso pegado a la piel"
+- "El trabajo diario no busca aplausos"
+- "Construí en silencio. Que hable el tiempo"
+- "Cortes precisos para entrenar en serio"
+- "Para los que cumplen"
 
 **En la misma línea, sin aprobar todavía:**
-- "Nadie te está mirando. Entrená igual."
 - "Así se cose la etiqueta que nadie ve."
 - "Entrá a la lista antes de que abra."
 - "El precio es este. Sin trucos."
@@ -107,6 +112,9 @@ Cómo se resuelve la tensión entre "verse bien" y "no presumir": lo estético e
 **Descartados por Facundo (no repetir el estilo):**
 - "Cómo escribir una promesa que puedas cumplir." Suena a tutorial o consejo: VOW no le explica a la gente cómo vivir.
 - "Todavía no hay prenda para mostrarte. Hay una idea." Anuncia lo que falta: una marca no muestra su ausencia de producto.
+- "Nadie te está mirando. Entrená igual." No lo convence.
+
+**Qué tienen en común los aprobados:** afirman en vez de explicar, hablan de compromiso, constancia o calidad, y tienen un ritmo corto y seco. Se pueden usar tal cual, pero el Estratega tiene que crear ganchos nuevos en el mismo estilo, no repetir esta lista.
 
 ## 9. Por confirmar
 

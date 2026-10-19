@@ -11,6 +11,8 @@ export const MAXIMO_PIEZAS = 5;
 const INTENTOS_MAXIMOS = 2;
 const LARGO_MAXIMO_GANCHO = 140;
 export const PALABRAS_MAXIMAS_GANCHO = 12; // un gancho fuerte es corto
+export const ALTERNATIVAS_PEDIDAS = 4;
+const ALTERNATIVAS_MINIMAS = 3;
 export const PIEZAS_POR_DEFECTO = 2; // sin producto, mejor pocas y buenas que rellenar
 // Ganchos que suenan a tutorial o a lista de consejos (descartado por Facundo)
 const TONO_TUTORIAL = /^\s*(c[oó]mo|tips?\b|consejos?\b|pasos?\b|gu[ií]a\b|\d+\s+(cosas|tips|pasos|razones|formas|ideas))/i;
@@ -35,12 +37,17 @@ export const HERRAMIENTA_PLAN = {
         maxItems: MAXIMO_PIEZAS,
         items: {
           type: "object",
-          required: ["fecha", "formato", "pilar", "gancho", "guion", "texto_en_pantalla", "epigrafe", "palabras_clave", "cta", "recursos", "justificacion"],
+          required: ["fecha", "formato", "pilar", "gancho", "ganchos_alternativos", "guion", "texto_en_pantalla", "epigrafe", "palabras_clave", "cta", "recursos", "justificacion"],
           properties: {
             fecha: { type: "string", description: "AAAA-MM-DD, dentro de la semana pedida." },
             formato: { type: "string", enum: FORMATOS },
             pilar: { type: "string", enum: PILARES },
             gancho: { type: "string", description: "Lo que se dice o se lee en los primeros 3 segundos." },
+            ganchos_alternativos: {
+              type: "array",
+              items: { type: "string" },
+              description: `${ALTERNATIVAS_PEDIDAS} ganchos NUEVOS y distintos entre sí para esta misma pieza, en el mismo estilo. No copies ni parafrasees los ejemplos del cerebro de marca.`,
+            },
             guion: { type: "string", description: "Qué pasa en la pieza, paso a paso." },
             texto_en_pantalla: { type: "array", items: { type: "string" } },
             epigrafe: { type: "string" },
@@ -72,10 +79,48 @@ const textosDeLaPieza = (pieza) => [
   ...(Array.isArray(pieza.texto_en_pantalla) ? pieza.texto_en_pantalla : []),
 ];
 
+// Compara ganchos sin tildes, mayúsculas ni puntuación
+const normalizar = (texto) => String(texto).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9ñ ]/g, " ").replace(/\s+/g, " ").trim();
+
+// Saca del cerebro de marca los ganchos de la sección 8 (aprobados, pendientes y descartados)
+export function extraerGanchosConocidos(textoCerebro) {
+  const inicio = textoCerebro.indexOf("## 8.");
+  const fin = textoCerebro.indexOf("## 9.");
+  if (inicio === -1) return { aprobados: [], conocidos: [] };
+  const seccion = textoCerebro.slice(inicio, fin === -1 ? undefined : fin);
+  const conocidos = [];
+  const aprobados = [];
+  let esAprobado = false;
+  for (const linea of seccion.split("\n")) {
+    if (linea.startsWith("**")) esAprobado = /^\*\*Aprobados? por/i.test(linea);
+    const coincidencia = linea.match(/^- "(.+?)"/);
+    if (!coincidencia) continue;
+    conocidos.push(coincidencia[1]);
+    if (esAprobado) aprobados.push(coincidencia[1]);
+  }
+  return { aprobados, conocidos };
+}
+
+// Reglas que tiene que cumplir cualquier gancho, principal o alternativo
+function revisarGancho(gancho, etiqueta, { reglas = true } = {}) {
+  const errores = [];
+  const palabras = gancho.trim().split(/\s+/).length;
+  if (palabras > PALABRAS_MAXIMAS_GANCHO) errores.push(`${etiqueta}: tiene ${palabras} palabras (máximo ${PALABRAS_MAXIMAS_GANCHO}).`);
+  if (gancho.length > LARGO_MAXIMO_GANCHO) errores.push(`${etiqueta}: supera ${LARGO_MAXIMO_GANCHO} caracteres.`);
+  if (TONO_TUTORIAL.test(gancho)) errores.push(`${etiqueta}: suena a tutorial o consejo ("${gancho}").`);
+  // El gancho principal ya pasa por las reglas de marca junto con el resto de los textos de la pieza
+  if (reglas) {
+    for (const { regla, fragmento } of revisarReglas(gancho)) errores.push(`${etiqueta}: ${regla} ("${fragmento}").`);
+    for (const cifra of cifrasNoPermitidas(gancho)) errores.push(`${etiqueta}: la cifra "${cifra}" no está en los datos cargados.`);
+  }
+  return errores;
+}
+
 // Revisa que el plan tenga la forma pedida y cumpla las reglas de marca.
 // Devuelve { ok, errores }. Si hay algún error, el plan se descarta (no se guarda).
-export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitidas = ["01"], piezas = PIEZAS_POR_DEFECTO } = {}) {
+export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitidas = ["01"], piezas = PIEZAS_POR_DEFECTO, ganchosConocidos = [] } = {}) {
   const errores = [];
+  const conocidos = new Set(ganchosConocidos.map(normalizar));
   if (!plan || typeof plan !== "object") return { ok: false, errores: ["El plan no es un objeto."] };
   if (typeof plan.resumen !== "string" || plan.resumen.trim() === "") errores.push("Falta el resumen.");
   if (!Array.isArray(plan.piezas) || plan.piezas.length === 0) {
@@ -101,13 +146,20 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
     for (const campo of ["texto_en_pantalla", "palabras_clave", "recursos"]) {
       if (!Array.isArray(pieza[campo])) falta(campo);
     }
-    if (typeof pieza.gancho === "string" && pieza.gancho.length > LARGO_MAXIMO_GANCHO) {
-      errores.push(`${etiqueta}: el gancho supera ${LARGO_MAXIMO_GANCHO} caracteres.`);
-    }
-    if (typeof pieza.gancho === "string") {
-      const palabras = pieza.gancho.trim().split(/\s+/).length;
-      if (palabras > PALABRAS_MAXIMAS_GANCHO) errores.push(`${etiqueta}: el gancho tiene ${palabras} palabras (máximo ${PALABRAS_MAXIMAS_GANCHO}).`);
-      if (TONO_TUTORIAL.test(pieza.gancho)) errores.push(`${etiqueta}: el gancho suena a tutorial o consejo ("${pieza.gancho}").`);
+    if (typeof pieza.gancho === "string" && pieza.gancho.trim() !== "") errores.push(...revisarGancho(pieza.gancho, `${etiqueta}: el gancho`, { reglas: false }));
+    // Ganchos alternativos: tienen que ser nuevos, distintos entre sí y cumplir las mismas reglas
+    if (!Array.isArray(pieza.ganchos_alternativos) || pieza.ganchos_alternativos.length < ALTERNATIVAS_MINIMAS) {
+      errores.push(`${etiqueta}: tiene que traer al menos ${ALTERNATIVAS_MINIMAS} ganchos alternativos.`);
+    } else {
+      const vistos = new Set([normalizar(pieza.gancho)]);
+      pieza.ganchos_alternativos.forEach((alternativo, j) => {
+        const nombre = `${etiqueta}, alternativo ${j + 1}`;
+        if (typeof alternativo !== "string" || alternativo.trim() === "") return errores.push(`${nombre}: está vacío.`);
+        if (conocidos.has(normalizar(alternativo))) errores.push(`${nombre}: copia un ejemplo del cerebro de marca ("${alternativo}").`);
+        if (vistos.has(normalizar(alternativo))) errores.push(`${nombre}: está repetido.`);
+        vistos.add(normalizar(alternativo));
+        errores.push(...revisarGancho(alternativo, nombre));
+      });
     }
     // Una sola acción: anotarse en la lista de espera
     if (typeof pieza.cta === "string" && !/lista/i.test(pieza.cta)) errores.push(`${etiqueta}: la acción final tiene que ser anotarse en la lista.`);
@@ -122,12 +174,23 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
     }
   });
 
+  // Entre piezas: a lo sumo un gancho principal puede salir de la lista del cerebro de marca,
+  // y ningún pilar se repite más de lo razonable (con 2 piezas, pilares distintos)
+  const principalesCopiados = plan.piezas.filter((pieza) => conocidos.has(normalizar(pieza.gancho)));
+  if (principalesCopiados.length > 1) errores.push("Más de un gancho principal sale de la lista del cerebro de marca: tiene que crear ganchos nuevos.");
+  const maximoPorPilar = Math.ceil(plan.piezas.length / 2);
+  const cuentaPilares = {};
+  for (const pieza of plan.piezas) cuentaPilares[pieza.pilar] = (cuentaPilares[pieza.pilar] ?? 0) + 1;
+  for (const [pilar, cantidad] of Object.entries(cuentaPilares)) {
+    if (cantidad > maximoPorPilar) errores.push(`El pilar "${pilar}" aparece ${cantidad} veces: tiene que haber variedad entre piezas.`);
+  }
+
   return { ok: errores.length === 0, errores };
 }
 
 export async function construirSistema(leer = (ruta) => readFile(ruta, "utf8")) {
   const [cerebro, referencias] = await Promise.all([leer(RUTA_CEREBRO), leer(RUTA_REFERENCIAS)]);
-  return `Sos el estratega de contenido de VOW, marca argentina de indumentaria y accesorios para entrenar. Proponés el plan de contenido de una semana para su perfil de Instagram. Solo proponés: una persona aprueba cada pieza antes de que salga.
+  return { cerebro, texto: `Sos el estratega de contenido de VOW, marca argentina de indumentaria y accesorios para entrenar. Proponés el plan de contenido de una semana para su perfil de Instagram. Solo proponés: una persona aprueba cada pieza antes de que salga.
 
 Reglas:
 - Todo lo que escribas sigue el cerebro de marca de abajo. Si algo lo contradice, gana el cerebro de marca.
@@ -136,13 +199,15 @@ Reglas:
 - Solo podés proponer piezas que se puedan hacer con los recursos disponibles que te indican. Si no hay producto, no propongas mostrar producto.
 - Las referencias son inspiración, no datos para citar. No copies sus textos ni sus ideas al pie de la letra.
 - Los ganchos tienen que ser potentes y sobrios, como pide la sección 8 del cerebro de marca: afirmaciones cortas de 3 a 8 palabras, en imperativo, que comprometen. Nunca tono de tutorial, de consejo ni de lo que falta.
+- Los ganchos de la sección 8 son ejemplos de estilo. A lo sumo UNO de los ganchos principales del plan puede ser uno de los aprobados; todos los demás tienen que ser creados por vos. Los ganchos alternativos son siempre nuevos: ni copias ni paráfrasis de los ejemplos.
+- Cada pieza trae un gancho principal y 4 alternativos distintos entre sí. Las piezas de una misma semana tienen que ser de pilares distintos.
 - En "justificacion" explicá por qué la pieza encaja con la marca o con una referencia.
 
 === CEREBRO DE MARCA ===
 ${cerebro}
 
 === MARCAS DE REFERENCIA ===
-${referencias}`;
+${referencias}` };
 }
 
 // Pide el plan de una semana. `cliente` se inyecta para poder probar sin gastar plata.
@@ -150,7 +215,8 @@ export async function planificarSemana({ semanaInicio, fase, recursos = {}, nota
   if (!esFechaISO(semanaInicio)) throw new Error("semanaInicio tiene que ser AAAA-MM-DD.");
   if (!cliente) throw new Error("Falta el cliente de Anthropic.");
 
-  const system = await construirSistema(leer);
+  const { cerebro, texto: system } = await construirSistema(leer);
+  const { conocidos: ganchosConocidos } = extraerGanchosConocidos(cerebro);
   const pedido = [
     `Armá el plan de la semana que empieza el ${semanaInicio} (hasta el ${sumarDias(semanaInicio, 6)}).`,
     `Fase del proyecto: ${fase}.`,
@@ -185,6 +251,6 @@ export async function planificarSemana({ semanaInicio, fase, recursos = {}, nota
 
   if (!bloque) return { ok: false, plan: null, errores: ["La respuesta no trajo el plan en el formato esperado."], uso };
 
-  const { ok, errores } = validarPlan(bloque.input, { semanaInicio, recursos, piezas });
+  const { ok, errores } = validarPlan(bloque.input, { semanaInicio, recursos, piezas, ganchosConocidos });
   return { ok, plan: ok ? bloque.input : null, errores, uso, propuesta: bloque.input };
 }

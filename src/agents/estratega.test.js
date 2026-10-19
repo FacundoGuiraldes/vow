@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { planificarSemana, validarPlan, construirSistema, HERRAMIENTA_PLAN } from "./estratega.js";
+import { planificarSemana, validarPlan, construirSistema, extraerGanchosConocidos, HERRAMIENTA_PLAN, PALABRAS_MAXIMAS_GANCHO } from "./estratega.js";
+import { revisarReglas } from "./reglas-marca.js";
 
 const SEMANA = "2026-10-19";
 
@@ -10,6 +11,7 @@ const piezaValida = (cambios = {}) => ({
   formato: "reel",
   pilar: "promesa",
   gancho: "Una promesa para vos.",
+  ganchos_alternativos: ["Prometé poco. Cumplí todo.", "Tu firma no se negocia.", "Lo escrito se cumple.", "Una línea. Un compromiso."],
   guion: "Texto sobre fondo hueso. Cada línea aparece sola, sin música fuerte.",
   texto_en_pantalla: ["Una promesa para vos.", "La escribís vos. Nadie más la lee."],
   epigrafe: "Es lo que sostiene todo lo demás. Anotate en la lista: link en la bio.",
@@ -70,7 +72,7 @@ test("le pide el formato con la herramienta en modo auto (Sonnet 5.5 no acepta f
 });
 
 test("el sistema lee los archivos reales de marca", async () => {
-  const sistema = await construirSistema();
+  const { texto: sistema } = await construirSistema();
   assert.match(sistema, /Cerebro de marca/);
   assert.match(sistema, /Vanquish/);
 });
@@ -200,7 +202,11 @@ test("un gancho largo no es un gancho fuerte: máximo 12 palabras", () => {
 });
 
 test("respeta la cantidad de piezas pedida (por defecto 2)", () => {
-  const tres = planValido([piezaValida(), piezaValida({ fecha: "2026-10-21" }), piezaValida({ fecha: "2026-10-22" })]);
+  const tres = planValido([
+    piezaValida(),
+    piezaValida({ fecha: "2026-10-21", pilar: "proceso" }),
+    piezaValida({ fecha: "2026-10-22", pilar: "lanzamiento" }),
+  ]);
   const porDefecto = validarPlan(tres, { semanaInicio: SEMANA });
   assert.match(porDefecto.errores.join(" "), /Se pidieron 2 piezas y el plan trae 3/);
   assert.equal(validarPlan(tres, { semanaInicio: SEMANA, piezas: 3 }).ok, true);
@@ -216,8 +222,79 @@ test("le informa a la IA cuántas piezas pedir", async () => {
 });
 
 test("las instrucciones incluyen el estilo de ganchos de la marca", async () => {
-  const sistema = await construirSistema();
+  const { texto: sistema } = await construirSistema();
   assert.match(sistema, /Fuerza y compromiso/);
   assert.match(sistema, /Escribí tu promesa\. Después cumplila\./);
   assert.match(sistema, /Descartados por Facundo/);
+});
+
+// --- Ganchos alternativos, ganchos conocidos y variedad ---
+const conocidosReales = async () => {
+  const { cerebro } = await construirSistema();
+  return extraerGanchosConocidos(cerebro);
+};
+
+test("lee del cerebro de marca los ganchos aprobados, pendientes y descartados", async () => {
+  const { aprobados, conocidos } = await conocidosReales();
+  assert.equal(aprobados.length, 7);
+  assert.ok(aprobados.includes("Para los que cumplen"));
+  assert.ok(aprobados.includes("Escribí tu promesa. Después cumplila."));
+  assert.ok(conocidos.includes("Nadie te está mirando. Entrená igual."), "los descartados también cuentan como conocidos");
+  assert.ok(conocidos.length > aprobados.length);
+});
+
+test("los ganchos aprobados cumplen las reglas del código (marca y código no se contradicen)", async () => {
+  const { aprobados } = await conocidosReales();
+  for (const gancho of aprobados) {
+    assert.deepEqual(revisarReglas(gancho), [], gancho);
+    assert.ok(gancho.trim().split(/\s+/).length <= PALABRAS_MAXIMAS_GANCHO, gancho);
+  }
+});
+
+test("rechaza ganchos alternativos que copian un ejemplo del cerebro de marca", async () => {
+  const { conocidos } = await conocidosReales();
+  const plan = planValido([piezaValida({ ganchos_alternativos: ["Para los que cumplen.", "Tu firma no se negocia.", "Lo escrito se cumple."] })]);
+  const r = validarPlan(plan, { semanaInicio: SEMANA, ganchosConocidos: conocidos });
+  assert.equal(r.ok, false);
+  assert.match(r.errores.join(" "), /copia un ejemplo del cerebro de marca/);
+});
+
+test("pide al menos 3 alternativos, sin repetidos y que cumplan las reglas", () => {
+  const pocos = validarPlan(planValido([piezaValida({ ganchos_alternativos: ["Uno solo."] })]), { semanaInicio: SEMANA });
+  assert.match(pocos.errores.join(" "), /al menos 3 ganchos alternativos/);
+
+  const repetido = validarPlan(planValido([piezaValida({ ganchos_alternativos: ["Tu firma no se negocia.", "tu firma no se negocia", "Lo escrito se cumple."] })]), { semanaInicio: SEMANA });
+  assert.match(repetido.errores.join(" "), /repetido/);
+
+  const malo = validarPlan(planValido([piezaValida({ ganchos_alternativos: ["Sin excusas, a entrenar", "Cómo cumplir una promesa", "Lo escrito se cumple."] })]), { semanaInicio: SEMANA });
+  assert.match(malo.errores.join(" "), /motivación vacía/);
+  assert.match(malo.errores.join(" "), /suena a tutorial/);
+});
+
+test("el gancho principal puede ser uno aprobado, pero no más de uno por plan", async () => {
+  const { conocidos } = await conocidosReales();
+  const uno = planValido([
+    piezaValida({ gancho: "Para los que cumplen" }),
+    piezaValida({ fecha: "2026-10-22", pilar: "proceso", gancho: "Firmá con vos. Cumplí." }),
+  ]);
+  assert.equal(validarPlan(uno, { semanaInicio: SEMANA, ganchosConocidos: conocidos }).ok, true);
+
+  const dos = planValido([
+    piezaValida({ gancho: "Para los que cumplen" }),
+    piezaValida({ fecha: "2026-10-22", pilar: "proceso", gancho: "Escribí tu promesa. Después cumplila." }),
+  ]);
+  const r = validarPlan(dos, { semanaInicio: SEMANA, ganchosConocidos: conocidos });
+  assert.match(r.errores.join(" "), /Más de un gancho principal sale de la lista/);
+});
+
+test("con 2 piezas, los pilares tienen que ser distintos", () => {
+  const dosIguales = planValido([piezaValida(), piezaValida({ fecha: "2026-10-22" })]);
+  const r = validarPlan(dosIguales, { semanaInicio: SEMANA });
+  assert.match(r.errores.join(" "), /pilar "promesa" aparece 2 veces/);
+});
+
+test("las instrucciones piden ganchos nuevos y alternativos", async () => {
+  const { texto } = await construirSistema();
+  assert.match(texto, /A lo sumo UNO de los ganchos principales/);
+  assert.match(texto, /4 alternativos/);
 });
