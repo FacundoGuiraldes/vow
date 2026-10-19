@@ -1,7 +1,9 @@
 name: Investigar cuentas de referencia
 
 # Baja los datos PÚBLICOS de las cuentas de docs/marca/cuentas-referencia.json con la API oficial de Meta
-# (solo lectura) y calcula el rendimiento de cada publicación. No usa IA, no gasta plata y no publica nada.
+# (solo lectura) y calcula el rendimiento de cada publicación. Opcionalmente, Claude analiza los datos y pone a
+# prueba las ideas de docs/investigacion/hipotesis.json (eso usa la API de Anthropic y gasta unos centavos).
+# Nunca publica nada.
 # Solo se lanza a mano desde Actions > Investigar cuentas de referencia > Run workflow, y solo desde main.
 # Los datos quedan en el resumen y como archivo descargable (14 días); no se guardan en el repo.
 
@@ -17,6 +19,11 @@ on:
           - "10"
           - "25"
           - "50"
+      analizar:
+        description: "Que Claude analice los datos y pruebe las ideas (gasta unos centavos)"
+        required: true
+        type: boolean
+        default: false
 
 concurrency:
   group: investigar
@@ -35,6 +42,7 @@ jobs:
       INSTAGRAM_TOKEN: ${{ secrets.INSTAGRAM_TOKEN }}
       INSTAGRAM_USER_ID: ${{ secrets.INSTAGRAM_USER_ID }}
       LIMITE: ${{ inputs.limite }}
+      ANALIZAR: ${{ inputs.analizar }}
     steps:
       - uses: actions/checkout@v5
 
@@ -57,6 +65,18 @@ jobs:
           set -o pipefail
           npm run investigar -- --limite "$LIMITE" 2>&1 | tee salida.txt
 
+      - name: Analizar con Claude
+        if: inputs.analizar
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error title=Falta ANTHROPIC_API_KEY::Cargala en Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          set -o pipefail
+          npm run analizar 2>&1 | tee salida-analisis.txt
+
       - name: Resumen de la corrida
         if: always()
         run: |
@@ -66,6 +86,16 @@ jobs:
             echo '```'
             cat salida.txt 2>/dev/null || echo "Sin salida."
             echo '```'
+            if ls docs/investigacion/informe-*.md >/dev/null 2>&1; then
+              echo
+              cat docs/investigacion/informe-*.md
+            elif [ -f salida-analisis.txt ]; then
+              echo
+              echo "### Análisis"
+              echo '```'
+              cat salida-analisis.txt
+              echo '```'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Guardar los datos como archivo descargable
@@ -75,6 +105,9 @@ jobs:
           name: datos-instagram
           path: |
             docs/investigacion/datos-*.json
+            docs/investigacion/informe-*.md
+            docs/investigacion/informe-*.json
             salida.txt
+            salida-analisis.txt
           if-no-files-found: ignore
           retention-days: 14
