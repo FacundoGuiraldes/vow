@@ -1,0 +1,98 @@
+name: Evals con IA real
+
+# Le pide al Estratega varios pedidos distintos y mide qué porcentaje de planes cumple las reglas de marca,
+# cuánto cuesta cada uno y qué reglas rechazan más (usa la API de Anthropic: GASTA PLATA, unos US$ 0,05 por plan).
+# Solo se lanza a mano desde Actions > Evals con IA real > Run workflow, y solo desde main.
+# El resultado queda en el resumen de la corrida y como archivo descargable. No se guarda en el repo.
+
+on:
+  workflow_dispatch:
+    inputs:
+      pedidos:
+        description: "Qué pedidos correr (vacío = todos). Ids separados por coma, por ejemplo: base-1-pieza-sin-producto,base-con-gente"
+        required: false
+        type: string
+        default: ""
+      repeticiones:
+        description: "Veces que se repite cada pedido (la IA no da siempre lo mismo)"
+        required: true
+        type: choice
+        default: "1"
+        options:
+          - "1"
+          - "2"
+          - "3"
+      tope_usd:
+        description: "Tope de gasto de la corrida, en dólares"
+        required: true
+        type: choice
+        default: "0.5"
+        options:
+          - "0.3"
+          - "0.5"
+          - "1"
+
+concurrency:
+  group: evals-online
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  evals:
+    # La clave de API solo se usa desde main
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # Los datos que escribe la persona pasan por variables de entorno, no dentro del script
+      PEDIDOS: ${{ inputs.pedidos }}
+      REPETICIONES: ${{ inputs.repeticiones }}
+      TOPE_USD: ${{ inputs.tope_usd }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Secreto ANTHROPIC_API_KEY configurado
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error title=Falta ANTHROPIC_API_KEY::Cargala en Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Correr las evals
+        run: |
+          args=(--tope-usd "$TOPE_USD" --repeticiones "$REPETICIONES")
+          if [ -n "$PEDIDOS" ]; then args+=(--solo "$PEDIDOS"); fi
+          set -o pipefail
+          npm run evals:online -- "${args[@]}" 2>&1 | tee salida.txt
+
+      - name: Resumen de la corrida
+        if: always()
+        run: |
+          {
+            echo "## Evals con IA real"
+            echo
+            echo '```'
+            cat salida.txt 2>/dev/null || echo "Sin salida."
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Guardar el informe como archivo descargable
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evals-online
+          path: |
+            evals/resultados/*.json
+            salida.txt
+          if-no-files-found: ignore
+          retention-days: 30
