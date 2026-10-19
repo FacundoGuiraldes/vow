@@ -13,8 +13,10 @@ Este archivo es la fuente única de cómo habla y cómo se ve VOW. Todo contenid
 
 - Hombres y mujeres de 20 a 35 años, urbanos, en Argentina.
 - Entrenan de 3 a 6 días por semana (fuerza, hipertrofia, funcional, crossfit).
-- Les gusta entrenar. Les gusta que la ropa y el equipo estén bien hechos y se vean bien, pero no entrenan para la foto.
-- Siguen contenido de fitness, compran online y están atentos a lanzamientos tipo drop.
+- Entrenan por rendimiento y disciplina personal: no para buscar aprobación, no para grabar contenido ni "para la foto".
+- Valoran el compromiso silencioso: prefieren asumir una promesa propia y cumplirla sin necesidad de mostrarla al mundo.
+- Buscan funcionalidad real: calces precisos y accesorios resistentes que no fallen bajo carga pesada, con una estética sobria y minimalista.
+- Marca orgullosamente argentina. Siguen contenido de fitness, compran online y están atentos a lanzamientos.
 
 ## 3. Qué es VOW y qué no es
 
@@ -97,7 +99,6 @@ Cómo se resuelve la tensión entre "verse bien" y "no presumir": lo estético e
 - Le habla a quien mira y le da algo (una idea, un gesto, una razón para sumarse). No explica la marca por dentro: paleta, tipografías y manual son para quien diseña, no para quien sigue la cuenta.
 
 **Aprobados por Facundo:**
-- "Escribí tu promesa. Después cumplila."
 - "Lo que firmás con vos no se rompe"
 - "Firmá lo que vas a sostener"
 - "Cumplite a vos primero"
@@ -117,6 +118,7 @@ Cómo se resuelve la tensión entre "verse bien" y "no presumir": lo estético e
 - "Cómo escribir una promesa que puedas cumplir." Suena a tutorial o consejo: VOW no le explica a la gente cómo vivir.
 - "Todavía no hay prenda para mostrarte. Hay una idea." Anuncia lo que falta: una marca no muestra su ausencia de producto.
 - "Nadie te está mirando. Entrená igual." No lo convence.
+- "Escribí tu promesa. Después cumplila." La promesa es de uno consigo mismo, no se escribe: ni en papel ni en la etiqueta.
 - "Sacá lo que sobra" (un carrusel que explica la paleta). No tiene fuerza ni compromiso, y explica la marca por dentro.
 - "Tu palabra primero. Después la barra." Nombra un elemento del gimnasio.
 
