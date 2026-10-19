@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { planificarSemana, validarPlan, construirSistema, extraerGanchosConocidos, HERRAMIENTA_PLAN, PALABRAS_MAXIMAS_GANCHO } from "./estratega.js";
+import { planificarSemana, validarPlan, construirSistema, leerUltimoInforme, extraerGanchosConocidos, HERRAMIENTA_PLAN, PALABRAS_MAXIMAS_GANCHO } from "./estratega.js";
 import { revisarReglas } from "./reglas-marca.js";
 
 const SEMANA = "2026-10-19";
@@ -50,7 +50,7 @@ const pedido = { semanaInicio: SEMANA, fase: "base", recursos: { producto: false
 
 test("un plan válido se acepta y informa cuántos tokens usó", async () => {
   const cliente = clienteFalso(planValido());
-  const r = await planificarSemana(pedido, { cliente, leer: leerFalso });
+  const r = await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
   assert.equal(r.ok, true);
   assert.deepEqual(r.errores, []);
   assert.equal(r.plan.piezas.length, 1);
@@ -59,7 +59,7 @@ test("un plan válido se acepta y informa cuántos tokens usó", async () => {
 
 test("le pide el formato con la herramienta en modo auto (Sonnet 5.5 no acepta forzarla) y le pasa la marca y las referencias", async () => {
   const cliente = clienteFalso(planValido());
-  await planificarSemana(pedido, { cliente, leer: leerFalso });
+  await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
   const enviado = cliente.pedidos[0];
   // La API real rechaza "tool" y "any" con este modelo (error 400): tiene que ser "auto"
   assert.deepEqual(enviado.tool_choice, { type: "auto" });
@@ -79,7 +79,7 @@ test("el sistema lee los archivos reales de marca", async () => {
 
 test("si la respuesta no trae el plan en el formato esperado, reintenta una vez y después lo descarta", async () => {
   const cliente = clienteFalso(null);
-  const r = await planificarSemana(pedido, { cliente, leer: leerFalso });
+  const r = await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
   assert.equal(r.ok, false);
   assert.equal(r.plan, null);
   assert.match(r.errores[0], /formato esperado/);
@@ -93,7 +93,7 @@ test("si la primera respuesta es texto y la segunda trae el plan, se acepta", as
     { content: [{ type: "tool_use", id: "t2", name: "proponer_plan", input: planValido() }], usage: { input_tokens: 150, output_tokens: 700 } },
   ];
   const cliente = { messages: { create: async () => respuestas.shift() } };
-  const r = await planificarSemana(pedido, { cliente, leer: leerFalso });
+  const r = await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
   assert.equal(r.ok, true);
   assert.deepEqual(r.uso, { entrada: 250, salida: 750 });
 });
@@ -162,7 +162,7 @@ test("rechaza más de 5 piezas en la semana", () => {
 
 test("un plan inválido devuelve los errores y no entrega el plan", async () => {
   const cliente = clienteFalso(planValido([piezaValida({ gancho: "Sin excusas" })]));
-  const r = await planificarSemana(pedido, { cliente, leer: leerFalso });
+  const r = await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
   assert.equal(r.ok, false);
   assert.equal(r.plan, null);
   assert.ok(r.propuesta, "se conserva la propuesta para poder mirarla");
@@ -214,10 +214,10 @@ test("respeta la cantidad de piezas pedida (por defecto 2)", () => {
 
 test("le informa a la IA cuántas piezas pedir", async () => {
   const cliente = clienteFalso(planValido());
-  await planificarSemana({ ...pedido, piezas: 1 }, { cliente, leer: leerFalso });
+  await planificarSemana({ ...pedido, piezas: 1 }, { cliente, leer: leerFalso, listar: async () => [] });
   assert.match(cliente.pedidos[0].messages[0].content, /Cantidad de piezas: 1/);
   const porDefecto = clienteFalso(planValido());
-  await planificarSemana(pedido, { cliente: porDefecto, leer: leerFalso });
+  await planificarSemana(pedido, { cliente: porDefecto, leer: leerFalso, listar: async () => [] });
   assert.match(porDefecto.pedidos[0].messages[0].content, /Cantidad de piezas: 2/);
 });
 
@@ -317,7 +317,7 @@ test("rechaza ganchos alternativos con elementos del gimnasio y recursos de pape
 });
 
 test("las instrucciones dicen que la promesa es de uno mismo y que no se nombran elementos del gym", async () => {
-  const { texto } = await construirSistema(leerFalso);
+  const { texto } = await construirSistema(leerFalso, { listar: async () => [] });
   assert.match(texto, /a sí misma y cumple/);
   assert.match(texto, /elementos del gimnasio/);
   assert.match(texto, /le habla a quien la mira/i);
@@ -336,4 +336,34 @@ test("un guion que numera las láminas no se rechaza por cifras", () => {
   assert.equal(r.ok, true, r.errores.join(" | "));
   const inventada = validarPlan(planValido([piezaValida({ guion: "Lámina 1: mostramos 5 straps." })]), { semanaInicio: SEMANA });
   assert.ok(inventada.errores.some((e) => e.includes('la cifra "5"')));
+});
+
+test("si hay un informe del Investigador, el Estratega lo lee y se apoya en él sin que gane sobre la marca", async () => {
+  const listar = async () => ["informe-2026-10-12.md", "informe-2026-10-19.md", "informe-2026-10-20-simulado.md", "datos-2026-10-19.json", "hipotesis.json"];
+  const leidos = [];
+  const leer = async (ruta) => {
+    leidos.push(String(ruta));
+    return String(ruta).includes("informe") ? "HALLAZGOS-DE-PRUEBA" : "CONTENIDO";
+  };
+  const { texto } = await construirSistema(leer, { listar });
+  assert.match(texto, /=== INVESTIGACIÓN DE MERCADO \(informe-2026-10-19\.md\) ===\nHALLAZGOS-DE-PRUEBA/);
+  assert.ok(leidos.some((r) => r.endsWith("informe-2026-10-19.md")), "lee el más reciente");
+  assert.ok(!leidos.some((r) => r.includes("simulado") || r.includes("2026-10-12")), "ignora el simulado y los viejos");
+  assert.match(texto, /nunca gana sobre el cerebro de marca/);
+  assert.match(texto, /no uses sus cifras en los textos/);
+});
+
+test("sin informe (o si no se puede leer), el Estratega trabaja como antes", async () => {
+  const sinNada = await construirSistema(leerFalso, { listar: async () => ["hipotesis.json"] });
+  assert.ok(!sinNada.texto.includes("=== INVESTIGACIÓN DE MERCADO"));
+  const roto = await construirSistema(async (ruta) => { if (String(ruta).includes("informe")) throw new Error("no se puede leer"); return "CONTENIDO"; }, { listar: async () => ["informe-2026-10-19.md"] });
+  assert.ok(!roto.texto.includes("=== INVESTIGACIÓN DE MERCADO"));
+  const sinCarpeta = await leerUltimoInforme({ listar: async () => { throw new Error("ENOENT"); } });
+  assert.equal(sinCarpeta, null);
+});
+
+test("el informe real del repo llega al Estratega", async () => {
+  const { texto } = await construirSistema();
+  assert.match(texto, /=== INVESTIGACIÓN DE MERCADO \(informe-\d{4}-\d{2}-\d{2}\.md\) ===/);
+  assert.match(texto, /## Hallazgos/);
 });
