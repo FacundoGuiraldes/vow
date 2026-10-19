@@ -10,6 +10,9 @@ export const FORMATOS = ["reel", "carrusel", "imagen", "story"];
 export const PILARES = ["promesa", "proceso", "producto en uso", "gente que entrena", "lanzamiento"];
 export const MAXIMO_PIEZAS = 5;
 const INTENTOS_MAXIMOS = 2;
+// Un plan con varias piezas, justificaciones y referencias ocupa más de 4096 tokens: si la respuesta se corta a mitad de la
+// herramienta, el plan llega incompleto. Se pide más espacio de entrada y, si igual se corta, se reintenta con el doble.
+export const MAX_TOKENS_ESTRATEGA = 8192;
 const LARGO_MAXIMO_GANCHO = 140;
 export const PALABRAS_MAXIMAS_GANCHO = 12; // un gancho fuerte es corto
 export const ALTERNATIVAS_PEDIDAS = 4;
@@ -295,11 +298,13 @@ export async function planificarSemana({ semanaInicio, fase, recursos = {}, nota
   const mensajes = [{ role: "user", content: `${pedido}\n\nRespondé llamando a la herramienta proponer_plan. No escribas nada fuera de la herramienta.` }];
   const uso = { entrada: 0, salida: 0 }; // cuánto se consumió, para controlar el gasto
   let bloque = null;
+  let cortada = false; // la respuesta se quedó sin espacio antes de terminar el plan
+  let maxTokens = MAX_TOKENS_ESTRATEGA;
 
   for (let intento = 1; intento <= INTENTOS_MAXIMOS && !bloque; intento++) {
     const respuesta = await cliente.messages.create({
       model: modelo,
-      max_tokens: 4096,
+      max_tokens: maxTokens,
       system,
       messages: mensajes,
       tools: [HERRAMIENTA_PLAN],
@@ -309,6 +314,14 @@ export async function planificarSemana({ semanaInicio, fase, recursos = {}, nota
     uso.salida += respuesta.usage?.output_tokens ?? 0;
 
     bloque = respuesta.content?.find((b) => b.type === "tool_use" && b.name === HERRAMIENTA_PLAN.name) ?? null;
+    if (respuesta.stop_reason === "max_tokens") {
+      // Lo que llegó de la herramienta es un plan a medias: no se usa ni se valida (daría errores engañosos como "no tiene piezas")
+      cortada = true;
+      bloque = null;
+      maxTokens *= 2;
+      continue;
+    }
+    cortada = false;
     if (!bloque) {
       // La IA contestó con texto: se le recuerda que tiene que usar la herramienta
       mensajes.push({ role: "assistant", content: respuesta.content ?? [] });
@@ -316,7 +329,10 @@ export async function planificarSemana({ semanaInicio, fase, recursos = {}, nota
     }
   }
 
-  if (!bloque) return { ok: false, plan: null, errores: ["La respuesta no trajo el plan en el formato esperado."], uso };
+  if (!bloque) {
+    const motivo = cortada ? "La respuesta se cortó por el límite de tokens: el plan quedó incompleto." : "La respuesta no trajo el plan en el formato esperado.";
+    return { ok: false, plan: null, errores: [motivo], uso };
+  }
 
   const { ok, errores } = validarPlan(bloque.input, { semanaInicio, recursos, piezas, ganchosConocidos, piezasDefinidas });
   return { ok, plan: ok ? bloque.input : null, errores, uso, propuesta: bloque.input };
