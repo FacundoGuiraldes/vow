@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { planificarSemana, validarPlan, construirSistema, leerUltimoInforme, extraerGanchosConocidos, HERRAMIENTA_PLAN, PALABRAS_MAXIMAS_GANCHO } from "./estratega.js";
+import { planificarSemana, validarPlan, MAX_TOKENS_ESTRATEGA, construirSistema, leerUltimoInforme, extraerGanchosConocidos, HERRAMIENTA_PLAN, PALABRAS_MAXIMAS_GANCHO } from "./estratega.js";
 import { revisarReglas } from "./reglas-marca.js";
 
 const SEMANA = "2026-10-19";
@@ -413,4 +413,61 @@ test("un guion con pasos numerados como 1) 2) 3) no se rechaza por cifras", () =
   const guion = "Reel corto de texto. 1) Aparece el gancho. 2) Entra la segunda frase. 3) Tercera frase. 4) Cierre sobre fondo hueso.";
   const r = validarPlan(planValido([piezaValida({ guion })]), { semanaInicio: SEMANA });
   assert.equal(r.ok, true, r.errores.join(" | "));
+});
+
+// Cliente que contesta una lista de respuestas en orden (con su stop_reason) y guarda los pedidos
+const clienteEnSecuencia = (respuestas) => {
+  const pedidos = [];
+  return {
+    pedidos,
+    messages: {
+      create: async (pedido) => {
+        pedidos.push(pedido);
+        const r = respuestas[Math.min(pedidos.length - 1, respuestas.length - 1)];
+        const content = r.texto ? [{ type: "text", text: "hola" }] : [{ type: "tool_use", id: "t1", name: "proponer_plan", input: r.input }];
+        return { content, stop_reason: r.stop_reason ?? "tool_use", usage: { input_tokens: 100, output_tokens: r.salida ?? 50 } };
+      },
+    },
+  };
+};
+
+test("pide espacio de sobra para el plan (más de 4096 tokens)", async () => {
+  const cliente = clienteEnSecuencia([{ input: planValido() }]);
+  await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
+  assert.equal(cliente.pedidos[0].max_tokens, MAX_TOKENS_ESTRATEGA);
+  assert.ok(MAX_TOKENS_ESTRATEGA > 4096);
+});
+
+test("si la respuesta se corta por el límite de tokens, no valida el plan a medias: reintenta con el doble de espacio", async () => {
+  // Lo que llega cortado no tiene piezas: antes se informaba "El plan no tiene piezas", que despistaba
+  const cliente = clienteEnSecuencia([{ input: { resumen: "plan a medias" }, stop_reason: "max_tokens", salida: MAX_TOKENS_ESTRATEGA }, { input: planValido(), salida: 3000 }]);
+  const r = await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
+  assert.equal(r.ok, true);
+  assert.equal(cliente.pedidos.length, 2);
+  assert.equal(cliente.pedidos[1].max_tokens, MAX_TOKENS_ESTRATEGA * 2);
+  assert.deepEqual(r.uso, { entrada: 200, salida: MAX_TOKENS_ESTRATEGA + 3000 }); // se cuenta lo gastado en los dos intentos
+  assert.equal(cliente.pedidos[1].messages.length, 1); // no se reenvía la herramienta a medias
+});
+
+test("si se corta las dos veces, el error dice que se cortó (no 'no tiene piezas') y se informa el gasto", async () => {
+  const cortado = { input: { resumen: "a medias" }, stop_reason: "max_tokens", salida: 8192 };
+  const cliente = clienteEnSecuencia([cortado, cortado]);
+  const r = await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.errores, ["La respuesta se cortó por el límite de tokens: el plan quedó incompleto."]);
+  assert.equal(r.propuesta, undefined);
+  assert.equal(r.uso.salida, 16384);
+});
+
+test("un plan que termina justo bien (stop_reason tool_use) no se reintenta", async () => {
+  const cliente = clienteEnSecuencia([{ input: planValido() }]);
+  await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
+  assert.equal(cliente.pedidos.length, 1);
+});
+
+test("el motivo del fallo es el del último intento: cortada una vez y después solo texto, no dice que se cortó", async () => {
+  const cliente = clienteEnSecuencia([{ input: { resumen: "a medias" }, stop_reason: "max_tokens", salida: 8192 }, { texto: true }]);
+  const r = await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.errores, ["La respuesta no trajo el plan en el formato esperado."]);
 });
