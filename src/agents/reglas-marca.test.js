@@ -96,3 +96,11 @@ test("numerar las láminas o escenas no cuenta como una cifra, pero una cifra su
   assert.deepEqual(cifrasNoPermitidas("Lámina 2: probamos 5 straps"), ["5"]);
   assert.deepEqual(cifrasNoPermitidas("Slide 1 a 3 con Drop 01"), []);
 });
+
+test("los marcadores de lista de un guion no cuentan como cifras, pero una cifra dentro de la frase sí", () => {
+  assert.deepEqual(cifrasNoPermitidas("1) Aparece el gancho. 2) Entra la frase. 3) Sin ruido. 4) Cierre."), []);
+  assert.deepEqual(cifrasNoPermitidas("Primero:\n1. Fondo negro\n2. Frase sola\n3. Cierre"), []);
+  assert.deepEqual(cifrasNoPermitidas("1) Probamos 5 straps"), ["5"]);
+  assert.deepEqual(cifrasNoPermitidas("Cuesta 3.500 pesos"), ["3.500"]);
+  assert.deepEqual(cifrasNoPermitidas("Drop 01 abre pronto"), []);
+});

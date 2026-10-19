@@ -68,12 +68,15 @@ export function revisarReglas(texto) {
 
 const NUMERACION_DE_PARTES = /(?<!\p{L})(l[aá]minas?|slides?|stor(?:y|ies)|paso|pasos|escenas?|planos?|tomas?|pantallas?|frames?|p[aá]ginas?)\s+\d+(?:\s*(?:y|a|-|–)\s*\d+)?/giu;
 
+// Marcadores de lista de un guion: "1) Aparece el gancho. 2) Entra la frase" o "1. Primero" al empezar una línea
+const MARCADORES_DE_LISTA = /(?<![\p{L}\p{N}.,])\d+\)(?=\s)|^[ \t]*\d+\.(?=\s)/gmu;
+
 // Regla "toda cifra que aparece existe en los datos cargados": cualquier número del texto
 // tiene que estar en la lista de cifras permitidas (por defecto solo "01", de "Drop 01").
 export function cifrasNoPermitidas(texto, permitidas = ["01"]) {
   if (typeof texto !== "string") return [];
   // Numerar las partes de una pieza ("Lámina 2", "Story 3", "Paso 1") no es una cifra de la marca
-  const sinNumeracion = texto.replace(NUMERACION_DE_PARTES, "");
+  const sinNumeracion = texto.replace(NUMERACION_DE_PARTES, "").replace(MARCADORES_DE_LISTA, "");
   const numeros = sinNumeracion.match(/\d+(?:[.,]\d+)?/g) ?? [];
   return numeros.filter((numero) => !permitidas.includes(numero));
 }
