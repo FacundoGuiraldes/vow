@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   analizarMercado,
+  depurarEnlaces,
   armarPedido,
   construirSistemaInvestigador,
   enlacesDeLosDatos,
@@ -169,4 +170,30 @@ test("el informe se puede leer en Markdown, con nombres de las ideas y enlaces",
   assert.match(md, /\*\*Idea A\*\*: respaldada \(confianza baja\)/);
   assert.match(md, /POST1/);
   assert.match(md, /## Límites/);
+});
+
+test("un enlace mal copiado se quita, se avisa en los límites y el informe se acepta si la evidencia alcanza", async () => {
+  const informe = informeValido();
+  informe.hipotesis[1].enlaces = [e(1), "https://www.instagram.com/reel/MAL-COPIADO/"]; // veredicto "no se puede medir": no necesita enlaces
+  const r = await analizarMercado({ datos, hipotesis }, { cliente: clienteFalso(informe), leer: leerFalso });
+  assert.equal(r.ok, true, (r.errores ?? []).join(" | "));
+  assert.deepEqual(r.enlacesQuitados, ["https://www.instagram.com/reel/MAL-COPIADO/"]);
+  assert.deepEqual(r.informe.hipotesis[1].enlaces, [e(1)]);
+  assert.ok(r.informe.limites.at(-1).includes("MAL-COPIADO"));
+  // el original queda intacto en la propuesta
+  assert.equal(r.propuesta.hipotesis[1].enlaces.length, 2);
+});
+
+test("si al quitar el enlace falso la conclusión se queda sin evidencia suficiente, se rechaza", async () => {
+  const informe = informeValido();
+  informe.hipotesis[0].enlaces = [e(1), "https://www.instagram.com/reel/INVENTADO/"]; // "respaldada" necesita 2
+  const r = await analizarMercado({ datos, hipotesis }, { cliente: clienteFalso(informe), leer: leerFalso });
+  assert.equal(r.ok, false);
+  assert.ok(r.errores.some((m) => m.includes("al menos 2")));
+});
+
+test("depurarEnlaces no toca nada si todos los enlaces existen", () => {
+  const { informe, quitados } = depurarEnlaces(informeValido(), enlacesConocidos);
+  assert.deepEqual(quitados, []);
+  assert.deepEqual(informe, informeValido());
 });
