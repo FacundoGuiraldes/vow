@@ -23,6 +23,30 @@ test.describe("Formulario de lista de espera", { tag: "@funcional" }, () => {
     expect(api.ultimoCuerpo()).toEqual({ email, instagram: "@vow_ar", origen: "landing" });
   });
 
+  // El parámetro ?origen= sirve para medir canales (por ejemplo, el QR de cada gimnasio).
+  // Estos tests abren la landing con su propia URL, por eso no usan el beforeEach.
+  const casosOrigen = [
+    { nombre: "usa el origen de la URL", ruta: "/?origen=gym-olivos", esperado: "gym-olivos" },
+    { nombre: "normaliza mayúsculas y espacios", ruta: "/?origen=%20Gym-Centro%20", esperado: "gym-centro" },
+    { nombre: "sin parámetro usa 'landing'", ruta: "/", esperado: "landing" },
+    { nombre: "un origen vacío usa 'landing'", ruta: "/?origen=", esperado: "landing" },
+    { nombre: "un origen con caracteres raros usa 'landing'", ruta: "/?origen=%3Cscript%3E%20x", esperado: "landing" },
+    { nombre: "un origen de más de 50 caracteres usa 'landing'", ruta: `/?origen=${"a".repeat(51)}`, esperado: "landing" },
+  ];
+
+  for (const caso of casosOrigen) {
+    test(`origen: ${caso.nombre}`, async ({ page, landing, formulario }) => {
+      await aislarLanding(page);
+      const api = await mockearListaEspera(page);
+      await landing.abrir(caso.ruta);
+
+      await formulario.anotarse(emailDePrueba());
+
+      await expect(formulario.mensaje).toHaveText(textos.form.success);
+      expect(api.ultimoCuerpo()?.origen).toBe(caso.esperado);
+    });
+  }
+
   test("un email inválido se frena en el navegador sin llamar a la API", async ({ page, formulario }) => {
     const api = await mockearListaEspera(page);
 
