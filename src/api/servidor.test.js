@@ -1,11 +1,12 @@
-import { test, before, after } from "node:test";
+import { before, after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { crearPool } from "../db/conexion.js";
+import { SIN_BASE, pruebaConBase } from "../db/requiere-base.js";
 import { migrar } from "../db/migrar.js";
 import { crearApp, MENSAJE_EXITO, MENSAJE_INSTAGRAM_INVALIDO } from "./servidor.js";
 
-const pool = crearPool();
+const pool = SIN_BASE ? null : crearPool(); // sin base (en local) los tests se saltean
 const emailsCreados = new Set();
 let servidor;
 
@@ -48,11 +49,13 @@ const contarRegistros = async (email) => {
 };
 
 before(async () => {
+  if (SIN_BASE) return;
   await migrar(pool);
   servidor = await levantar(crearApp({ pool, origenesPermitidos: [], limitePorMinuto: 100 }));
 });
 
 after(async () => {
+  if (SIN_BASE) return;
   if (emailsCreados.size > 0) {
     await pool.query("DELETE FROM lista_espera WHERE email = ANY($1)", [[...emailsCreados]]);
   }
@@ -60,7 +63,7 @@ after(async () => {
   await pool.end();
 });
 
-test("rechaza un email con formato inválido", async () => {
+pruebaConBase("rechaza un email con formato inválido", async () => {
   for (const email of ["no-es-un-email", "falta@dominio", "con espacio@vow.com", "@vow.com"]) {
     const r = await enviar(servidor, { email });
     assert.equal(r.status, 400, email);
@@ -68,7 +71,7 @@ test("rechaza un email con formato inválido", async () => {
   }
 });
 
-test("rechaza un email vacío o ausente", async () => {
+pruebaConBase("rechaza un email vacío o ausente", async () => {
   for (const cuerpo of [{ email: "" }, { email: "   " }, {}]) {
     const r = await enviar(servidor, cuerpo);
     assert.equal(r.status, 400);
@@ -76,14 +79,14 @@ test("rechaza un email vacío o ausente", async () => {
   }
 });
 
-test("rechaza un email de 254 caracteres o más", async () => {
+pruebaConBase("rechaza un email de 254 caracteres o más", async () => {
   const email = `${"a".repeat(240)}@vow-pruebas.invalid`;
   const r = await enviar(servidor, { email });
   assert.equal(r.status, 400);
   assert.match(r.cuerpo.error, /menos de 254 caracteres/);
 });
 
-test("registra un email válido normalizado en minúsculas y sin espacios", async () => {
+pruebaConBase("registra un email válido normalizado en minúsculas y sin espacios", async () => {
   const email = emailDePrueba();
   const r = await enviar(servidor, { email: `  ${email.toUpperCase()}  `, origen: "landing" });
   assert.equal(r.status, 200);
@@ -95,7 +98,7 @@ test("registra un email válido normalizado en minúsculas y sin espacios", asyn
   assert.equal(rows[0].origen, "landing");
 });
 
-test("un email repetido responde 200 con el mismo mensaje y no se duplica", async () => {
+pruebaConBase("un email repetido responde 200 con el mismo mensaje y no se duplica", async () => {
   const email = emailDePrueba();
   const primera = await enviar(servidor, { email });
   const segunda = await enviar(servidor, { email: email.toUpperCase() });
@@ -106,7 +109,7 @@ test("un email repetido responde 200 con el mismo mensaje y no se duplica", asyn
   assert.equal(await contarRegistros(email), 1);
 });
 
-test("limita a 5 pedidos por minuto por IP", async () => {
+pruebaConBase("limita a 5 pedidos por minuto por IP", async () => {
   const limitado = await levantar(crearApp({ pool, origenesPermitidos: [] }));
   try {
     for (let i = 0; i < 5; i++) {
@@ -121,7 +124,7 @@ test("limita a 5 pedidos por minuto por IP", async () => {
   }
 });
 
-test("solo habilita CORS para los orígenes de ALLOWED_ORIGINS", async () => {
+pruebaConBase("solo habilita CORS para los orígenes de ALLOWED_ORIGINS", async () => {
   const conCors = await levantar(crearApp({ pool, origenesPermitidos: ["https://vow.test"] }));
   try {
     const permitido = await enviar(conCors, { email: "" }, { Origin: "https://vow.test" });
@@ -134,7 +137,7 @@ test("solo habilita CORS para los orígenes de ALLOWED_ORIGINS", async () => {
   }
 });
 
-test("/api/salud responde 200 y no consulta la base", async () => {
+pruebaConBase("/api/salud responde 200 y no consulta la base", async () => {
   let consultas = 0;
   const poolEspia = {
     query: async () => {
@@ -153,7 +156,7 @@ test("/api/salud responde 200 y no consulta la base", async () => {
   }
 });
 
-test("con TRUST_PROXY=1 el límite por IP usa la IP de X-Forwarded-For", async () => {
+pruebaConBase("con TRUST_PROXY=1 el límite por IP usa la IP de X-Forwarded-For", async () => {
   const anterior = process.env.TRUST_PROXY;
   process.env.TRUST_PROXY = "1";
   const instancia = await levantar(crearApp({ pool, origenesPermitidos: [] }));
@@ -175,7 +178,7 @@ test("con TRUST_PROXY=1 el límite por IP usa la IP de X-Forwarded-For", async (
   }
 });
 
-test("guarda un Instagram válido normalizado", async () => {
+pruebaConBase("guarda un Instagram válido normalizado", async () => {
   const email = emailDePrueba();
   const r = await enviar(servidor, { email, instagram: "@Vow_AR ", origen: "landing" });
   assert.equal(r.status, 200);
@@ -186,7 +189,7 @@ test("guarda un Instagram válido normalizado", async () => {
   assert.equal(registro.origen, "landing");
 });
 
-test("sin Instagram guarda NULL y responde 200", async () => {
+pruebaConBase("sin Instagram guarda NULL y responde 200", async () => {
   for (const cuerpo of [{}, { instagram: "" }, { instagram: "   " }, { instagram: null }]) {
     const email = emailDePrueba();
     const r = await enviar(servidor, { email, ...cuerpo });
@@ -195,7 +198,7 @@ test("sin Instagram guarda NULL y responde 200", async () => {
   }
 });
 
-test("rechaza un Instagram con espacios, caracteres raros o más de 30 caracteres", async () => {
+pruebaConBase("rechaza un Instagram con espacios, caracteres raros o más de 30 caracteres", async () => {
   const invalidos = ["vow ar", "vow-ar", "vow!", "vów", "@", "a".repeat(31), 12345];
   for (const instagram of invalidos) {
     const email = emailDePrueba();
@@ -207,7 +210,7 @@ test("rechaza un Instagram con espacios, caracteres raros o más de 30 caractere
   }
 });
 
-test("un email repetido con otro Instagram no modifica el registro", async () => {
+pruebaConBase("un email repetido con otro Instagram no modifica el registro", async () => {
   const email = emailDePrueba();
   const primera = await enviar(servidor, { email, instagram: "primero" });
   const segunda = await enviar(servidor, { email, instagram: "segundo" });

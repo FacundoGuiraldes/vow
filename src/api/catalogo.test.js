@@ -1,6 +1,7 @@
-import { test, before, after } from "node:test";
+import { before, after } from "node:test";
 import assert from "node:assert/strict";
 import { crearPool } from "../db/conexion.js";
+import { SIN_BASE, pruebaConBase } from "../db/requiere-base.js";
 import { migrar } from "../db/migrar.js";
 import { seedCatalogo } from "../db/seed-catalogo.js";
 import { drop01 } from "../data/drop-01.js";
@@ -20,7 +21,7 @@ const CAMPOS_PUBLICOS = [
 ];
 const CAMPOS_PROHIBIDOS = /^(id|precio|price|stock|material|gramaje|medidas?|costo)/i;
 
-const pool = crearPool();
+const pool = SIN_BASE ? null : crearPool(); // sin base (en local) los tests se saltean
 let servidor;
 
 const levantar = (app) =>
@@ -40,17 +41,19 @@ const pedir = async (ruta) => {
 };
 
 before(async () => {
+  if (SIN_BASE) return;
   await migrar(pool);
   await seedCatalogo(pool);
   servidor = await levantar(crearApp({ pool, origenesPermitidos: [], limiteCatalogoPorMinuto: 1000 }));
 });
 
 after(async () => {
+  if (SIN_BASE) return;
   await cerrar(servidor);
   await pool.end();
 });
 
-test("la lista devuelve los 7 productos ordenados por número", async () => {
+pruebaConBase("la lista devuelve los 7 productos ordenados por número", async () => {
   const r = await pedir("/api/productos");
   assert.equal(r.status, 200);
   assert.equal(r.headers.get("cache-control"), "public, max-age=300");
@@ -65,7 +68,7 @@ test("la lista devuelve los 7 productos ordenados por número", async () => {
   );
 });
 
-test("?drop=1 filtra por drop", async () => {
+pruebaConBase("?drop=1 filtra por drop", async () => {
   const uno = await pedir("/api/productos?drop=1");
   assert.equal(uno.status, 200);
   assert.equal(uno.cuerpo.productos.length, 7);
@@ -76,7 +79,7 @@ test("?drop=1 filtra por drop", async () => {
   assert.deepEqual(otro.cuerpo.productos, []);
 });
 
-test("?drop inválido responde 400", async () => {
+pruebaConBase("?drop inválido responde 400", async () => {
   for (const valor of ["abc", "0", "-1", "1.5", ""]) {
     const r = await pedir(`/api/productos?drop=${valor}`);
     assert.equal(r.status, 400, valor);
@@ -86,7 +89,7 @@ test("?drop inválido responde 400", async () => {
   assert.equal(repetido.status, 400);
 });
 
-test("el detalle por slug devuelve el producto", async () => {
+pruebaConBase("el detalle por slug devuelve el producto", async () => {
   const r = await pedir("/api/productos/hoodie-oversize");
   assert.equal(r.status, 200);
   assert.equal(r.headers.get("cache-control"), "public, max-age=300");
@@ -95,13 +98,13 @@ test("el detalle por slug devuelve el producto", async () => {
   assert.deepEqual(r.cuerpo.producto.colores, ["beige", "negro", "gris topo"]);
 });
 
-test("un slug inexistente responde 404", async () => {
+pruebaConBase("un slug inexistente responde 404", async () => {
   const r = await pedir("/api/productos/producto-que-no-existe");
   assert.equal(r.status, 404);
   assert.equal(r.cuerpo.error, "Producto no encontrado");
 });
 
-test("un slug con caracteres inválidos responde 400", async () => {
+pruebaConBase("un slug con caracteres inválidos responde 400", async () => {
   for (const slug of ["Remera-Oversize", "remera_oversize", "remera%20oversize", "remera%27--", "a".repeat(61)]) {
     const r = await pedir(`/api/productos/${slug}`);
     assert.equal(r.status, 400, slug);
@@ -109,7 +112,7 @@ test("un slug con caracteres inválidos responde 400", async () => {
   }
 });
 
-test("la respuesta no incluye id ni campos de precio, stock o material", async () => {
+pruebaConBase("la respuesta no incluye id ni campos de precio, stock o material", async () => {
   const lista = await pedir("/api/productos");
   const detalle = await pedir("/api/productos/remera-oversize");
   for (const producto of [...lista.cuerpo.productos, detalle.cuerpo.producto]) {
@@ -118,7 +121,7 @@ test("la respuesta no incluye id ni campos de precio, stock o material", async (
   }
 });
 
-test("todos los productos están en estado concepto y sin imagen", async () => {
+pruebaConBase("todos los productos están en estado concepto y sin imagen", async () => {
   const r = await pedir("/api/productos?drop=1");
   for (const producto of r.cuerpo.productos) {
     assert.equal(producto.estado, "concepto", producto.slug);
@@ -126,7 +129,7 @@ test("todos los productos están en estado concepto y sin imagen", async () => {
   }
 });
 
-test("correr el seed dos veces no duplica productos", async () => {
+pruebaConBase("correr el seed dos veces no duplica productos", async () => {
   await seedCatalogo(pool);
   await seedCatalogo(pool);
   const { rows } = await pool.query(
