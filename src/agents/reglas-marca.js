@@ -79,10 +79,16 @@ const MARCADORES_DE_LISTA = /(?<![\p{L}\p{N}.,])\d+\)(?=\s)|^[ \t]*\d+\.(?=\s)/g
 // Hoy solo hay dos datos reales: "01" (de "Drop 01") y "2027" (el año del lanzamiento, definido por Facundo).
 export const CIFRAS_PERMITIDAS = ["01", "2027"];
 
-export function cifrasNoPermitidas(texto, permitidas = CIFRAS_PERMITIDAS) {
+// Medidas de producción de una pieza ("carrusel de 6 láminas", "plano de 3 segundos", "8 a 10 tomas").
+// Describen cómo se arma la pieza, no un dato de la marca. Solo se perdonan en el guion, que son instrucciones;
+// "3 días" o "5 straps" siguen marcados, y el texto que ve el público (gancho, epígrafe) nunca usa esta excepción.
+const MEDIDAS_DE_PRODUCCION = /(?<![\p{L}\p{N}.,])\d+(?:[.,]\d+)?(?:\s*(?:y|a|-|–)\s*\d+(?:[.,]\d+)?)?\s+(?:l[aá]minas?|slides?|escenas?|planos?|tomas?|cortes?|cuadros?|frames?|pantallas?|p[aá]ginas?|segundos?|fotos?|im[aá]gen(?:es)?|clips?)(?![\p{L}\p{N}])/giu;
+
+export function cifrasNoPermitidas(texto, permitidas = CIFRAS_PERMITIDAS, { produccion = false } = {}) {
   if (typeof texto !== "string") return [];
   // Numerar las partes de una pieza ("Lámina 2", "Story 3", "Paso 1") no es una cifra de la marca
-  const sinNumeracion = texto.replace(NUMERACION_DE_PARTES, "").replace(MARCADORES_DE_LISTA, "");
+  let sinNumeracion = texto.replace(NUMERACION_DE_PARTES, "").replace(MARCADORES_DE_LISTA, "");
+  if (produccion) sinNumeracion = sinNumeracion.replace(MEDIDAS_DE_PRODUCCION, "");
   const numeros = sinNumeracion.match(/\d+(?:[.,]\d+)?/g) ?? [];
   return numeros.filter((numero) => !permitidas.includes(numero));
 }

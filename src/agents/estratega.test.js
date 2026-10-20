@@ -520,11 +520,11 @@ test("el prompt del Estratega le dice que 2027 es el único número permitido ad
 });
 
 test("el error de una cifra muestra en qué frase está, para poder decidir si es un error real o una regla demasiado estricta", () => {
-  const plan = planValido([piezaValida({ guion: "Plano fijo de 3 segundos con la prenda sobre la mesa y luz natural de ventana.", epigrafe: "Somos 500. Anotate en la lista: link en la bio." })]);
+  const plan = planValido([piezaValida({ guion: "Plano fijo con 3 prendas sobre la mesa y luz natural de ventana.", epigrafe: "Somos 500. Anotate en la lista: link en la bio." })]);
   const { errores } = validarPlan(plan, { semanaInicio: SEMANA, piezas: 1 });
   const delGuion = errores.find((e) => e.startsWith('Pieza 1 (guion): la cifra "3"'));
   assert.ok(delGuion, errores.join(" | "));
-  assert.match(delGuion, /no está en los datos cargados \("[^"]*3 segundos[^"]*"\)\.$/);
+  assert.match(delGuion, /no está en los datos cargados \("[^"]*3 prendas[^"]*"\)\.$/);
   const delEpigrafe = errores.find((e) => e.startsWith('Pieza 1 (epigrafe): la cifra "500"'));
   assert.match(delEpigrafe, /\("Somos 500\. Anotate/);
 });
@@ -535,4 +535,13 @@ test("el error de una cifra en un gancho alternativo también muestra la frase",
   const e = errores.find((x) => x.includes("alternativo 2") && x.includes('la cifra "3"'));
   assert.ok(e, errores.join(" | "));
   assert.match(e, /\("Quedan 3 días"\)\.$/);
+});
+
+test("el guion puede nombrar medidas de producción, pero el gancho y el epígrafe no", () => {
+  const ok = planValido([piezaValida({ guion: "Carrusel de 6 láminas, una frase por lámina. Plano de 3 segundos." })]);
+  assert.equal(validarPlan(ok, { semanaInicio: SEMANA, piezas: 1 }).errores.filter((e) => e.includes("cifra")).length, 0);
+  const dato = planValido([piezaValida({ guion: "Quedan 3 días para el drop." })]);
+  assert.ok(validarPlan(dato, { semanaInicio: SEMANA, piezas: 1 }).errores.some((e) => e.includes("(guion)") && e.includes('"3"')));
+  const epi = planValido([piezaValida({ epigrafe: "Carrusel de 6 láminas." })]);
+  assert.ok(validarPlan(epi, { semanaInicio: SEMANA, piezas: 1 }).errores.some((e) => e.includes("(epigrafe)") && e.includes('"6"')));
 });

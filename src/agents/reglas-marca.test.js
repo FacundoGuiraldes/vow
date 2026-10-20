@@ -142,3 +142,46 @@ test("contextoDeCifra no confunde el 5 de 3,5 ni el 3 de 30 con el número que s
   assert.equal(contextoDeCifra("cuesta 3,5 y hay 5 más", "5", 3), "…ay 5 má…");
   assert.equal(contextoDeCifra("hay 30 cosas y 3 más", "3", 3), "…y 3 má…");
 });
+
+test("cifrasNoPermitidas con produccion perdona medidas de armado y nada más", () => {
+  const p = { produccion: true };
+  const permitidas = CIFRAS_PERMITIDAS;
+  // medidas de producción: no son datos de la marca
+  assert.deepEqual(cifrasNoPermitidas("Carrusel de 6 láminas con fotos", permitidas, p), []);
+  assert.deepEqual(cifrasNoPermitidas("Plano de 3 segundos y 8 a 10 tomas", permitidas, p), []);
+  assert.deepEqual(cifrasNoPermitidas("Video de 12 cuadros, 2 clips y 4 imágenes", permitidas, p), []);
+  // sin la opción, siguen marcadas (el texto al público es estricto)
+  assert.deepEqual(cifrasNoPermitidas("Carrusel de 6 láminas", permitidas), ["6"]);
+  assert.deepEqual(cifrasNoPermitidas("Carrusel de 6 láminas", permitidas, { produccion: false }), ["6"]);
+  // datos que sí serían inventados siguen marcados aunque tengan la opción
+  assert.deepEqual(cifrasNoPermitidas("Quedan 3 días", permitidas, p), ["3"]);
+  assert.deepEqual(cifrasNoPermitidas("Probamos 5 straps", permitidas, p), ["5"]);
+  assert.deepEqual(cifrasNoPermitidas("Más de 30 segundos y 500 unidades", permitidas, p), ["500"]);
+  // el número pegado a otro no se confunde: "13 láminas" no deja un "3" suelto, y "3,5 segundos" se perdona entero
+  assert.deepEqual(cifrasNoPermitidas("13 láminas", permitidas, p), []);
+  assert.deepEqual(cifrasNoPermitidas("3,5 segundos", permitidas, p), []);
+  // la palabra tiene que estar completa: "3 tomate" o "2 segundoss" no es una medida
+  assert.deepEqual(cifrasNoPermitidas("3 tomate", permitidas, p), ["3"]);
+  assert.deepEqual(cifrasNoPermitidas("Drop 01 y 6 láminas", permitidas, p), []);
+});
+
+test("cifrasNoPermitidas con produccion perdona cada unidad de armado, en singular y plural", () => {
+  const unidades = ["lámina", "láminas", "lamina", "slide", "slides", "escena", "escenas", "plano", "planos", "toma", "tomas", "corte", "cortes", "cuadro", "cuadros", "frame", "frames", "pantalla", "pantallas", "página", "páginas", "pagina", "segundo", "segundos", "foto", "fotos", "imagen", "imágenes", "imagenes", "clip", "clips"];
+  for (const u of unidades) assert.deepEqual(cifrasNoPermitidas(`Son 7 ${u} en total`, CIFRAS_PERMITIDAS, { produccion: true }), [], u);
+  // rango: "6 a 8 láminas" y "6 y 8 láminas" y "6-8 láminas"
+  for (const r of ["6 a 8", "6 y 8", "6-8", "6 – 8"]) assert.deepEqual(cifrasNoPermitidas(`Son ${r} láminas`, CIFRAS_PERMITIDAS, { produccion: true }), [], r);
+  // con mayúsculas
+  assert.deepEqual(cifrasNoPermitidas("Son 7 LÁMINAS", CIFRAS_PERMITIDAS, { produccion: true }), []);
+  // la unidad pegada a otra letra no cuenta
+  assert.deepEqual(cifrasNoPermitidas("7 lámina2", CIFRAS_PERMITIDAS, { produccion: true }), ["7", "2"]);
+  // el número después de una letra tampoco ("x3 tomas": el 3 está pegado a una letra)
+  assert.deepEqual(cifrasNoPermitidas("modelo A3 tomas", CIFRAS_PERMITIDAS, { produccion: true }), ["3"]);
+});
+
+test("cifrasNoPermitidas con produccion: rango con decimal y espacio obligatorio entre número y unidad", () => {
+  const p = { produccion: true };
+  assert.deepEqual(cifrasNoPermitidas("De 1 a 2,5 segundos", CIFRAS_PERMITIDAS, p), []);
+  assert.deepEqual(cifrasNoPermitidas("De 1,5 a 2 segundos", CIFRAS_PERMITIDAS, p), []);
+  // sin espacio ("7láminas") no es la forma de escribir una medida: se marca
+  assert.deepEqual(cifrasNoPermitidas("Son 7láminas", CIFRAS_PERMITIDAS, p), ["7"]);
+});
