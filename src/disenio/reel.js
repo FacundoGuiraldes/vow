@@ -25,7 +25,7 @@ const COLOR = { hueso: "#ECE8E1", negro: "#0A0A0A", beige: "#CDBFA6", bordo: "#7
 export const ESCENAS = [
   { segundos: 2.2, lineas: ["¿Hoy no", "tenés", "ganas?"], tamano: 128, fondo: COLOR.negro, tinta: COLOR.hueso },
   { segundos: 1.6, lineas: ["Entrená", "igual."], tamano: 128, fondo: COLOR.hueso, tinta: COLOR.negro },
-  { segundos: 1.6, lineas: ["Nadie", "te mira."], tamano: 128, fondo: COLOR.negro, tinta: COLOR.hueso },
+  { segundos: 1.8, lineas: ["Construí", "en", "silencio."], tamano: 112, fondo: COLOR.negro, tinta: COLOR.hueso },
   { segundos: 3.0, lineas: ["Lo que", "firmás", "con vos", "no se", "rompe."], tamano: 112, fondo: COLOR.hueso, tinta: COLOR.negro },
   { segundos: 2.0, lineas: ["Cumplite", "a vos", "primero."], tamano: 112, fondo: COLOR.negro, tinta: COLOR.hueso },
   { segundos: 2.8, lineas: ["Una promesa", "con vos."], tamano: 84, fondo: COLOR.beige, tinta: COLOR.negro, logo: true, pie: "Drop 01 en 2027" },
