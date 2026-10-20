@@ -2,19 +2,16 @@
 // Uso: node src/disenio/reel.js [carpeta de salida]
 // Cómo funciona: Playwright dibuja cada cuadro de la animación y ffmpeg los une en un video.
 // El guion se revisa con las reglas de marca antes de dibujar: si alguna frase las rompe, no se genera nada.
-import { readFileSync, mkdirSync } from "node:fs";
-import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { chromium } from "playwright-core";
+import { ANCHO, ALTO, CUADROS_POR_SEGUNDO, grabar } from "./video.js";
 import { cifrasNoPermitidas, revisarReglas, revisarTextoAlPublico } from "../agents/reglas-marca.js";
 
 const aqui = dirname(fileURLToPath(import.meta.url));
 const raiz = join(aqui, "..", "..");
 
-export const ANCHO = 1080;
-export const ALTO = 1920;
-export const CUADROS_POR_SEGUNDO = 30;
+export { ANCHO, ALTO, CUADROS_POR_SEGUNDO };
 const MARGEN = 96;
 
 const COLOR = { hueso: "#ECE8E1", negro: "#0A0A0A", beige: "#CDBFA6", bordo: "#7A1F24" };
@@ -100,44 +97,15 @@ window.dibujar = (escena, local, avances, avanceAcento, avancePie) => {
 export async function generar(salida, escenas = ESCENAS) {
   const problemas = revisarEscenas(escenas);
   if (problemas.length) throw new Error(`Textos que rompen reglas de marca: ${JSON.stringify(problemas)}`);
-  mkdirSync(salida, { recursive: true });
-  const archivo = join(salida, "reel.mp4");
-  const navegador = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
-  let ffmpeg;
-  try {
-    const pagina = await navegador.newPage({ viewport: { width: ANCHO, height: ALTO } });
-    await pagina.setContent(htmlDelReel());
-    await pagina.evaluate(() => document.fonts.ready);
-
-    // ffmpeg recibe los cuadros como imágenes por la entrada estándar y arma el MP4 (sin audio: la música se pone desde Instagram)
-    ffmpeg = spawn("ffmpeg", ["-y", "-loglevel", "error", "-f", "image2pipe", "-framerate", String(CUADROS_POR_SEGUNDO), "-i", "-",
-      "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-movflags", "+faststart", "-an", archivo], { stdio: ["pipe", "inherit", "inherit"] });
-    const termino = new Promise((resolver, rechazar) => {
-      ffmpeg.on("error", rechazar);
-      ffmpeg.on("close", (codigo) => (codigo === 0 ? resolver() : rechazar(new Error(`ffmpeg terminó con código ${codigo}`))));
-    });
-    termino.catch(() => {}); // si se frena antes de tiempo, que el cierre forzado de ffmpeg no cuente como error sin atender
-
-    const total = Math.round(duracionTotal(escenas) * CUADROS_POR_SEGUNDO);
-    for (let cuadro = 0; cuadro < total; cuadro++) {
+  return grabar({
+    archivo: join(salida, "reel.mp4"),
+    html: htmlDelReel(),
+    cuadros: Math.round(duracionTotal(escenas) * CUADROS_POR_SEGUNDO),
+    argumentosDelCuadro: (cuadro) => {
       const { escena, local } = escenaEn(cuadro / CUADROS_POR_SEGUNDO, escenas);
-      const avances = escena.lineas.map((_, i) => entrada(local, i));
-      const avanceAcento = entrada(local, escena.lineas.length, 0.12, 0.3);
-      const avancePie = entrada(local, escena.lineas.length + 1, 0.12, 0.3);
-      await pagina.evaluate(([e, l, a, ac, pi]) => window.dibujar(e, l, a, ac, pi), [escena, local, avances, avanceAcento, avancePie]);
-      // Si una línea se sale del margen, el texto quedaría cortado: se frena en vez de entregar el video
-      // (cada línea es un bloque del ancho del margen: si el texto es más ancho que el bloque, scrollWidth lo delata)
-      const desbordes = await pagina.evaluate(() => [...document.querySelectorAll("h1 > span")].filter((s) => s.scrollWidth > s.clientWidth + 1).map((s) => s.textContent));
-      if (desbordes.length) throw new Error(`Cuadro ${cuadro}: se sale del margen: ${desbordes.join(" | ")}`);
-      if (!ffmpeg.stdin.write(await pagina.screenshot({ type: "png" }))) await new Promise((r) => ffmpeg.stdin.once("drain", r));
-    }
-    ffmpeg.stdin.end();
-    await termino;
-  } finally {
-    ffmpeg?.kill("SIGKILL"); // si ya terminó no hace nada; si se frenó por un error, no lo deja colgado esperando cuadros
-    await navegador.close();
-  }
-  return archivo;
+      return [escena, local, escena.lineas.map((_, i) => entrada(local, i)), entrada(local, escena.lineas.length, 0.12, 0.3), entrada(local, escena.lineas.length + 1, 0.12, 0.3)];
+    },
+  });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
