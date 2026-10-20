@@ -14,6 +14,7 @@
     "db-seed": "node src/db/seed-catalogo.js",
     "dev": "bash .devcontainer/iniciar.sh",
     "laminas": "CHROMIUM_PATH=/opt/pw-browsers/chromium node src/disenio/carrusel.js",
+    "reel": "CHROMIUM_PATH=/opt/pw-browsers/chromium node src/disenio/reel.js",
     "test:e2e": "playwright test -c e2e/playwright.config.ts",
     "test:e2e:smoke": "playwright test -c e2e/playwright.config.ts --grep @smoke",
     "test:e2e:ui": "playwright test -c e2e/playwright.config.ts --ui",
