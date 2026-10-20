@@ -1,6 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { leerPiezasDefinidas, diasEntre } from "./piezas-definidas.js";
-import { revisarReglas, revisarGuion, revisarTextoAlPublico, cifrasNoPermitidas, CIFRAS_PERMITIDAS } from "./reglas-marca.js";
+import { revisarReglas, revisarGuion, revisarTextoAlPublico, cifrasNoPermitidas, contextoDeCifra, CIFRAS_PERMITIDAS } from "./reglas-marca.js";
 
 // Estratega: propone el plan de contenido de UNA semana para @vow_ar.
 // Propone y nada más: no publica. Una persona aprueba cada pieza.
@@ -126,7 +126,7 @@ function revisarGancho(gancho, etiqueta, { reglas = true } = {}) {
   // El gancho principal ya pasa por las reglas de marca junto con el resto de los textos de la pieza
   if (reglas) {
     for (const { regla, fragmento } of revisarReglas(gancho)) errores.push(`${etiqueta}: ${regla} ("${fragmento}").`);
-    for (const cifra of cifrasNoPermitidas(gancho)) errores.push(`${etiqueta}: la cifra "${cifra}" no está en los datos cargados.`);
+    for (const cifra of cifrasNoPermitidas(gancho)) errores.push(`${etiqueta}: la cifra "${cifra}" no está en los datos cargados ("${contextoDeCifra(gancho, cifra)}").`);
   }
   return errores;
 }
@@ -208,7 +208,7 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
     for (const [campo, texto] of textosDeLaPieza(pieza)) {
       const revisar = campo === "guion" ? revisarGuion : revisarReglas;
       for (const { regla, fragmento } of revisar(texto)) errores.push(`${etiqueta} (${campo}): ${regla} ("${fragmento}").`);
-      for (const cifra of cifrasNoPermitidas(texto, cifrasPermitidas)) errores.push(`${etiqueta} (${campo}): la cifra "${cifra}" no está en los datos cargados.`);
+      for (const cifra of cifrasNoPermitidas(texto, cifrasPermitidas)) errores.push(`${etiqueta} (${campo}): la cifra "${cifra}" no está en los datos cargados ("${contextoDeCifra(texto, cifra)}").`);
     }
   });
 

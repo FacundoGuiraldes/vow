@@ -87,6 +87,18 @@ export function cifrasNoPermitidas(texto, permitidas = CIFRAS_PERMITIDAS) {
   return numeros.filter((numero) => !permitidas.includes(numero));
 }
 
+// El pedacito de texto donde aparece una cifra, para que un error diga dónde está ("…plano de 3 segundos con…").
+// Busca el número suelto (el "3" de "13" no cuenta) y lo deja en una sola línea, sin comillas dobles.
+export function contextoDeCifra(texto, cifra, margen = 28) {
+  const limpio = String(texto).replace(/\s+/g, " ").replace(/"/g, "'");
+  const escapada = String(cifra).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const suelta = new RegExp(`(?<![\\d.,])${escapada}(?![\\d])`).exec(limpio);
+  const inicio = suelta ? suelta.index : Math.max(0, limpio.indexOf(cifra));
+  const desde = Math.max(0, inicio - margen);
+  const hasta = Math.min(limpio.length, inicio + String(cifra).length + margen);
+  return `${desde > 0 ? "…" : ""}${limpio.slice(desde, hasta).trim()}${hasta < limpio.length ? "…" : ""}`;
+}
+
 // En el guion (instrucciones de producción) es válido nombrar algo para descartarlo:
 // "No aparece papel ni lapicera" o "no se habla de lo que todavía no hay" no son una infracción.
 // Solo se perdona en estas reglas, y solo si la oración tiene una negación aparte del fragmento marcado.
