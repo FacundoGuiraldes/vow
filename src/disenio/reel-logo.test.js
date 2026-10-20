@@ -70,6 +70,12 @@ test("suave arranca y frena: a un cuarto del tiempo lleva un octavo, a tres cuar
   assert.ok(Math.abs(avancesDelLogo(d + (h - d) * 0.25).contornos[0] - 0.125) < 1e-9);
 });
 
+test("el texto 'Una promesa con vos.' aparece recién cuando el logo ya está completo (con el sello), y se queda un rato antes del cierre", () => {
+  assert.ok(SEGUNDOS_TEXTO_PROMESA >= TIEMPOS.sello[1]);
+  assert.ok(SEGUNDOS_PAPEL - SEGUNDOS_TEXTO_PROMESA >= 1); // al menos un segundo para leerlo
+  assert.ok(TIEMPOS.sello[1] < SEGUNDOS_PAPEL);
+});
+
 test("cuando el logo termina cambia el texto a 'Una promesa con vos.' (más grande) y después pasa al cierre sobre fondo negro", () => {
   const antes = estadoEn(SEGUNDOS_TEXTO_PROMESA - 0.05);
   assert.deepEqual(antes.lineas.map((l) => l.texto), TEXTO_GANCHO);

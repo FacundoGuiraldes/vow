@@ -26,10 +26,10 @@ export const CIERRE = [
 // El detalle de marca: una línea bordó recta, igual al acento de la marca, firma "Cumplilo." (cuándo empieza y cuánto dura, en segundos desde que entra esa línea)
 export const FIRMA = { despues: 0.5, dura: 0.55 };
 
-export const SEGUNDOS_PAPEL = 9.6; // la escena del dibujo
+export const SEGUNDOS_PAPEL = 6.4; // la escena del dibujo
 export const SEGUNDOS_CIERRE = 4.6; // la escena final
 export const DURACION = SEGUNDOS_PAPEL + SEGUNDOS_CIERRE;
-export const SEGUNDOS_TEXTO_PROMESA = 8.2; // desde acá el texto del gancho cambia a "Una promesa con vos."
+export const SEGUNDOS_TEXTO_PROMESA = 5.1; // desde acá el texto del gancho cambia a "Una promesa con vos."
 
 export const TEXTOS = [...TEXTO_GANCHO, ...TEXTO_PROMESA, ...CIERRE.map((c) => c.texto)].join(" ");
 
@@ -44,7 +44,7 @@ export function revisarGuion(texto = TEXTOS) {
 // ---- Tiempos del dibujo (segundos desde el inicio): [empieza, termina] ----
 // La línea ya se mueve en el primer medio segundo (para que el gancho tenga movimiento desde el principio).
 // Orden: primero el trazo curvo (contorno 0), después la V con la flecha (contorno 1), después entra el relleno y al final el sello.
-export const TIEMPOS = { contornos: [[0.3, 1.9], [2.0, 6.3]], relleno: [6.4, 7.4], sello: [7.7, 8.1] };
+export const TIEMPOS = { contornos: [[0.3, 1.2], [1.3, 3.4]], relleno: [3.5, 4.3], sello: [4.6, 5.0] };
 
 const limitar = (x) => Math.min(1, Math.max(0, x));
 // Arranca y frena suave
