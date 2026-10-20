@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 import { chromium as playwright } from "playwright-core";
 import {
   CIERRE, DURACION, FIRMA, SEGUNDOS_PAPEL, SEGUNDOS_TEXTO_PROMESA, TEXTOS, TEXTO_GANCHO, TEXTO_PROMESA, TIEMPOS,
-  avancesDelLogo, estadoEn, generar, htmlDelReel, marcadorEn, revisarGuion, suave,
+  avancesDelLogo, estadoEn, generar, htmlDelReel, revisarGuion, suave,
 } from "./reel-logo.js";
 
 const [C0, C1] = TIEMPOS.contornos;
@@ -31,14 +31,14 @@ test("el cierre es '¿Y vos? ¿Qué te prometés? Cumplilo.', las líneas entran
   assert.equal(estadoEn(DURACION).pie, undefined);
 });
 
-test("dura entre 7 y 30 segundos, el gancho está desde el primer cuadro y la pluma ya se mueve en el primer medio segundo", () => {
+test("dura entre 7 y 30 segundos, el gancho está desde el primer cuadro y el logo ya se está dibujando en el primer medio segundo", () => {
   assert.ok(DURACION >= 7 && DURACION <= 30);
   const primero = estadoEn(0);
   assert.equal(primero.escena, "papel");
   assert.deepEqual(primero.lineas.map((l) => l.texto), TEXTO_GANCHO);
   assert.ok(primero.lineas[0].avance <= 0.01); // entra, no aparece de golpe
-  assert.ok(C0[0] <= 0.6);
-  assert.ok(estadoEn(0.3).logo.marcador.opacidad > 0);
+  assert.ok(C0[0] <= 0.5);
+  assert.ok(estadoEn(0.5).logo.contornos[0] > 0);
 });
 
 test("el dibujo sigue un orden: primero el trazo curvo, después la V con la flecha, después el relleno y al final el sello", () => {
@@ -52,6 +52,10 @@ test("el dibujo sigue un orden: primero el trazo curvo, después la V con la fle
   const b = avancesDelLogo(mitad(C1));
   assert.equal(b.contornos[0], 1);
   assert.ok(b.contornos[1] > 0 && b.contornos[1] < 1);
+  assert.equal(b.relleno, 0);
+  const c = avancesDelLogo(mitad(TIEMPOS.relleno));
+  assert.deepEqual(c.contornos, [1, 1]);
+  assert.ok(c.relleno > 0 && c.relleno < 1);
   assert.deepEqual(avancesDelLogo(TIEMPOS.sello[1]), { contornos: [1, 1], relleno: 1, sello: 1 });
 });
 
@@ -64,50 +68,6 @@ test("suave arranca y frena: a un cuarto del tiempo lleva un octavo, a tres cuar
   assert.ok(Math.abs(suave(0.75) - 0.875) < 1e-9);
   const [d, h] = C0;
   assert.ok(Math.abs(avancesDelLogo(d + (h - d) * 0.25).contornos[0] - 0.125) < 1e-9);
-});
-
-test("la pluma entra desde afuera, dibuja cada contorno, viaja levantada entre los dos y se retira al final", () => {
-  const entrada = marcadorEn(C0[0] / 2);
-  assert.equal(entrada.tipo, "entrada");
-  assert.ok(Math.abs(entrada.k - 0.5) < 1e-9);
-  assert.ok(Math.abs(entrada.opacidad - 1) < 1e-9 || entrada.opacidad > 0.9);
-  assert.equal(marcadorEn(0).opacidad, 0);
-  assert.ok(Math.abs(marcadorEn(0.125).opacidad - 0.5) < 1e-9); // entra con un fundido de un cuarto de segundo
-
-  const uno = marcadorEn(mitad(C0));
-  assert.equal(uno.tipo, "contorno");
-  assert.equal(uno.contorno, 0);
-  assert.ok(Math.abs(uno.avance - 0.5) < 1e-9);
-  assert.equal(uno.opacidad, 1);
-
-  const aire = marcadorEn(C0[1] + (C1[0] - C0[1]) * 0.25);
-  assert.equal(aire.tipo, "aire");
-  assert.deepEqual([aire.de, aire.a], [{ contorno: 0, avance: 1 }, { contorno: 1, avance: 0 }]);
-  assert.ok(Math.abs(aire.k - 0.125) < 1e-9);
-
-  const dos = marcadorEn(mitad(C1));
-  assert.equal(dos.tipo, "contorno");
-  assert.equal(dos.contorno, 1);
-
-  const sale = marcadorEn(C1[1] + 0.4);
-  assert.equal(sale.tipo, "salida");
-  assert.deepEqual(sale.desde, { contorno: 1, avance: 1 });
-  assert.ok(Math.abs(sale.k - suave(0.5)) < 1e-9);
-  assert.ok(Math.abs(sale.opacidad - 1) < 1e-9);
-  assert.ok(Math.abs(marcadorEn(C1[1] + 0.6).opacidad - 0.5) < 1e-9);
-  assert.equal(marcadorEn(C1[1] + 1.2).opacidad, 0);
-});
-
-test("la entrada y la salida de la pluma son suaves: a un cuarto del camino llevan un octavo", () => {
-  assert.ok(Math.abs(marcadorEn(C0[0] / 4).k - 0.125) < 1e-9);
-  assert.ok(Math.abs(marcadorEn(C1[1] + 0.2).k - 0.125) < 1e-9);
-});
-
-test("justo en los cortes: al terminar el primer contorno todavía es 'contorno', y al terminar el segundo todavía es 'contorno'", () => {
-  assert.equal(marcadorEn(C0[1]).tipo, "contorno");
-  assert.equal(marcadorEn(C1[1]).tipo, "contorno");
-  assert.equal(marcadorEn(C0[0]).tipo, "contorno");
-  assert.equal(marcadorEn(C1[0]).tipo, "contorno"); // en el instante en que arranca el segundo ya está dibujándolo
 });
 
 test("cuando el logo termina cambia el texto a 'Una promesa con vos.' (más grande) y después pasa al cierre sobre fondo negro", () => {
@@ -154,6 +114,9 @@ async function conPagina(estado, fn) {
     await pagina.setContent(htmlDelReel());
     await pagina.evaluate(() => document.fonts.ready);
     await pagina.evaluate((e) => window.dibujar(e), estado);
+    // la primera vez la tipografía todavía puede estar cargándose; en el video ya está cargada desde el primer cuadro
+    await pagina.evaluate(() => document.fonts.ready);
+    await pagina.evaluate((e) => window.dibujar(e), estado);
     return await fn(pagina);
   } finally {
     await navegador.close();
@@ -162,7 +125,6 @@ async function conPagina(estado, fn) {
 
 test("al terminar de dibujarse, el logo queda igual al logo real (menos de 0,05% de diferencia, y sin contorno sobrante)", { skip: sinNavegador }, async () => {
   const estado = estadoEn(TIEMPOS.sello[1] + 0.1);
-  estado.logo.marcador.opacidad = 0;
   estado.lineas = [];
   await conPagina(estado, async (pagina) => {
     const recorte = { x: 200, y: 620, width: 680, height: 720 };
@@ -184,7 +146,14 @@ test("al terminar de dibujarse, el logo queda igual al logo real (menos de 0,05%
   });
 });
 
-test("el contorno no se ve hasta que la pluma lo empieza (sin puntitos), y la firma tampoco hasta que se traza", { skip: sinNavegador }, async () => {
+test("no hay ningún lápiz ni pluma en pantalla: el logo se traza solo", { skip: sinNavegador }, async () => {
+  await conPagina(estadoEn(mitad(C1)), async (pagina) => {
+    assert.equal(await pagina.evaluate(() => document.getElementById("pluma")), null);
+    assert.ok(!/pluma|l[áa]piz|marcador/i.test(htmlDelReel().replace(/\/\/[^\n]*/g, "")));
+  });
+});
+
+test("el contorno no se ve hasta que se empieza a trazar (sin puntitos), y la firma tampoco hasta que se traza", { skip: sinNavegador }, async () => {
   await conPagina(estadoEn(0.1), async (pagina) => {
     const opacidades = await pagina.evaluate(() => [...document.querySelectorAll(".contorno")].map((c) => c.style.opacity));
     assert.deepEqual(opacidades, ["0", "0"]);
@@ -201,47 +170,6 @@ test("el contorno no se ve hasta que la pluma lo empieza (sin puntitos), y la fi
   });
 });
 
-test("la pluma está sobre el contorno que dibuja (su punta coincide con el final del trazo visible)", { skip: sinNavegador }, async () => {
-  await conPagina(estadoEn(mitad(C1)), async (pagina) => {
-    // la punta de la pluma es el origen de su dibujo: se compara con el punto del contorno a ese avance, en pantalla
-    const { pluma, esperado } = await pagina.evaluate(() => {
-      const c = document.querySelectorAll(".contorno")[1];
-      const p = c.getPointAtLength(0.5 * c.getTotalLength()); // a mitad de tiempo el avance suave es 0,5
-      const caja = document.getElementById("logo").getBoundingClientRect();
-      const m = new DOMMatrix(getComputedStyle(document.getElementById("pluma")).transform);
-      return { pluma: [m.e, m.f], esperado: [caja.left + (p.x - 308) * (caja.width / 492), caja.top + (p.y - 128) * (caja.height / 518)] };
-    });
-    assert.ok(Math.hypot(pluma[0] - esperado[0], pluma[1] - esperado[1]) < 1.5, `${pluma} vs ${esperado}`);
-  });
-});
-
-test("genera un MP4 vertical (prueba con el primer segundo)", { skip: (sinNavegador || !hayFfmpeg) && "no hay Chromium o ffmpeg" }, async () => {
-  process.env.CHROMIUM_PATH = chromium;
-  const archivo = await generar(mkdtempSync(join(tmpdir(), "reel-logo-")), { segundos: 0.4 });
-  assert.ok(statSync(archivo).size > 1000);
-  const sonda = spawnSync("ffprobe", ["-v", "error", "-show_entries", "stream=width,height", "-of", "csv=p=0", archivo]).stdout.toString().trim();
-  assert.equal(sonda, "1080,1920");
-});
-
-// Punto del contorno `c` a la fracción `f` de su largo, en pantalla (calculado dentro de la página, sin usar el código del reel)
-const enPantalla = (pagina, c, f) => pagina.evaluate(([c, f]) => {
-  const e = document.querySelectorAll(".contorno")[c];
-  const p = e.getPointAtLength(f * e.getTotalLength());
-  const caja = document.getElementById("logo").getBoundingClientRect();
-  return [caja.left + (p.x - 308) * (caja.width / 492), caja.top + (p.y - 128) * (caja.height / 518)];
-}, [c, f]);
-const plumaEn = (pagina) => pagina.evaluate(() => { const m = new DOMMatrix(getComputedStyle(document.getElementById("pluma")).transform); return [m.e, m.f]; });
-const cerca = (a, b) => assert.ok(Math.hypot(a[0] - b[0], a[1] - b[1]) < 1.5, `${a} no está cerca de ${b}`);
-// el punto de afuera por donde entra y sale la pluma, en pantalla (viene de 900,700 en las coordenadas del logo)
-const afuera = (pagina) => pagina.evaluate(() => { const caja = document.getElementById("logo").getBoundingClientRect(); return [caja.left + (900 - 308) * (caja.width / 492), caja.top + (700 - 128) * (caja.height / 518)]; });
-const medio = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-
-test("la pluma entra desde afuera, viaja levantada entre los contornos y sale: está donde corresponde en cada momento", { skip: sinNavegador }, async () => {
-  await conPagina(estadoEn(C0[0] / 2), async (p) => cerca(await plumaEn(p), medio(await afuera(p), await enPantalla(p, 0, 0))));
-  await conPagina(estadoEn(C0[1] + (C1[0] - C0[1]) / 2), async (p) => cerca(await plumaEn(p), medio(await enPantalla(p, 0, 1), await enPantalla(p, 1, 0))));
-  await conPagina(estadoEn(C1[1] + 0.4), async (p) => cerca(await plumaEn(p), medio(await enPantalla(p, 1, 1), await afuera(p)))); // k suave a esa altura es 0,5
-});
-
 test("el relleno entra con borde suave (no corte seco) y el contorno tiene un grosor de lápiz fino", { skip: sinNavegador }, async () => {
   await conPagina(estadoEn(mitad(TIEMPOS.relleno)), async (pagina) => {
     const [a, b] = await pagina.evaluate(() => [+document.getElementById("barrido-a").getAttribute("offset"), +document.getElementById("barrido-b").getAttribute("offset")]);
@@ -255,4 +183,34 @@ test("la firma no se ve mientras no empezó a trazarse, aunque 'Cumplilo.' ya es
   await conPagina(estadoEn(SEGUNDOS_PAPEL + CIERRE.at(-1).entra + 0.3), async (pagina) => {
     assert.equal(await pagina.evaluate(() => document.getElementById("firma").style.opacity), "0");
   });
+});
+
+test("la línea bordó del final es recta (horizontal, de extremos rectos) y tiene el largo de la palabra 'Cumplilo.'", { skip: sinNavegador }, async () => {
+  await conPagina(estadoEn(DURACION), async (pagina) => {
+    const r = await pagina.evaluate(() => {
+      const trazo = document.querySelector("#firma path");
+      const caja = trazo.getBBox();
+      const f = document.getElementById("firma").getBoundingClientRect();
+      const h1 = document.getElementById("texto");
+      const rango = document.createRange();
+      rango.selectNodeContents(h1.lastElementChild);
+      const t = rango.getBoundingClientRect();
+      return { alto: caja.height, ancho: caja.width, extremos: trazo.getAttribute("stroke-linecap"), color: trazo.getAttribute("stroke"), dEs: trazo.getAttribute("d"), izq: f.left - t.left, anchoPantalla: f.width - t.width, debajo: f.top - t.bottom };
+    });
+    assert.equal(r.alto, 0, "recta: sin altura");
+    assert.ok(r.ancho > 0);
+    assert.match(r.dEs, /^M [\d.]+ ([\d.]+) L [\d.]+ \1$/, "mismo alto de punta a punta");
+    assert.equal(r.extremos, "butt");
+    assert.equal(r.color, "#7A1F24");
+    assert.ok(Math.abs(r.izq) < 1 && Math.abs(r.anchoPantalla) < 1, "alineada con la palabra");
+    assert.ok(r.debajo > 0 && r.debajo < 60, "justo debajo del texto");
+  });
+});
+
+test("genera un MP4 vertical (prueba con el primer segundo)", { skip: (sinNavegador || !hayFfmpeg) && "no hay Chromium o ffmpeg" }, async () => {
+  process.env.CHROMIUM_PATH = chromium;
+  const archivo = await generar(mkdtempSync(join(tmpdir(), "reel-logo-")), { segundos: 0.4 });
+  assert.ok(statSync(archivo).size > 1000);
+  const sonda = spawnSync("ffprobe", ["-v", "error", "-show_entries", "stream=width,height", "-of", "csv=p=0", archivo]).stdout.toString().trim();
+  assert.equal(sonda, "1080,1920");
 });

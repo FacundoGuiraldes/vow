@@ -1,4 +1,4 @@
-// Reel "el logo se dibuja": una pluma recorre el contorno del logo de VOW sobre papel hueso, el relleno entra con un barrido,
+// Reel "el logo se dibuja": una línea fina traza sola el contorno del logo de VOW sobre papel hueso, el relleno entra con un barrido,
 // y el video cierra con la pregunta "¿Y vos? ¿Qué te prometés? Cumplilo." (MP4 vertical 1080x1920, 30 fps, sin audio).
 // Uso: node src/disenio/reel-logo.js [carpeta de salida]
 // El logo es el real (el mismo SVG de la landing). Tiene dos contornos: el trazo curvo de arriba y la V con la flecha.
@@ -23,7 +23,7 @@ export const CIERRE = [
   { texto: "prometés?", entra: 1.0 },
   { texto: "Cumplilo.", entra: 2.6 },
 ];
-// El detalle de marca: una línea bordó, trazada a mano, firma "Cumplilo." (cuándo empieza y cuánto dura, en segundos desde que entra esa línea)
+// El detalle de marca: una línea bordó recta, igual al acento de la marca, firma "Cumplilo." (cuándo empieza y cuánto dura, en segundos desde que entra esa línea)
 export const FIRMA = { despues: 0.5, dura: 0.55 };
 
 export const SEGUNDOS_PAPEL = 9.6; // la escena del dibujo
@@ -42,9 +42,9 @@ export function revisarGuion(texto = TEXTOS) {
 }
 
 // ---- Tiempos del dibujo (segundos desde el inicio): [empieza, termina] ----
-// La pluma ya se mueve en el primer medio segundo (para que el gancho tenga movimiento desde el principio).
+// La línea ya se mueve en el primer medio segundo (para que el gancho tenga movimiento desde el principio).
 // Orden: primero el trazo curvo (contorno 0), después la V con la flecha (contorno 1), después entra el relleno y al final el sello.
-export const TIEMPOS = { contornos: [[0.5, 2.0], [2.2, 6.4]], relleno: [6.5, 7.5], sello: [7.8, 8.2] };
+export const TIEMPOS = { contornos: [[0.3, 1.9], [2.0, 6.3]], relleno: [6.4, 7.4], sello: [7.7, 8.1] };
 
 const limitar = (x) => Math.min(1, Math.max(0, x));
 // Arranca y frena suave
@@ -54,20 +54,6 @@ const avance = (t, [desde, hasta]) => suave((t - desde) / (hasta - desde));
 // Cuánto avanzó el dibujo en el segundo t
 export function avancesDelLogo(t) {
   return { contornos: TIEMPOS.contornos.map((i) => avance(t, i)), relleno: avance(t, TIEMPOS.relleno), sello: avance(t, TIEMPOS.sello) };
-}
-
-// Dónde está la pluma. Devuelve una descripción; la página calcula el punto sobre el contorno real del logo.
-//   entrada: viene de afuera hacia el comienzo del primer contorno
-//   contorno: dibujando el contorno `contorno`, a `avance` (0 a 1) de su largo
-//   aire: levantada, viajando entre el final de un contorno y el comienzo del siguiente
-//   salida: se retira hacia afuera al terminar el último contorno
-export function marcadorEn(t) {
-  const [c0, c1] = TIEMPOS.contornos;
-  if (t < c0[0]) return { tipo: "entrada", k: suave(t / c0[0]), opacidad: limitar(t / 0.25) };
-  if (t <= c0[1]) return { tipo: "contorno", contorno: 0, avance: avance(t, c0), opacidad: 1 };
-  if (t < c1[0]) return { tipo: "aire", de: { contorno: 0, avance: 1 }, a: { contorno: 1, avance: 0 }, k: suave((t - c0[1]) / (c1[0] - c0[1])), opacidad: 1 };
-  if (t <= c1[1]) return { tipo: "contorno", contorno: 1, avance: avance(t, c1), opacidad: 1 };
-  return { tipo: "salida", desde: { contorno: 1, avance: 1 }, k: suave((t - c1[1]) / 0.8), opacidad: 1 - limitar((t - c1[1] - 0.4) / 0.4) };
 }
 
 // Entrada de un texto: aparece subiendo un poco, con frenado al final
@@ -81,7 +67,7 @@ export function estadoEn(t) {
     return {
       escena: "papel", fondo: COLOR.hueso, tinta: COLOR.negro, tamano: promesa ? 84 : 68,
       lineas: (promesa ? TEXTO_PROMESA : TEXTO_GANCHO).map((texto, i) => ({ texto, avance: entrada(local, i * 0.12) })),
-      logo: { ...avancesDelLogo(t), marcador: marcadorEn(t) },
+      logo: avancesDelLogo(t),
     };
   }
   const local = t - SEGUNDOS_PAPEL;
@@ -106,7 +92,6 @@ const LOGO_IZQUIERDA = (ANCHO - LOGO_ANCHO) / 2;
 const LOGO_ARRIBA = 640;
 const ESCALA = LOGO_ANCHO / 492;
 const ALTO_LOGO = 518 * ESCALA;
-const SALIDA = [900, 700]; // por dónde entra y sale la pluma (coordenadas del SVG del logo)
 
 export const htmlDelReel = () => `<!doctype html><html lang="es"><head><meta charset="utf-8"><style>
 @font-face{font-family:"Unbounded";font-weight:800;src:url(data:font/woff2;base64,${fuente("unbounded", "unbounded-latin-800-normal.woff2")}) format("woff2")}
@@ -121,7 +106,6 @@ h1{font-family:"Unbounded",sans-serif;font-weight:800;line-height:1.08;word-spac
 h1 span{display:block;white-space:nowrap}
 #logo{position:absolute;left:${LOGO_IZQUIERDA}px;top:${LOGO_ARRIBA}px;width:${LOGO_ANCHO}px;height:${ALTO_LOGO}px;overflow:visible}
 #sello{position:absolute;left:${LOGO_IZQUIERDA}px;top:${LOGO_ARRIBA + ALTO_LOGO + 56}px;height:8px;background:${COLOR.bordo}}
-#pluma{position:absolute;left:0;top:0;overflow:visible;filter:drop-shadow(12px 16px 9px rgba(40,30,20,.25))}
 #firma{position:absolute;overflow:visible}
 </style></head><body>
 <div id="papel">
@@ -135,29 +119,12 @@ h1 span{display:block;white-space:nowrap}
     ${CONTORNOS.map((c, i) => `<path class="contorno" data-i="${i}" d="${c}" pathLength="1" fill="none" stroke="${COLOR.negro}" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="0 1"/>`).join("")}
   </svg>
   <div id="sello" style="width:0"></div>
-  <svg id="pluma" width="1" height="1" style="opacity:0"><defs><linearGradient id="cuerpo" x1="0" x2="1"><stop offset="0" stop-color="#151515"/><stop offset=".45" stop-color="#4a4a4a"/><stop offset="1" stop-color="#151515"/></linearGradient></defs>
-    <g transform="rotate(38)"><path d="M -4 0 L 4 0 L 10 -34 L -10 -34 Z" fill="#2a2a2a"/><rect x="-14" y="-240" width="28" height="208" rx="9" fill="url(#cuerpo)"/><rect x="-14" y="-110" width="28" height="12" fill="${COLOR.bordo}"/><rect x="-14" y="-240" width="28" height="40" rx="9" fill="${COLOR.bordo}"/></g></svg>
   <h1 id="texto-papel"></h1>
 </div>
 <div id="bloque" style="display:none"><h1 id="texto"></h1></div>
-<svg id="firma" width="10" height="10" style="display:none"><path d="M 2 14 C 70 4, 130 22, 210 10 S 330 16, 398 6" pathLength="1" fill="none" stroke="${COLOR.bordo}" stroke-width="12" stroke-linecap="round" stroke-dasharray="0 1"/></svg>
+<svg id="firma" width="10" height="10" style="display:none"><path d="M 0 15 L 400 15" pathLength="1" fill="none" stroke="${COLOR.bordo}" stroke-width="12" stroke-linecap="butt" stroke-dasharray="0 1"/></svg>
 <script>
-const SALIDA = ${JSON.stringify(SALIDA)};
 const contornos = [...document.querySelectorAll(".contorno")];
-// Un punto sobre un contorno del logo, a una fracción de su largo (coordenadas del SVG del logo)
-const sobre = ({ contorno, avance }) => {
-  const c = contornos[contorno];
-  const p = c.getPointAtLength(avance * c.getTotalLength());
-  return [p.x, p.y];
-};
-const mezcla = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
-const puntoDeLaPluma = (m) => {
-  if (m.tipo === "entrada") return mezcla(SALIDA, sobre({ contorno: 0, avance: 0 }), m.k);
-  if (m.tipo === "contorno") return sobre(m);
-  if (m.tipo === "aire") return mezcla(sobre(m.de), sobre(m.a), m.k);
-  return mezcla(sobre(m.desde), SALIDA, m.k);
-};
-const aPantalla = (p) => [${LOGO_IZQUIERDA} + (p[0] - 308) * ${ESCALA}, ${LOGO_ARRIBA} + (p[1] - 128) * ${ESCALA}];
 const lineasHtml = (lineas) => lineas.map((l) => '<span style="opacity:' + l.avance + ';transform:translateY(' + (1 - l.avance) * 60 + 'px)">' + l.texto + "</span>").join("");
 
 // Se llama una vez por cuadro con el estado completo de la escena
@@ -175,7 +142,7 @@ window.dibujar = (e) => {
     h1.innerHTML = lineasHtml(e.lineas);
     contornos.forEach((c) => {
       c.setAttribute("stroke-dasharray", e.logo.contornos[+c.dataset.i] + " 1");
-      // El contorno desaparece cuando el relleno lo reemplaza (el logo final es el original exacto) y no se ve hasta que la pluma lo empieza
+      // El contorno desaparece cuando el relleno lo reemplaza (el logo final es el original exacto) y no se ve hasta que la línea lo empieza
       // (con la punta redonda, un trazo de largo cero dejaría un puntito)
       c.style.opacity = e.logo.contornos[+c.dataset.i] > 0 ? 1 - e.logo.relleno : 0;
     });
@@ -184,10 +151,6 @@ window.dibujar = (e) => {
     document.getElementById("barrido-a").setAttribute("offset", Math.min(1, Math.max(0, k * 1.25 - 0.25)));
     document.getElementById("barrido-b").setAttribute("offset", Math.min(1, k * 1.25));
     document.getElementById("sello").style.width = e.logo.sello * 120 + "px";
-    const [x, y] = aPantalla(puntoDeLaPluma(e.logo.marcador));
-    const pluma = document.getElementById("pluma");
-    pluma.style.transform = "translate(" + x + "px," + y + "px)";
-    pluma.style.opacity = e.logo.marcador.opacidad;
   } else {
     const h1 = document.getElementById("texto");
     h1.style.fontSize = e.tamano + "px";
@@ -204,7 +167,7 @@ window.dibujar = (e) => {
     firma.setAttribute("viewBox", "0 0 400 30");
     firma.setAttribute("preserveAspectRatio", "none");
     firma.querySelector("path").setAttribute("stroke-dasharray", e.firma + " 1");
-    firma.style.opacity = e.firma > 0 ? ultima.style.opacity : 0; // sin avance no se ve (la punta redonda dejaría puntitos)
+    firma.style.opacity = e.firma > 0 ? ultima.style.opacity : 0; // sin avance no se ve
   }
 };
 </script></body></html>`;
