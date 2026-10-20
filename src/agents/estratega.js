@@ -208,7 +208,7 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
     for (const [campo, texto] of textosDeLaPieza(pieza)) {
       const revisar = campo === "guion" ? revisarGuion : revisarReglas;
       for (const { regla, fragmento } of revisar(texto)) errores.push(`${etiqueta} (${campo}): ${regla} ("${fragmento}").`);
-      for (const cifra of cifrasNoPermitidas(texto, cifrasPermitidas)) errores.push(`${etiqueta} (${campo}): la cifra "${cifra}" no está en los datos cargados ("${contextoDeCifra(texto, cifra)}").`);
+      for (const cifra of cifrasNoPermitidas(texto, cifrasPermitidas, { produccion: campo === "guion" })) errores.push(`${etiqueta} (${campo}): la cifra "${cifra}" no está en los datos cargados ("${contextoDeCifra(texto, cifra)}").`);
     }
   });
 
