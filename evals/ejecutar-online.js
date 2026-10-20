@@ -174,8 +174,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       console.error("Falta ANTHROPIC_API_KEY en el .env. Para probar sin gastar, agregá --simulado.");
       process.exit(1);
     }
-    const { default: Anthropic } = await import("@anthropic-ai/sdk");
-    const cliente = new Anthropic();
+    const { crearClienteReal } = await import("../src/cliente-real.js");
+    const cliente = await crearClienteReal("evals-online");
     crearCliente = () => cliente;
   }
 

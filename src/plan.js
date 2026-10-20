@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { mkdir, writeFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
-import Anthropic from "@anthropic-ai/sdk";
+import { corteLimpio, crearClienteReal } from "./cliente-real.js";
 import { planificarSemana } from "./agents/estratega.js";
 import { crearClienteSimulado } from "./agents/cliente-simulado.js";
 import { resumenDePlan } from "./agents/resumen-plan.js";
@@ -35,18 +35,20 @@ if (!values.simulado) {
     console.error("Falta ANTHROPIC_API_KEY en el .env. Para probar sin gastar, agregá --simulado.");
     process.exit(1);
   }
-  cliente = new Anthropic();
+  cliente = await crearClienteReal("plan");
 }
 
-const resultado = await planificarSemana(
-  {
-    semanaInicio: values.semana,
-    fase: values.fase,
-    recursos: { producto: values.producto, gente: values.gente },
-    notas: values.notas,
-    piezas: Number(values.piezas),
-  },
-  { cliente }
+const resultado = await corteLimpio(
+  planificarSemana(
+    {
+      semanaInicio: values.semana,
+      fase: values.fase,
+      recursos: { producto: values.producto, gente: values.gente },
+      notas: values.notas,
+      piezas: Number(values.piezas),
+    },
+    { cliente }
+  )
 );
 
 console.log(`Tokens usados: ${resultado.uso.entrada} de entrada, ${resultado.uso.salida} de salida.`);

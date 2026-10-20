@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
-import Anthropic from "@anthropic-ai/sdk";
+import { crearClienteReal } from "./cliente-real.js";
 import { crearClienteSimulado } from "./agents/cliente-simulado.js";
 import { resumenDePlan } from "./agents/resumen-plan.js";
 import { ejecutarFlujo, registroNuevo, aprobar, rehacerDesde, costoUSD } from "./orquestador/orquestador.js";
@@ -74,7 +74,7 @@ if (!values.simulado) {
     console.error("Falta ANTHROPIC_API_KEY en el .env. Para probar sin gastar, agregá --simulado.");
     process.exit(1);
   }
-  cliente = new Anthropic();
+  cliente = await crearClienteReal("semana");
 }
 
 const pasos = armarPasos({
