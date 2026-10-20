@@ -1,0 +1,27 @@
+{
+  "fecha": "2026-10-20T02:46:35.229Z",
+  "modelo": "claude-sonnet-5-5",
+  "pedidos": [
+    "base-1-pieza-sin-producto",
+    "base-2-piezas-sin-producto",
+    "expectativa-2-piezas-con-nota",
+    "expectativa-con-producto",
+    "base-con-gente",
+    "cuenta-regresiva-3-piezas"
+  ],
+  "resumen": {
+    "total": 6,
+    "aprobados": 6,
+    "rechazados": 0,
+    "erroresTecnicos": 0,
+    "omitidos": 0,
+    "tasaAprobacion": 1,
+    "costoTotalUSD": 0.480912,
+    "costoMedioUSD": 0.080152,
+    "tokens": {
+      "entrada": 102586,
+      "salida": 27574
+    },
+    "problemasFrecuentes": []
+  }
+}
