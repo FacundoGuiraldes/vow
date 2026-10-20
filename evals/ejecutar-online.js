@@ -8,6 +8,7 @@
 //   --repeticiones 2        repite cada pedido (la IA no da siempre lo mismo)
 //   --solo id1,id2          corre solo esos pedidos
 //   --guardar-linea-base    guarda este resultado como referencia para comparar los próximos
+//   --base-desde <informe>  arma la línea base desde un informe que ya existe (no llama a la API, no gasta)
 import "dotenv/config";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -112,6 +113,20 @@ export function compararConLineaBase(resumen, base, { margenTasa = 0.15, margenC
   return { ok: avisos.length === 0, sinBase: false, avisos };
 }
 
+// La línea base que se guarda a partir de un informe ya generado, sin volver a gastar.
+// Rechaza informes que no sirven de referencia: simulados, con errores técnicos o con pedidos omitidos.
+export function lineaBaseDesdeInforme(informe) {
+  if (!informe?.resumen || !Array.isArray(informe.resultados)) throw new Error("El archivo no parece un informe de evals online.");
+  if (informe.simulado) throw new Error("No se guarda una línea base con un informe simulado.");
+  const { resumen } = informe;
+  if (resumen.erroresTecnicos > 0 || resumen.omitidos > 0 || resumen.tasaAprobacion === null) {
+    throw new Error("El informe tiene errores técnicos o pedidos omitidos: no sirve como referencia.");
+  }
+  // Con --repeticiones los ids vienen como "pedido #2": en la base van una sola vez y sin el número
+  const pedidos = [...new Set(informe.resultados.map((r) => r.id.replace(/ #\d+$/, "")))];
+  return { fecha: informe.fecha, modelo: informe.modelo, pedidos, resumen };
+}
+
 const porcentaje = (x) => `${Math.round(x * 100)}%`;
 
 async function leerJSON(ruta) {
@@ -131,8 +146,27 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       repeticiones: { type: "string", default: "1" },
       solo: { type: "string" },
       "guardar-linea-base": { type: "boolean", default: false },
+      "base-desde": { type: "string" },
     },
   });
+
+  // Atajo gratis: convierte un informe que ya tenés en la línea base y termina (no usa la API)
+  if (values["base-desde"]) {
+    const informe = await leerJSON(values["base-desde"]);
+    if (!informe) {
+      console.error(`No existe el informe ${values["base-desde"]}.`);
+      process.exit(1);
+    }
+    try {
+      const base = lineaBaseDesdeInforme(informe);
+      await writeFile(RUTA_LINEA_BASE, JSON.stringify(base, null, 2) + "\n");
+      console.log(`Línea base guardada en evals/linea-base-online.json (${base.pedidos.length} pedidos, aprobación ${porcentaje(base.resumen.tasaAprobacion)}).`);
+      process.exit(0);
+    } catch (error) {
+      console.error(error.message);
+      process.exit(1);
+    }
+  }
 
   let crearCliente = (pedido) => crearClienteSimulado(pedido.semana);
   if (!values.simulado) {

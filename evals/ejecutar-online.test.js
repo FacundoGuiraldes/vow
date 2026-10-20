@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { clasificarError, compararConLineaBase, correrEvalsOnline, resumir } from "./ejecutar-online.js";
+import { clasificarError, compararConLineaBase, correrEvalsOnline, lineaBaseDesdeInforme, resumir } from "./ejecutar-online.js";
 
 const pedidos = [
   { id: "a", semana: "2026-11-02", fase: "base", piezas: 1 },
@@ -126,4 +126,35 @@ test("clasificarError agrupa los errores de cifras aunque cambie el número, el 
   const b = clasificarError('Pieza 2 (epigrafe): la cifra "500" no está en los datos cargados ("Somos 500. Anotate en la lista").');
   assert.equal(a, b);
   assert.equal(a, "la cifra no está en los datos cargados");
+});
+
+const informeBueno = (cambios = {}) => ({
+  fecha: "2026-10-20T02:46:35.229Z",
+  modelo: "modelo-x",
+  simulado: false,
+  resumen: { total: 2, aprobados: 2, rechazados: 0, erroresTecnicos: 0, omitidos: 0, tasaAprobacion: 1, costoMedioUSD: 0.08 },
+  resultados: [{ id: "a" }, { id: "b" }],
+  ...cambios,
+});
+
+test("lineaBaseDesdeInforme arma la base con la forma de --guardar-linea-base", () => {
+  const informe = informeBueno();
+  assert.deepEqual(lineaBaseDesdeInforme(informe), { fecha: informe.fecha, modelo: "modelo-x", pedidos: ["a", "b"], resumen: informe.resumen });
+});
+
+test("lineaBaseDesdeInforme junta las repeticiones en un solo pedido", () => {
+  const informe = informeBueno({ resultados: [{ id: "a #1" }, { id: "a #2" }, { id: "b #1" }, { id: "b #2" }] });
+  assert.deepEqual(lineaBaseDesdeInforme(informe).pedidos, ["a", "b"]);
+});
+
+test("lineaBaseDesdeInforme rechaza informes que no sirven de referencia", () => {
+  assert.throws(() => lineaBaseDesdeInforme(null), /no parece un informe/);
+  assert.throws(() => lineaBaseDesdeInforme({}), /no parece un informe/);
+  assert.throws(() => lineaBaseDesdeInforme({ resumen: {} }), /no parece un informe/);
+  assert.throws(() => lineaBaseDesdeInforme({ resultados: [] }), /no parece un informe/);
+  assert.throws(() => lineaBaseDesdeInforme(informeBueno({ simulado: true })), /simulado/);
+  const r = informeBueno().resumen;
+  assert.throws(() => lineaBaseDesdeInforme(informeBueno({ resumen: { ...r, erroresTecnicos: 1 } })), /errores técnicos/);
+  assert.throws(() => lineaBaseDesdeInforme(informeBueno({ resumen: { ...r, omitidos: 1 } })), /errores técnicos/);
+  assert.throws(() => lineaBaseDesdeInforme(informeBueno({ resumen: { ...r, tasaAprobacion: null } })), /errores técnicos/);
 });
