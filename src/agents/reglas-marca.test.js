@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { revisarReglas, revisarGuion, revisarTextoAlPublico, cifrasNoPermitidas } from "./reglas-marca.js";
+import { revisarReglas, revisarGuion, revisarTextoAlPublico, cifrasNoPermitidas, CIFRAS_PERMITIDAS } from "./reglas-marca.js";
 
 const reglasDe = (texto) => revisarReglas(texto).map((p) => p.regla);
 
@@ -103,4 +103,13 @@ test("los marcadores de lista de un guion no cuentan como cifras, pero una cifra
   assert.deepEqual(cifrasNoPermitidas("1) Probamos 5 straps"), ["5"]);
   assert.deepEqual(cifrasNoPermitidas("Cuesta 3.500 pesos"), ["3.500"]);
   assert.deepEqual(cifrasNoPermitidas("Drop 01 abre pronto"), []);
+});
+
+test("las únicas cifras de la marca son 01 (Drop 01) y 2027 (el año del lanzamiento)", () => {
+  assert.deepEqual(CIFRAS_PERMITIDAS, ["01", "2027"]);
+  assert.deepEqual(cifrasNoPermitidas("Drop 01 en 2027."), []);
+  assert.deepEqual(cifrasNoPermitidas("Drop 01 en 2028."), ["2028"]);
+  assert.deepEqual(cifrasNoPermitidas("Sale en marzo de 2027."), []); // el año es dato real
+  assert.deepEqual(cifrasNoPermitidas("Sale el 15 de marzo de 2027."), ["15"]); // un día inventado no
+  assert.deepEqual(cifrasNoPermitidas("Somos 500."), ["500"]);
 });

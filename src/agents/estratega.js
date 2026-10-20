@@ -1,6 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { leerPiezasDefinidas, diasEntre } from "./piezas-definidas.js";
-import { revisarReglas, revisarGuion, revisarTextoAlPublico, cifrasNoPermitidas } from "./reglas-marca.js";
+import { revisarReglas, revisarGuion, revisarTextoAlPublico, cifrasNoPermitidas, CIFRAS_PERMITIDAS } from "./reglas-marca.js";
 
 // Estratega: propone el plan de contenido de UNA semana para @vow_ar.
 // Propone y nada más: no publica. Una persona aprueba cada pieza.
@@ -133,7 +133,7 @@ function revisarGancho(gancho, etiqueta, { reglas = true } = {}) {
 
 // Revisa que el plan tenga la forma pedida y cumpla las reglas de marca.
 // Devuelve { ok, errores }. Si hay algún error, el plan se descarta (no se guarda).
-export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitidas = ["01"], piezas = PIEZAS_POR_DEFECTO, ganchosConocidos = [], piezasDefinidas = [] } = {}) {
+export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitidas = CIFRAS_PERMITIDAS, piezas = PIEZAS_POR_DEFECTO, ganchosConocidos = [], piezasDefinidas = [] } = {}) {
   const errores = [];
   const conocidos = new Set(ganchosConocidos.map(normalizar));
   const frasesUsadas = new Set(piezasDefinidas.flatMap((p) => p.frases ?? []).map(normalizar));
@@ -263,7 +263,7 @@ ${piezas.map((p) => p.texto.trim()).join("\n\n---\n\n")}`
 Reglas:
 - Todo lo que escribas sigue el cerebro de marca de abajo. Si algo lo contradice, gana el cerebro de marca.
 - Hablás en voseo rioplatense. Cada pieza termina con una sola acción: anotarse en la lista de espera.
-- Nunca inventes cifras, pruebas, stock, fechas ni opiniones. No uses números en los textos salvo "01" de "Drop 01".
+- Nunca inventes cifras, pruebas, stock, fechas ni opiniones. No uses números en los textos salvo "01" de "Drop 01" y "2027", el año del lanzamiento.
 - Solo podés proponer piezas que se puedan hacer con los recursos disponibles que te indican. Si no hay producto, no propongas mostrar producto.
 - Las referencias son inspiración, no datos para citar. No copies sus textos ni sus ideas al pie de la letra.
 - Los ganchos tienen que ser potentes y sobrios, como pide la sección 8 del cerebro de marca: afirmaciones cortas de 3 a 8 palabras, en imperativo, que comprometen. Nunca tono de tutorial, de consejo ni de lo que falta.

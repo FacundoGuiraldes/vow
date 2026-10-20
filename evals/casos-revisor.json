@@ -679,6 +679,30 @@
           "nombra elementos del gimnasio"
         ]
       }
+    },
+    {
+      "id": "anio-del-lanzamiento",
+      "descripcion": "2027 es el año del lanzamiento y se puede decir",
+      "pieza": {
+        "epigrafe": "Drop 01 en 2027. Anotate en la lista: link en la bio."
+      },
+      "esperado": {
+        "aprobada": true,
+        "problemas_contienen": []
+      }
+    },
+    {
+      "id": "otro-anio-rechazado",
+      "descripcion": "Cualquier otro año o fecha sería inventar un dato",
+      "pieza": {
+        "epigrafe": "Drop 01 en 2028. Anotate en la lista: link en la bio."
+      },
+      "esperado": {
+        "aprobada": false,
+        "problemas_contienen": [
+          "la cifra \"2028\""
+        ]
+      }
     }
   ]
 }
