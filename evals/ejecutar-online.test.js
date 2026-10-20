@@ -120,3 +120,10 @@ test("un plan rechazado guarda lo que propuso la IA y cuántos intentos hizo; un
   assert.deepEqual(resultados[1].propuesta, propuesta);
   assert.equal(resultados[1].intentos, 2);
 });
+
+test("clasificarError agrupa los errores de cifras aunque cambie el número, el campo o la frase que se muestra", () => {
+  const a = clasificarError('Pieza 1 (guion): la cifra "3" no está en los datos cargados ("Plano fijo de 3 segundos con la prenda").');
+  const b = clasificarError('Pieza 2 (epigrafe): la cifra "500" no está en los datos cargados ("Somos 500. Anotate en la lista").');
+  assert.equal(a, b);
+  assert.equal(a, "la cifra no está en los datos cargados");
+});

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { revisarReglas, revisarGuion, revisarTextoAlPublico, cifrasNoPermitidas, CIFRAS_PERMITIDAS } from "./reglas-marca.js";
+import { revisarReglas, revisarGuion, revisarTextoAlPublico, cifrasNoPermitidas, contextoDeCifra, CIFRAS_PERMITIDAS } from "./reglas-marca.js";
 
 const reglasDe = (texto) => revisarReglas(texto).map((p) => p.regla);
 
@@ -112,4 +112,33 @@ test("las únicas cifras de la marca son 01 (Drop 01) y 2027 (el año del lanzam
   assert.deepEqual(cifrasNoPermitidas("Sale en marzo de 2027."), []); // el año es dato real
   assert.deepEqual(cifrasNoPermitidas("Sale el 15 de marzo de 2027."), ["15"]); // un día inventado no
   assert.deepEqual(cifrasNoPermitidas("Somos 500."), ["500"]);
+});
+
+test("contextoDeCifra muestra el pedacito de texto donde está el número, con puntos suspensivos si se corta", () => {
+  assert.equal(contextoDeCifra("uno dos tres cuatro 5 seis siete ocho nueve", "5", 6), "…uatro 5 seis…");
+  assert.equal(contextoDeCifra("abcdefghij 12 klmnopqrst", "12", 2), "…j 12 k…");
+});
+
+test("contextoDeCifra no pone puntos suspensivos si el texto entra entero", () => {
+  assert.equal(contextoDeCifra("Plano fijo de 3 segundos", "3"), "Plano fijo de 3 segundos");
+});
+
+test("contextoDeCifra busca el número suelto: el 3 de 13 no cuenta", () => {
+  assert.equal(contextoDeCifra("hay 13 cosas y 3 más", "3", 3), "…y 3 má…");
+});
+
+test("contextoDeCifra devuelve una sola línea y cambia las comillas dobles por simples (para no romper el formato del error)", () => {
+  assert.equal(contextoDeCifra("línea uno\n\n  línea 7 dos", "7", 100), "línea uno línea 7 dos");
+  assert.equal(contextoDeCifra('dice "faltan 3 días" en pantalla', "3", 100), "dice 'faltan 3 días' en pantalla");
+});
+
+test("contextoDeCifra aguanta números con punto o coma y un número que no está en el texto", () => {
+  assert.equal(contextoDeCifra("cuesta 12,5 pesos", "12,5", 100), "cuesta 12,5 pesos");
+  assert.equal(contextoDeCifra("sin numero", "9"), "sin numero");
+  assert.equal(contextoDeCifra("x 3", "3", 1), "…3");
+});
+
+test("contextoDeCifra no confunde el 5 de 3,5 ni el 3 de 30 con el número que se busca", () => {
+  assert.equal(contextoDeCifra("cuesta 3,5 y hay 5 más", "5", 3), "…ay 5 má…");
+  assert.equal(contextoDeCifra("hay 30 cosas y 3 más", "3", 3), "…y 3 má…");
 });
