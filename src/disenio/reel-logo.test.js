@@ -1,14 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { chromium as playwright } from "playwright-core";
 import {
-  CIERRE, DURACION, PUNTA, SALIDA_DEL_MARCADOR, SEGUNDOS_PAPEL, TEXTO_GANCHO, TEXTO_PROMESA, TIEMPOS, TRAZOS,
-  avancesDelLogo, estadoEn, generar, htmlDelReel, marcadorEn, puntoEn, revisarGuion,
+  CIERRE, DURACION, FIRMA, SEGUNDOS_PAPEL, SEGUNDOS_TEXTO_PROMESA, TEXTOS, TEXTO_GANCHO, TEXTO_PROMESA, TIEMPOS,
+  avancesDelLogo, estadoEn, generar, htmlDelReel, marcadorEn, revisarGuion, suave,
 } from "./reel-logo.js";
+
+const [C0, C1] = TIEMPOS.contornos;
+const mitad = ([d, h]) => (d + h) / 2;
 
 test("el guion cumple las reglas de marca", () => {
   assert.deepEqual(revisarGuion(), []);
@@ -20,115 +23,196 @@ test("el guion rechaza modo bestia, una cifra que no es 01 ni 2027 y explicar la
   assert.ok(revisarGuion("Nuestra paleta y tipografía").some((p) => p.regla === "explica la marca por dentro"));
 });
 
-test("el video cierra con la pregunta y 'Cumplilo.' al final; las líneas entran en orden", () => {
+test("el cierre es '¿Y vos? ¿Qué te prometés? Cumplilo.', las líneas entran en orden y no hay nada de Drop ni de fechas", () => {
   assert.deepEqual(CIERRE.map((c) => c.texto), ["¿Y vos?", "¿Qué te", "prometés?", "Cumplilo."]);
   const entradas = CIERRE.map((c) => c.entra);
   assert.deepEqual(entradas, [...entradas].sort((a, b) => a - b));
-  assert.equal(CIERRE.at(-1).texto, "Cumplilo.");
+  assert.ok(!/drop|2027|01/i.test(TEXTOS));
+  assert.equal(estadoEn(DURACION).pie, undefined);
 });
 
-test("dura entre 7 y 30 segundos y el gancho está desde el primer cuadro", () => {
+test("dura entre 7 y 30 segundos, el gancho está desde el primer cuadro y la pluma ya se mueve en el primer medio segundo", () => {
   assert.ok(DURACION >= 7 && DURACION <= 30);
   const primero = estadoEn(0);
   assert.equal(primero.escena, "papel");
   assert.deepEqual(primero.lineas.map((l) => l.texto), TEXTO_GANCHO);
   assert.ok(primero.lineas[0].avance <= 0.01); // entra, no aparece de golpe
+  assert.ok(C0[0] <= 0.6);
+  assert.ok(estadoEn(0.3).logo.marcador.opacidad > 0);
 });
 
-test("puntoEn recorre una línea quebrada por largo, y no se pasa de los extremos", () => {
-  const l = [[0, 0], [10, 0], [10, 10]]; // largo total 20
-  assert.deepEqual(puntoEn(l, 0), [0, 0]);
-  assert.deepEqual(puntoEn(l, 0.5), [10, 0]);
-  assert.deepEqual(puntoEn(l, 0.75), [10, 5]);
-  assert.deepEqual(puntoEn(l, 1), [10, 10]);
-  assert.deepEqual(puntoEn(l, 3), [10, 10]);
-  assert.deepEqual(puntoEn(l, -1), [0, 0]);
+test("el dibujo sigue un orden: primero el trazo curvo, después la V con la flecha, después el relleno y al final el sello", () => {
+  assert.deepEqual(avancesDelLogo(0), { contornos: [0, 0], relleno: 0, sello: 0 });
+  const fases = [C0, C1, TIEMPOS.relleno, TIEMPOS.sello];
+  fases.slice(1).forEach((f, i) => assert.ok(f[0] >= fases[i][1], "cada fase empieza cuando termina la anterior"));
+  const a = avancesDelLogo(mitad(C0));
+  assert.ok(a.contornos[0] > 0 && a.contornos[0] < 1);
+  assert.equal(a.contornos[1], 0);
+  assert.equal(a.relleno, 0);
+  const b = avancesDelLogo(mitad(C1));
+  assert.equal(b.contornos[0], 1);
+  assert.ok(b.contornos[1] > 0 && b.contornos[1] < 1);
+  assert.deepEqual(avancesDelLogo(TIEMPOS.sello[1]), { contornos: [1, 1], relleno: 1, sello: 1 });
 });
 
-test("el logo se dibuja en orden: trazo curvo, pata izquierda, pata derecha, eje y punta de la flecha", () => {
-  assert.deepEqual(avancesDelLogo(0), { trazos: [0, 0, 0, 0], punta: 0 });
-  const t1 = avancesDelLogo((TIEMPOS.curva[0] + TIEMPOS.curva[1]) / 2);
-  assert.ok(t1.trazos[3] > 0 && t1.trazos[3] < 1);
-  assert.deepEqual(t1.trazos.slice(0, 3), [0, 0, 0]); // todavía no empezó la V
-  const t2 = avancesDelLogo((TIEMPOS.trazos[0][0] + TIEMPOS.trazos[0][1]) / 2);
-  assert.equal(t2.trazos[3], 1);
-  assert.ok(t2.trazos[0] > 0 && t2.trazos[0] < 1);
-  assert.equal(t2.trazos[1], 0);
-  assert.deepEqual(avancesDelLogo(TIEMPOS.punta[1]), { trazos: [1, 1, 1, 1], punta: 1 });
-  // cada parte empieza cuando termina la anterior
-  const arranques = [TIEMPOS.curva, ...TIEMPOS.trazos, TIEMPOS.punta];
-  arranques.slice(1).forEach((a, i) => assert.ok(a[0] >= arranques[i][1]));
+test("suave arranca y frena: a un cuarto del tiempo lleva un octavo, a tres cuartos siete octavos", () => {
+  assert.equal(suave(0), 0);
+  assert.equal(suave(1), 1);
+  assert.equal(suave(-2), 0);
+  assert.equal(suave(5), 1);
+  assert.ok(Math.abs(suave(0.25) - 0.125) < 1e-9);
+  assert.ok(Math.abs(suave(0.75) - 0.875) < 1e-9);
+  const [d, h] = C0;
+  assert.ok(Math.abs(avancesDelLogo(d + (h - d) * 0.25).contornos[0] - 0.125) < 1e-9);
 });
 
-// Compara puntos con una tolerancia mínima (los decimales de la geometría)
-const casi = (a, b) => assert.ok(Math.hypot(a[0] - b[0], a[1] - b[1]) < 1e-6, `${a} no es ${b}`);
-
-test("el marcador entra desde afuera, sigue la punta del trazo y se va al terminar", () => {
+test("la pluma entra desde afuera, dibuja cada contorno, viaja levantada entre los dos y se retira al final", () => {
+  const entrada = marcadorEn(C0[0] / 2);
+  assert.equal(entrada.tipo, "entrada");
+  assert.ok(Math.abs(entrada.k - 0.5) < 1e-9);
+  assert.ok(Math.abs(entrada.opacidad - 1) < 1e-9 || entrada.opacidad > 0.9);
   assert.equal(marcadorEn(0).opacidad, 0);
-  assert.equal(marcadorEn(TIEMPOS.curva[0]).opacidad, 1);
-  casi(marcadorEn(TIEMPOS.curva[0]).punto, TRAZOS[3].puntos[0]); // empieza donde empieza el trazo curvo
-  casi(marcadorEn(TIEMPOS.curva[1]).punto, TRAZOS[3].puntos.at(-1));
-  const a = TRAZOS[0].puntos[0];
-  casi(marcadorEn(TIEMPOS.trazos[0][0]).punto, a); // pata izquierda
-  const enAire = marcadorEn((TIEMPOS.curva[1] + TIEMPOS.trazos[0][0]) / 2).punto; // viaja de un trazo al siguiente
-  assert.notDeepEqual(enAire, TRAZOS[3].puntos.at(-1));
-  assert.notDeepEqual(enAire, a);
-  casi(marcadorEn(TIEMPOS.punta[1]).punto, PUNTA.hasta);
-  assert.equal(marcadorEn(TIEMPOS.punta[1] + 2).opacidad, 0);
+  assert.ok(Math.abs(marcadorEn(0.125).opacidad - 0.5) < 1e-9); // entra con un fundido de un cuarto de segundo
+
+  const uno = marcadorEn(mitad(C0));
+  assert.equal(uno.tipo, "contorno");
+  assert.equal(uno.contorno, 0);
+  assert.ok(Math.abs(uno.avance - 0.5) < 1e-9);
+  assert.equal(uno.opacidad, 1);
+
+  const aire = marcadorEn(C0[1] + (C1[0] - C0[1]) * 0.25);
+  assert.equal(aire.tipo, "aire");
+  assert.deepEqual([aire.de, aire.a], [{ contorno: 0, avance: 1 }, { contorno: 1, avance: 0 }]);
+  assert.ok(Math.abs(aire.k - 0.125) < 1e-9);
+
+  const dos = marcadorEn(mitad(C1));
+  assert.equal(dos.tipo, "contorno");
+  assert.equal(dos.contorno, 1);
+
+  const sale = marcadorEn(C1[1] + 0.4);
+  assert.equal(sale.tipo, "salida");
+  assert.deepEqual(sale.desde, { contorno: 1, avance: 1 });
+  assert.ok(Math.abs(sale.k - suave(0.5)) < 1e-9);
+  assert.ok(Math.abs(sale.opacidad - 1) < 1e-9);
+  assert.ok(Math.abs(marcadorEn(C1[1] + 0.6).opacidad - 0.5) < 1e-9);
+  assert.equal(marcadorEn(C1[1] + 1.2).opacidad, 0);
 });
 
-test("cuando el logo termina cambia el texto a 'Una promesa con vos.' y después pasa al cierre sobre fondo negro", () => {
-  const antes = estadoEn(TIEMPOS.punta[1] + 0.05);
+test("la entrada y la salida de la pluma son suaves: a un cuarto del camino llevan un octavo", () => {
+  assert.ok(Math.abs(marcadorEn(C0[0] / 4).k - 0.125) < 1e-9);
+  assert.ok(Math.abs(marcadorEn(C1[1] + 0.2).k - 0.125) < 1e-9);
+});
+
+test("justo en los cortes: al terminar el primer contorno todavía es 'contorno', y al terminar el segundo todavía es 'contorno'", () => {
+  assert.equal(marcadorEn(C0[1]).tipo, "contorno");
+  assert.equal(marcadorEn(C1[1]).tipo, "contorno");
+  assert.equal(marcadorEn(C0[0]).tipo, "contorno");
+  assert.equal(marcadorEn(C1[0]).tipo, "contorno"); // en el instante en que arranca el segundo ya está dibujándolo
+});
+
+test("cuando el logo termina cambia el texto a 'Una promesa con vos.' (más grande) y después pasa al cierre sobre fondo negro", () => {
+  const antes = estadoEn(SEGUNDOS_TEXTO_PROMESA - 0.05);
   assert.deepEqual(antes.lineas.map((l) => l.texto), TEXTO_GANCHO);
-  const despues = estadoEn(9.0);
+  assert.equal(antes.tamano, 68);
+  const despues = estadoEn(SEGUNDOS_TEXTO_PROMESA + 0.8);
   assert.deepEqual(despues.lineas.map((l) => l.texto), TEXTO_PROMESA);
-  assert.ok(despues.logo.sello >= 0.99); // el sello bordó ya está completo
+  assert.equal(despues.tamano, 84);
+  assert.equal(estadoEn(SEGUNDOS_TEXTO_PROMESA).tamano, 84);
   assert.equal(estadoEn(SEGUNDOS_PAPEL - 0.01).escena, "papel");
-  const cierre = estadoEn(SEGUNDOS_PAPEL + 0.01);
-  assert.equal(cierre.escena, "cierre");
-  assert.equal(cierre.fondo, "#0A0A0A");
+  assert.equal(estadoEn(SEGUNDOS_PAPEL).escena, "cierre");
+  assert.equal(estadoEn(SEGUNDOS_PAPEL).fondo, "#0A0A0A");
 });
 
-test("en el cierre, '¿Y vos?' aparece primero y 'Cumplilo.' al final", () => {
+test("en el cierre, '¿Y vos?' aparece primero y 'Cumplilo.' al final; 'prometés?' entra un instante después de '¿Qué te'", () => {
   const e1 = estadoEn(SEGUNDOS_PAPEL + 0.6);
   assert.ok(e1.lineas[0].avance > 0.9 && e1.lineas[3].avance === 0);
-  const e2 = estadoEn(SEGUNDOS_PAPEL + 1.8);
-  assert.ok(e2.lineas[1].avance > 0.9 && e2.lineas[2].avance > 0.9 && e2.lineas[3].avance === 0);
-  const e3 = estadoEn(DURACION);
-  assert.ok(e3.lineas.every((l) => l.avance > 0.99) && e3.pie.avance > 0.99 && e3.acento > 0.99);
+  const e2 = estadoEn(SEGUNDOS_PAPEL + 1.2);
+  assert.ok(e2.lineas[2].avance < e2.lineas[1].avance && e2.lineas[2].avance > 0);
+  const e3 = estadoEn(SEGUNDOS_PAPEL + 2.0);
+  assert.ok(e3.lineas[1].avance > 0.9 && e3.lineas[2].avance > 0.9 && e3.lineas[3].avance === 0);
+  assert.ok(estadoEn(DURACION).lineas.every((l) => l.avance > 0.99));
+});
+
+test("la firma bordó se traza después de que entra 'Cumplilo.': no aparece de golpe y termina completa", () => {
+  const entra = SEGUNDOS_PAPEL + CIERRE.at(-1).entra;
+  assert.equal(estadoEn(entra + FIRMA.despues - 0.01).firma, 0);
+  const aMedias = estadoEn(entra + FIRMA.despues + FIRMA.dura * 0.25).firma;
+  assert.ok(Math.abs(aMedias - 0.125) < 1e-9);
+  assert.equal(estadoEn(entra + FIRMA.despues + FIRMA.dura).firma, 1);
+  assert.equal(estadoEn(DURACION).firma, 1);
 });
 
 const chromium = process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium";
 const hayFfmpeg = spawnSync("ffmpeg", ["-version"]).status === 0;
 const sinNavegador = !existsSync(chromium) && "no hay Chromium";
 
-test("al terminar de dibujarse, el logo queda igual al logo real (menos de 0,05% de diferencia)", { skip: sinNavegador }, async () => {
+// Abre la página, dibuja el estado y ejecuta `fn(pagina)`
+async function conPagina(estado, fn) {
   const navegador = await playwright.launch({ executablePath: chromium });
   try {
     const pagina = await navegador.newPage({ viewport: { width: 1080, height: 1920 } });
     await pagina.setContent(htmlDelReel());
     await pagina.evaluate(() => document.fonts.ready);
-    const estado = estadoEn(TIEMPOS.punta[1] + 0.1);
-    estado.logo.marcador.opacidad = 0;
-    estado.lineas = [];
     await pagina.evaluate((e) => window.dibujar(e), estado);
-    const recorte = { x: 200, y: 620, width: 680, height: 720 };
-    const con = (await pagina.screenshot({ clip: recorte })).toString("base64");
-    await pagina.evaluate(() => document.querySelector("#logo g").removeAttribute("mask"));
-    const sin = (await pagina.screenshot({ clip: recorte })).toString("base64");
-    // se comparan los píxeles dentro de la página: cuánta tinta del logo real falta en el dibujado
-    const { tinta, faltan } = await pagina.evaluate(async ([a, b]) => {
-      const leer = (b64) => new Promise((ok) => { const i = new Image(); i.onload = () => { const c = document.createElement("canvas"); c.width = i.width; c.height = i.height; const x = c.getContext("2d"); x.drawImage(i, 0, 0); ok(x.getImageData(0, 0, i.width, i.height).data); }; i.src = "data:image/png;base64," + b64; });
-      const [dc, ds] = [await leer(a), await leer(b)];
-      let t = 0, f = 0;
-      for (let i = 0; i < ds.length; i += 4) { if (ds[i] < 110) { t++; if (dc[i] - ds[i] > 60) f++; } }
-      return { tinta: t, faltan: f };
-    }, [con, sin]);
-    assert.ok(tinta > 100000, "se midió el logo");
-    assert.ok(faltan / tinta < 0.0005, `faltan ${faltan} de ${tinta} píxeles`);
+    return await fn(pagina);
   } finally {
     await navegador.close();
   }
+}
+
+test("al terminar de dibujarse, el logo queda igual al logo real (menos de 0,05% de diferencia, y sin contorno sobrante)", { skip: sinNavegador }, async () => {
+  const estado = estadoEn(TIEMPOS.sello[1] + 0.1);
+  estado.logo.marcador.opacidad = 0;
+  estado.lineas = [];
+  await conPagina(estado, async (pagina) => {
+    const recorte = { x: 200, y: 620, width: 680, height: 720 };
+    const dibujado = (await pagina.screenshot({ clip: recorte })).toString("base64");
+    // el logo real: el archivo original del logo (web/src/assets/logo-mark.svg), con su propia regla de relleno
+    const original = readFileSync(new URL("../../web/src/assets/logo-mark.svg", import.meta.url), "utf8").replace(/<svg[^>]*>/, "").replace("</svg>", "");
+    await pagina.evaluate((interior) => { const l = document.getElementById("logo"); l.setAttribute("fill", "#0A0A0A"); l.innerHTML = interior; }, original);
+    const real = (await pagina.screenshot({ clip: recorte })).toString("base64");
+    const { tinta, faltan, sobran } = await pagina.evaluate(async ([a, b]) => {
+      const leer = (b64) => new Promise((ok) => { const i = new Image(); i.onload = () => { const c = document.createElement("canvas"); c.width = i.width; c.height = i.height; const x = c.getContext("2d"); x.drawImage(i, 0, 0); ok(x.getImageData(0, 0, i.width, i.height).data); }; i.src = "data:image/png;base64," + b64; });
+      const [da, dr] = [await leer(a), await leer(b)];
+      let t = 0, f = 0, s = 0;
+      for (let i = 0; i < dr.length; i += 4) { if (dr[i] < 110) t++; if (da[i] - dr[i] > 60) f++; if (dr[i] - da[i] > 60) s++; }
+      return { tinta: t, faltan: f, sobran: s };
+    }, [dibujado, real]);
+    assert.ok(tinta > 100000, "se midió el logo");
+    assert.ok(faltan / tinta < 0.0005, `faltan ${faltan} de ${tinta} píxeles`);
+    assert.ok(sobran / tinta < 0.0005, `sobran ${sobran} de ${tinta} píxeles`);
+  });
+});
+
+test("el contorno no se ve hasta que la pluma lo empieza (sin puntitos), y la firma tampoco hasta que se traza", { skip: sinNavegador }, async () => {
+  await conPagina(estadoEn(0.1), async (pagina) => {
+    const opacidades = await pagina.evaluate(() => [...document.querySelectorAll(".contorno")].map((c) => c.style.opacity));
+    assert.deepEqual(opacidades, ["0", "0"]);
+  });
+  await conPagina(estadoEn(mitad(C0)), async (pagina) => {
+    const opacidades = await pagina.evaluate(() => [...document.querySelectorAll(".contorno")].map((c) => c.style.opacity));
+    assert.deepEqual(opacidades, ["1", "0"]); // el primero se está dibujando, el segundo todavía no
+  });
+  await conPagina(estadoEn(SEGUNDOS_PAPEL + 0.1), async (pagina) => {
+    assert.equal(await pagina.evaluate(() => document.getElementById("firma").style.opacity), "0");
+  });
+  await conPagina(estadoEn(DURACION), async (pagina) => {
+    assert.equal(await pagina.evaluate(() => document.getElementById("firma").style.opacity), "1");
+  });
+});
+
+test("la pluma está sobre el contorno que dibuja (su punta coincide con el final del trazo visible)", { skip: sinNavegador }, async () => {
+  await conPagina(estadoEn(mitad(C1)), async (pagina) => {
+    // la punta de la pluma es el origen de su dibujo: se compara con el punto del contorno a ese avance, en pantalla
+    const { pluma, esperado } = await pagina.evaluate(() => {
+      const c = document.querySelectorAll(".contorno")[1];
+      const p = c.getPointAtLength(0.5 * c.getTotalLength()); // a mitad de tiempo el avance suave es 0,5
+      const caja = document.getElementById("logo").getBoundingClientRect();
+      const m = new DOMMatrix(getComputedStyle(document.getElementById("pluma")).transform);
+      return { pluma: [m.e, m.f], esperado: [caja.left + (p.x - 308) * (caja.width / 492), caja.top + (p.y - 128) * (caja.height / 518)] };
+    });
+    assert.ok(Math.hypot(pluma[0] - esperado[0], pluma[1] - esperado[1]) < 1.5, `${pluma} vs ${esperado}`);
+  });
 });
 
 test("genera un MP4 vertical (prueba con el primer segundo)", { skip: (sinNavegador || !hayFfmpeg) && "no hay Chromium o ffmpeg" }, async () => {
@@ -139,43 +223,36 @@ test("genera un MP4 vertical (prueba con el primer segundo)", { skip: (sinNavega
   assert.equal(sonda, "1080,1920");
 });
 
-test("puntoEn no se rompe con dos puntos iguales seguidos (tramo de largo cero)", () => {
-  assert.deepEqual(puntoEn([[0, 0], [0, 0], [10, 0]], 0), [0, 0]);
-  assert.deepEqual(puntoEn([[0, 0], [0, 0], [10, 0]], 0.5), [5, 0]);
+// Punto del contorno `c` a la fracción `f` de su largo, en pantalla (calculado dentro de la página, sin usar el código del reel)
+const enPantalla = (pagina, c, f) => pagina.evaluate(([c, f]) => {
+  const e = document.querySelectorAll(".contorno")[c];
+  const p = e.getPointAtLength(f * e.getTotalLength());
+  const caja = document.getElementById("logo").getBoundingClientRect();
+  return [caja.left + (p.x - 308) * (caja.width / 492), caja.top + (p.y - 128) * (caja.height / 518)];
+}, [c, f]);
+const plumaEn = (pagina) => pagina.evaluate(() => { const m = new DOMMatrix(getComputedStyle(document.getElementById("pluma")).transform); return [m.e, m.f]; });
+const cerca = (a, b) => assert.ok(Math.hypot(a[0] - b[0], a[1] - b[1]) < 1.5, `${a} no está cerca de ${b}`);
+// el punto de afuera por donde entra y sale la pluma, en pantalla (viene de 900,700 en las coordenadas del logo)
+const afuera = (pagina) => pagina.evaluate(() => { const caja = document.getElementById("logo").getBoundingClientRect(); return [caja.left + (900 - 308) * (caja.width / 492), caja.top + (700 - 128) * (caja.height / 518)]; });
+const medio = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+
+test("la pluma entra desde afuera, viaja levantada entre los contornos y sale: está donde corresponde en cada momento", { skip: sinNavegador }, async () => {
+  await conPagina(estadoEn(C0[0] / 2), async (p) => cerca(await plumaEn(p), medio(await afuera(p), await enPantalla(p, 0, 0))));
+  await conPagina(estadoEn(C0[1] + (C1[0] - C0[1]) / 2), async (p) => cerca(await plumaEn(p), medio(await enPantalla(p, 0, 1), await enPantalla(p, 1, 0))));
+  await conPagina(estadoEn(C1[1] + 0.4), async (p) => cerca(await plumaEn(p), medio(await enPantalla(p, 1, 1), await afuera(p)))); // k suave a esa altura es 0,5
 });
 
-test("los trazos arrancan y frenan suave: a un cuarto del tiempo llevan un octavo, y a tres cuartos siete octavos", () => {
-  const [d, h] = TIEMPOS.curva;
-  assert.ok(Math.abs(avancesDelLogo(d + (h - d) * 0.25).trazos[3] - 0.125) < 1e-9);
-  assert.ok(Math.abs(avancesDelLogo(d + (h - d) * 0.75).trazos[3] - 0.875) < 1e-9);
+test("el relleno entra con borde suave (no corte seco) y el contorno tiene un grosor de lápiz fino", { skip: sinNavegador }, async () => {
+  await conPagina(estadoEn(mitad(TIEMPOS.relleno)), async (pagina) => {
+    const [a, b] = await pagina.evaluate(() => [+document.getElementById("barrido-a").getAttribute("offset"), +document.getElementById("barrido-b").getAttribute("offset")]);
+    assert.ok(a > 0 && b > a && b <= 1, `${a} ${b}`);
+    const grosor = await pagina.evaluate(() => +document.querySelector(".contorno").getAttribute("stroke-width"));
+    assert.ok(grosor >= 3 && grosor <= 6);
+  });
 });
 
-test("el marcador entra suave: a mitad del recorrido de entrada está en el punto medio", () => {
-  const inicio = TRAZOS[3].puntos[0];
-  const medio = [(SALIDA_DEL_MARCADOR[0] + inicio[0]) / 2, (SALIDA_DEL_MARCADOR[1] + inicio[1]) / 2];
-  casi(marcadorEn(0.7).punto, medio); // la entrada va de 0,4 s a 1,0 s
-});
-
-test("entre dos trazos el marcador viaja suave: a un cuarto del viaje recorrió un octavo", () => {
-  const fin = TRAZOS[3].puntos.at(-1);
-  const inicio = TRAZOS[0].puntos[0];
-  const [d, h] = [TIEMPOS.curva[1], TIEMPOS.trazos[0][0]];
-  const esperado = [fin[0] + (inicio[0] - fin[0]) * 0.125, fin[1] + (inicio[1] - fin[1]) * 0.125];
-  casi(marcadorEn(d + (h - d) * 0.25).punto, esperado);
-});
-
-test("el texto es más grande en 'Una promesa con vos.' que en el gancho, y el corte al cierre es justo en 9,6 s", () => {
-  assert.equal(estadoEn(1).tamano, 68);
-  assert.equal(estadoEn(9.0).tamano, 84);
-  assert.equal(estadoEn(SEGUNDOS_PAPEL).escena, "cierre");
-});
-
-test("en el cierre 'prometés?' entra un instante después de '¿Qué te' y el acento y el pie se animan (no aparecen de golpe)", () => {
-  const e = estadoEn(SEGUNDOS_PAPEL + 1.2);
-  assert.ok(e.lineas[2].avance < e.lineas[1].avance);
-  const ultima = CIERRE.at(-1).entra;
-  const enAcento = estadoEn(SEGUNDOS_PAPEL + ultima + 0.5 + 0.15);
-  assert.ok(enAcento.acento > 0 && enAcento.acento < 1);
-  const enPie = estadoEn(SEGUNDOS_PAPEL + ultima + 0.9 + 0.15);
-  assert.ok(enPie.pie.avance > 0 && enPie.pie.avance < 1);
+test("la firma no se ve mientras no empezó a trazarse, aunque 'Cumplilo.' ya esté en pantalla", { skip: sinNavegador }, async () => {
+  await conPagina(estadoEn(SEGUNDOS_PAPEL + CIERRE.at(-1).entra + 0.3), async (pagina) => {
+    assert.equal(await pagina.evaluate(() => document.getElementById("firma").style.opacity), "0");
+  });
 });
