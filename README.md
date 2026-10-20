@@ -10,7 +10,21 @@
 
 VOW es una marca argentina de ropa y accesorios de gym que vende directo al público. Está en construcción, con lanzamiento previsto para 2027.
 
-Este repositorio contiene el backend y la capa de agentes de IA de la marca. En `web/` también vive la landing de la lista de espera.
+Este repositorio es la base técnica de la marca:
+
+- **Landing y API** (`web/`, `src/api`): lista de espera y catálogo del Drop 01, publicados y monitoreados.
+- **Un sistema de agentes de IA** que investiga cuentas de referencia y propone el plan de contenido semanal, siempre con reglas de marca, tope de gasto y aprobación de una persona antes de seguir. [Ver cómo funciona](#el-sistema-de-agentes).
+- **Piezas de Instagram hechas con código**: láminas de carruseles y reels que se generan desde el repo, con el mismo sistema visual de la marca.
+
+## Qué demuestra este proyecto
+
+La parte difícil de usar IA en serio no es llamarla, es **poder confiar en lo que devuelve**. Por eso la mayor parte del trabajo está en controlarla y medirla:
+
+- **Reglas que se pueden probar:** la marca tiene un manual (`docs/marca/cerebro-de-marca.md`) y sus reglas están en código, no solo en un prompt. Frenan datos inventados, frases fuera de tono y ganchos repetidos.
+- **Evals con un número:** hay casos fijos que corren gratis en cada cambio y una corrida con la IA real que mide qué porcentaje de planes cumple las reglas y cuánto cuesta cada uno.
+- **Tests que prueban a los tests:** cada cambio pasa por mutation testing (se rompe el código a propósito y se comprueba que algún test lo detecte).
+- **Control del gasto:** tope por corrida, tope mensual y modo simulado que prueba todo el flujo sin gastar.
+- **La IA propone, una persona decide:** ningún agente publica nada.
 
 ## Qué funciona hoy
 
@@ -18,9 +32,14 @@ Este repositorio contiene el backend y la capa de agentes de IA de la marca. En 
 - **Catálogo del Drop 01:** tabla `productos` con los 7 productos del Drop 01 en estado concepto, cargados con el script `db-seed`. `GET /api/productos` y `GET /api/productos/:slug` los exponen sin precios, stock ni datos internos.
 - **Sección Drop 01 en la landing:** muestra la imagen conceptual del drop y el listado que trae de la API, con avisos mientras el servidor despierta y si la carga falla.
 - **Conexión a PostgreSQL (Neon):** pool de conexiones, script de prueba y migración de las tablas `lista_espera` y `productos`.
-- **Motor de agentes:** ejecuta agentes sobre el SDK de Anthropic con soporte para herramientas, límite de turnos y conteo de tokens.
+- **Sistema de agentes:** Investigador, Estratega y Revisor, coordinados por un orquestador que frena donde hace falta una persona. Detalle en [El sistema de agentes](#el-sistema-de-agentes).
+- **Reglas de marca en código:** voseo, palabras y frases prohibidas, máximo de emojis, y toda cifra tiene que existir en los datos cargados.
+- **Evals offline y online:** 121 casos gratis en el CI y una corrida con la IA real contra una línea base. Detalle en [Cómo sé que funciona](#cómo-sé-que-funciona).
+- **Tope de gasto:** por corrida y mensual (`TOPE_MENSUAL_USD`), con `npm run gasto` para ver cuánto va del mes.
+- **Piezas de Instagram por código:** láminas de carruseles (`npm run laminas`) y reels animados (`npm run reel:logo`) generados con Playwright y ffmpeg, más la foto de perfil. Las piezas definidas viven en `docs/piezas/`.
+- **Motor de agentes base:** `src/core/runAgent.js` ejecuta agentes sobre el SDK de Anthropic con herramientas, límite de turnos y conteo de tokens.
 - **Calculadora de costos:** calcula el costo de importación por unidad y el margen a partir de los datos de una orden. Todavía no incluye IVA de importación ni Ingresos Brutos, que quedan pendientes de confirmar con un contador.
-- **Tests y CI:** 25 tests automáticos que corren en GitHub Actions con cada push.
+- **Tests y CI:** más de 240 tests automáticos (`node --test`) que corren en GitHub Actions con cada push. Los que necesitan base de datos se saltean si no hay `DATABASE_URL`, pero en el CI fallan si falta.
 - **Tests e2e:** suite de Playwright en TypeScript (smoke, funcionales con la API simulada, accesibilidad con axe e integración contra la base `dev`) en cuatro navegadores.
 - **Monitoreo:** un workflow programado revisa cada 10 minutos que la landing y `GET /api/salud` respondan, y cada 6 horas que el catálogo del Drop 01 devuelva productos.
 - **Entorno de desarrollo:** configuración de GitHub Codespaces que instala las dependencias y levanta la API y la landing al arrancar.
@@ -53,7 +72,7 @@ flowchart LR
     subgraph agentes["Capa de agentes"]
         motor["Motor de agentes<br/>src/core/runAgent.js"]
         costos["Calculadora de costos<br/>src/tools/costos.js"]
-        contenido["Agente de contenido<br/>con evaluaciones"]
+        contenido["Investigador, Estratega y Revisor<br/>src/agents · con evals"]
         soporte["Agente de atención<br/>al cliente"]
         inventario["Agente de inventario"]
     end
@@ -69,18 +88,73 @@ flowchart LR
     monitoreo -->|"cada 10 min"| landing
     monitoreo -->|"/api/salud cada 10 min<br/>/api/productos?drop=1 cada 6 h"| api
     motor --> anthropic
-    contenido -.-> motor
+    contenido --> anthropic
     soporte -.-> motor
     inventario -.-> motor
 
     classDef existe fill:#ECE8E1,stroke:#0A0A0A,color:#0A0A0A
     classDef planificado fill:#ffffff,stroke:#7A7064,stroke-dasharray:5 5,color:#4F4840
-    class repo,ci,monitoreo,landing,api,db,dbdev,motor,costos existe
-    class contenido,soporte,inventario planificado
+    class repo,ci,monitoreo,landing,api,db,dbdev,motor,costos,contenido existe
+    class soporte,inventario planificado
     style agentes fill:#ffffff,stroke:#7A7064,color:#4F4840
 ```
 
 Los bloques con borde continuo ya existen en el repo. Los bloques con borde punteado están planificados.
+
+## El sistema de agentes
+
+Hoy cubre una tarea concreta: **decidir qué publicar cada semana en @vow_ar**, apoyándose en datos reales y en el manual de marca.
+
+```mermaid
+flowchart LR
+    meta[("Cuentas de referencia<br/>API oficial de Meta · solo lectura")] --> inv["Investigador<br/>analiza datos y pone a prueba ideas"]
+    inv --> informe["Informe con enlaces reales<br/>y nivel de confianza"]
+    cerebro["Manual de marca<br/>docs/marca"] --> est
+    definidas["Piezas ya definidas<br/>docs/piezas"] --> est
+    informe --> est["Estratega<br/>propone el plan de la semana"]
+    est --> reglas{"Reglas de marca<br/>voseo · cifras · ganchos · emojis"}
+    reglas -->|"no pasa"| descarte["Plan descartado<br/>con los motivos"]
+    reglas -->|"pasa"| rev["Revisor<br/>segunda mirada · sin IA"]
+    rev --> aprob{{"Aprobación<br/>de una persona"}}
+    aprob --> plan["Plan guardado<br/>docs/planes"]
+    tope["Tope de gasto<br/>por corrida y mensual"] -.-> inv
+    tope -.-> est
+```
+
+| Pieza | Qué hace | Qué no hace |
+|---|---|---|
+| **Investigador** (`src/agents/investigador.js`) | Lee datos públicos de cuentas de referencia, calcula el rendimiento con la mediana y mide cada publicación contra el tamaño de su cuenta. Pone a prueba hipótesis de formato. | Afirmar algo que los datos no sostienen: cada conclusión cita publicaciones reales y dice qué tan segura es. No cambia al Estratega por su cuenta. |
+| **Estratega** (`src/agents/estratega.js`) | Propone las piezas de una semana (gancho, guion, epígrafe, llamado a la acción, justificación), sin repetir lo que ya está definido. | Publicar. Propone y nada más. |
+| **Revisor** (`src/agents/revisor.js`) | Vuelve a pasar un plan por las mismas reglas con el contexto de hoy: un plan editado a mano, uno viejo o una pieza definida después. No usa IA ni gasta. | Aprobar solo: la aprobación es de una persona. |
+| **Orquestador** (`src/orquestador`) | Ejecuta los pasos en orden, guarda lo que hizo cada uno (`docs/ejecuciones/`), cuenta el gasto y no repite un paso que ya terminó. Un paso que falla frena el flujo. | Saber nada de Instagram ni de Claude: solo ordena pasos. |
+
+Cómo se usa:
+
+```bash
+npm run semana -- --semana 2026-11-02 --simulado      # prueba todo el flujo sin gastar
+npm run semana -- --semana 2026-11-02                 # con la IA real: planifica y revisa, y se frena en la aprobación
+npm run semana -- --semana 2026-11-02 --aprobar aprobar-plan   # aprueba; al volver a correr se guarda el plan
+```
+
+Qué cuida el sistema para que la IA no se descontrole:
+
+- **Nada de datos inventados:** toda cifra de un texto tiene que existir en los datos cargados. Hoy solo existen "01" (de Drop 01) y "2027". Las medidas de armado de una pieza ("carrusel de 6 láminas") se permiten solo en el guion.
+- **Tono de marca verificable:** las reglas de `src/agents/reglas-marca.js` detectan voseo mal usado, motivación vacía, exceso de emojis y ganchos copiados de otras cuentas.
+- **Los errores dicen dónde están:** un rechazo por una cifra muestra la frase donde aparece, para decidir si fue un error real o una regla demasiado estricta.
+- **Gasto acotado:** `--tope-usd` por corrida y un tope mensual que corta antes de llamar a la API (se configura con `TOPE_MENSUAL_USD`, por defecto US$ 5). Con `--simulado` ningún comando gasta.
+- **Todo a mano:** los workflows que usan la IA solo se lanzan manualmente desde Actions.
+
+## Cómo sé que funciona
+
+Un sistema con IA no se prueba mirando una vez la salida. Hay tres capas:
+
+1. **Tests** (`npm test`): más de 240 tests de reglas, agentes, orquestador, API y diseño, con la IA reemplazada por un cliente simulado.
+2. **Evals offline** (`npm run evals`, gratis, en el CI): 121 casos fijos. Incluyen los falsos positivos reales que ya se corrigieron, para que no vuelvan, y una frase por cada palabra de cada regla de marca. Si una regla no tiene ningún caso que la dispare, el test falla.
+3. **Evals online** (`npm run evals:online`, con la IA real): pide al Estratega seis pedidos distintos (con y sin producto, con y sin gente, distintas fases), mide el porcentaje que cumple las reglas, el costo por plan y qué reglas rechazan más, y lo compara con una línea base guardada. Última línea base: **6 de 6 aprobados, unos US$ 0,08 por plan.**
+
+Además, cada cambio pasa por **mutation testing**: se rompe el código de a una cosa y se comprueba que algún test falle. Los que no fallan se corrigen o se documentan como equivalentes.
+
+Un ejemplo de cómo se ve en la práctica: una corrida online rechazó planes por la cifra "6". Con los errores que muestran la frase se vio que era "carrusel de 6 láminas", una medida de armado y no un dato inventado. La regla estaba siendo demasiado estricta; se corrigió solo para el guion, con tests que prueban que "3 días" o "5 straps" siguen siendo rechazados, y una nueva corrida dio 6 de 6. Los detalles de las evals están en [`evals/README.md`](evals/README.md).
 
 ## Publicación
 
@@ -137,7 +211,8 @@ La tabla no tiene columnas de precio, stock, material, gramaje ni medidas. Los d
 | API | Express + `pg` |
 | Base de datos | PostgreSQL (Neon) |
 | Landing | Vite + JavaScript, con Lenis y GSAP |
-| Agentes | SDK de Anthropic |
+| Agentes | SDK de Anthropic, con un cliente simulado para tests y modo `--simulado` |
+| Piezas de Instagram | Playwright (render de cuadros) y ffmpeg (video) |
 | Tests | `node --test` y Playwright (e2e) con axe-core |
 | CI y monitoreo | GitHub Actions |
 | Hosting | Cloudflare Pages (landing) y Render (API) |
@@ -171,6 +246,8 @@ cp .env.example .env
 |---|---|
 | `ANTHROPIC_API_KEY` | Clave de la API de Anthropic. La usan el motor de agentes y los scripts `hola` y `prueba`. |
 | `DATABASE_URL` | Cadena de conexión a PostgreSQL. La usan la API, la migración y los tests de la API. |
+| `TOPE_MENSUAL_USD` | Tope de gasto mensual en dólares para los comandos que usan la IA. Opcional; por defecto 5. |
+| `INSTAGRAM_TOKEN` y `INSTAGRAM_USER_ID` | Acceso de solo lectura a la API oficial de Meta, para que el Investigador baje datos públicos de las cuentas de referencia. |
 | `ALLOWED_ORIGINS` | Orígenes que pueden llamar a la API desde el navegador, separados por coma. Hace falta cuando la landing llama a la API en otro dominio o puerto (por ejemplo, si `VITE_API_URL` apunta a `http://localhost:3000`, tiene que incluir la dirección donde corre Vite). Si queda vacía, ningún otro sitio puede llamar a la API. |
 | `VITE_API_URL` | URL base de la API que usa la landing. Si queda vacía, la landing llama a `/api/...` en su mismo dominio; en desarrollo, Vite reenvía esas rutas a la API local en el puerto 3000. |
 | `TRUST_PROXY` | Se activa con `1` solo cuando la API corre detrás de un proxy. Así el límite de pedidos usa la IP real del visitante (`X-Forwarded-For`) y no la del proxy. En local se deja vacía. |
@@ -221,6 +298,13 @@ El `.env` no se crea solo: hay que copiarlo de `.env.example` y completarlo, com
 | `npm run db-migrar` | Crea las tablas `lista_espera` y `productos` si no existen y agrega las columnas nuevas a las tablas existentes. Se puede correr más de una vez. |
 | `npm run db-seed` | Carga o actualiza los productos del Drop 01. Se puede correr más de una vez sin duplicar y nunca borra registros. |
 | `npm run costos` | Corre la calculadora de costos con un caso de ejemplo. |
+| `npm run evals` | Corre las 121 evals offline (gratis). |
+| `npm run evals:online` | Corre las evals con la IA real contra la línea base. **Gasta**; tiene `--tope-usd`, `--solo`, `--repeticiones` y `--simulado`. |
+| `npm run semana -- --semana AAAA-MM-DD` | Corre el flujo semanal: planificar, revisar y esperar tu aprobación. Con `--simulado` no gasta. |
+| `npm run plan -- --semana AAAA-MM-DD` | Pide solo el plan al Estratega (sin orquestador). |
+| `npm run investigar` y `npm run analizar` | Bajan datos de las cuentas de referencia y los analizan con la IA (`analizar` gasta). |
+| `npm run gasto` | Muestra cuánto se gastó este mes contra el tope. |
+| `npm run laminas`, `npm run reel`, `npm run reel:logo`, `npm run foto-perfil` | Generan las láminas de los carruseles, los reels y la foto de perfil de Instagram. |
 | `npm run hola` | Pide un eslogan a la API de Anthropic. Hace una llamada real y consume crédito. |
 | `npm run prueba` | Corre el agente de prueba sobre el motor de agentes. Hace una llamada real y consume crédito. |
 
@@ -232,7 +316,7 @@ Dentro de `web/`: `npm run dev`, `npm run build` y `npm run preview`.
 npm test
 ```
 
-Son 25 tests: 3 de la calculadora de costos, 13 de la lista de espera y 9 del catálogo. Los de la API necesitan `DATABASE_URL` y antes de empezar corren la migración; los del catálogo también corren el seed. Las dos operaciones se pueden repetir sin duplicar datos. Los de la lista de espera usan emails descartables bajo un dominio `.invalid` y, al terminar, borran los registros que crearon.
+Son más de 240 tests: calculadora de costos, lista de espera, catálogo, reglas de marca, agentes, orquestador, tope de gasto y piezas de diseño. Los de la API necesitan `DATABASE_URL` (si falta se saltean en local y fallan en el CI) y antes de empezar corren la migración; los del catálogo también corren el seed. Las dos operaciones se pueden repetir sin duplicar datos. Los de la lista de espera usan emails descartables bajo un dominio `.invalid` y, al terminar, borran los registros que crearon.
 
 Los tests de la API usan la rama `dev` de Neon: tanto en local como en la CI, `DATABASE_URL` tiene que apuntar a `dev` y nunca a `production`.
 
@@ -286,6 +370,8 @@ Para cargar `E2E_PROD_DB_HOST` en GitHub: **Settings > Secrets and variables > A
 | [`e2e.yml`](.github/workflows/e2e.yml) | En cada pull request (Chromium); los lunes y a mano, con los cuatro navegadores | Chequea los tipos de `e2e/` y corre la suite de Playwright contra la API local y la base `dev`. Guarda los navegadores en caché y, si algo falla, sube el reporte HTML y las trazas como artefactos. |
 | [`monitoreo.yml`](.github/workflows/monitoreo.yml) | Cada 10 minutos y cada 6 horas (y a mano desde la pestaña Actions) | Cada 10 minutos revisa que la landing cargue y que `GET /api/salud` responda `{ "ok": true }`; de paso, mantiene despierta la API en Render sin tocar la base. Cada 6 horas revisa que `GET /api/productos?drop=1` devuelva al menos un producto. |
 
+| [`evals-online.yml`](.github/workflows/evals-online.yml), [`plan-semanal.yml`](.github/workflows/plan-semanal.yml), [`investigar.yml`](.github/workflows/investigar.yml) | Solo a mano desde la pestaña Actions, y solo desde `main` | Corren las evals online, el plan semanal y la investigación de cuentas con la IA real. Gastan, por eso nunca corren solos. El resultado queda en el resumen de la corrida y como archivo descargable. |
+
 El monitoreo necesita el secreto `API_URL` con la URL base de la API; si falta, falla con un aviso que lo indica. GitHub solo ejecuta los workflows programados desde la rama por defecto (`main`).
 
 ## Decisiones de diseño
@@ -301,6 +387,8 @@ El monitoreo necesita el secreto `API_URL` con la URL base de la API; si falta, 
 
 - [x] Publicar la API y la landing.
 - [x] Catálogo del Drop 01 en la API y en la landing.
-- [ ] Agente de contenido con evaluaciones.
-- [ ] Agente de atención al cliente.
-- [ ] Agente de inventario.
+- [x] Agentes de contenido (Investigador, Estratega y Revisor) con evaluaciones, línea base y tope de gasto.
+- [x] Piezas de Instagram generadas por código (carruseles y reels).
+- [ ] Publicar con constancia (una pieza por semana desde el 2/11/2026) y sumar material real filmado.
+- [ ] Medir el rendimiento de @vow_ar con sus propios datos.
+- [ ] Agente de atención al cliente y agente de inventario (cuando haya producto).
