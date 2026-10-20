@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
-import Anthropic from "@anthropic-ai/sdk";
+import { corteLimpio, crearClienteReal } from "./cliente-real.js";
 import { analizarMercado, informeAMarkdown } from "./agents/investigador.js";
 
 // Uso:
@@ -62,10 +62,10 @@ if (!values.simulado) {
     console.error("Falta ANTHROPIC_API_KEY. Para probar sin gastar, agregá --simulado.");
     process.exit(1);
   }
-  cliente = new Anthropic();
+  cliente = await crearClienteReal("analizar");
 }
 
-const resultado = await analizarMercado({ datos, hipotesis }, { cliente });
+const resultado = await corteLimpio(analizarMercado({ datos, hipotesis }, { cliente }));
 console.log(`Tokens usados: ${resultado.uso.entrada} de entrada, ${resultado.uso.salida} de salida.`);
 
 if (!resultado.ok) {
