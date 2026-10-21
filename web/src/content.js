@@ -1,9 +1,7 @@
 export const content = {
-  marquee: "DROP 01 EN DESARROLLO · 7 PRODUCTOS · PRIMERA TANDA LIMITADA · SUMATE A LA LISTA DE ESPERA · ",
+  marquee: "DROP 01 EN DESARROLLO · 7 PRODUCTOS · LANZAMIENTO EN 2027 · SUMATE A LA LISTA DE ESPERA · ",
   hero: {
     title: "Tu promesa.\nTu fuerza.",
-    alt1: "Disciplina sin excusas.",
-    alt2: "El peso de tu palabra.",
     cta: "UNIRSE"
   },
   manifest: "VOW no es ropa. Es el voto que hacés con vos mismo cuando nadie te ve. Es la disciplina cruda, la obsesión por el progreso y la negativa a ser uno más. Entrenamos para construir, no para figurar. Esta es tu promesa.",
