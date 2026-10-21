@@ -232,6 +232,23 @@ Los dos endpoints de productos responden con `Cache-Control: public, max-age=300
 
 La tabla no tiene columnas de precio, stock, material, gramaje ni medidas. Los datos del Drop 01 viven en `src/data/drop-01.js` y se cargan con `npm run db-seed`, que actualiza los productos existentes por `slug` y nunca borra registros.
 
+## Publicación programada de Instagram (Telegram)
+
+Flujo: el **lunes** el Estratega arma el plan de la semana y te llega por Telegram (una tarjeta por pieza, con qué filmar y cuándo te lo recuerdan). Podés **responder a cualquier tarjeta** para cambiarla, o escribir sin responder para pasarle una novedad de VOW al próximo plan. Todos los días a las **8:00** (Argentina) llega lo de hoy con la hora de publicación. Dos horas antes, si todavía no confirmaste, te llega un recordatorio. Si confirmás **ese mismo día**, el sistema publica a la hora; si no confirmás, **no se publica nada**.
+
+- Recordatorio de filmación: 3 días antes de la fecha de la pieza (si el plan llega con menos margen, sale marcado como urgente).
+- Seguridad: la confirmación vale solo el día en que se da; cualquier edición la borra; una publicación nunca se reintenta sola; si el sistema llega más de 20 minutos tarde, pregunta; `/pausar` y `/reanudar` frenan todo; sin `INSTAGRAM_PERMITIR_PUBLICAR=1` corre en simulación.
+- Límites: las stories se avisan pero se publican a mano; no hay música de la biblioteca vía API; Telegram solo deja bajar archivos de hasta 20 MB.
+- Piezas: `src/programacion/`. Plan semanal: `npm run plan:lunes` (workflow `plan-lunes.yml`). Ticker: cron-job.org cada minuto + `tick.yml` de respaldo.
+
+Puesta en marcha:
+1. Crear el bot con @BotFather, mandarle `/start` para ver tu chat id.
+2. Variables en Render: `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRETO`, `PROGRAMACION_SECRETO`, `URL_PUBLICA`, `ANTHROPIC_API_KEY`, `INSTAGRAM_TOKEN`, `INSTAGRAM_USER_ID` (sin `INSTAGRAM_PERMITIR_PUBLICAR` al principio: simulación).
+3. Secrets en GitHub Actions: `ANTHROPIC_API_KEY`, `INSTAGRAM_TOKEN`, `INSTAGRAM_USER_ID`, `URL_PUBLICA`, `PROGRAMACION_SECRETO`.
+4. `npm run db-migrar` y `npm run telegram:webhook`.
+5. cron-job.org: POST cada minuto a `URL_PUBLICA/api/programacion/tick` con `Authorization: Bearer <PROGRAMACION_SECRETO>` (también mantiene despierto a Render free).
+6. Tras un par de semanas de simulación, activar `INSTAGRAM_PERMITIR_PUBLICAR=1`. El token de Meta vence cada 60 días.
+
 ## Stack
 
 | Capa | Tecnología |

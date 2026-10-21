@@ -108,6 +108,7 @@ export function crearApp({
   origenesPermitidos = leerOrigenes(process.env.ALLOWED_ORIGINS),
   limitePorMinuto = 5,
   limiteCatalogoPorMinuto = 60,
+  programacion = null,
 } = {}) {
   const app = express();
 
@@ -122,6 +123,9 @@ export function crearApp({
       methods: ["GET", "POST"],
     })
   );
+  // La publicación programada (bot de Telegram, aviso de las 8, publicador) va ANTES del parser de 10 kb:
+  // el plan de la semana pesa más, así que su router trae el suyo.
+  if (programacion) app.use("/api/programacion", programacion);
   app.use(express.json({ limit: "10kb" }));
 
   app.get("/api/salud", (req, res) => {
@@ -223,7 +227,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
 
   const puerto = Number(process.env.PORT) || 3000;
-  const app = crearApp({ pool: crearPool(), origenesPermitidos });
+  const pool = crearPool();
+  const { construirProgramacion } = await import("../programacion/construir.js");
+  const { router: programacion, faltan, permitirPublicar, edicionConIA } = await construirProgramacion({ pool });
+  if (programacion) {
+    console.log(`Publicación programada activa (${permitirPublicar ? "publica de verdad" : "modo simulación"}; edición con IA: ${edicionConIA ? "sí" : "no"}).`);
+  } else {
+    console.log(`Publicación programada apagada: faltan ${faltan.join(", ")}.`);
+  }
+  const app = crearApp({ pool, origenesPermitidos, programacion });
   app.listen(puerto, () => {
     console.log(`API de VOW escuchando en http://localhost:${puerto}`);
   });

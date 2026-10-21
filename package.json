@@ -30,7 +30,9 @@
     "analizar": "node src/investigar-analisis.js",
     "gasto": "node src/gasto.js",
     "rendimiento": "node src/rendimiento.js",
-    "mcp:instagram": "node src/mcp/instagram/servidor.js"
+    "mcp:instagram": "node src/mcp/instagram/servidor.js",
+    "plan:lunes": "node src/programacion/plan-lunes.js",
+    "telegram:webhook": "node src/programacion/configurar-webhook.js"
   },
   "repository": {
     "type": "git",

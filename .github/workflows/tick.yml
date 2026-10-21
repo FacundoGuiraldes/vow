@@ -1,0 +1,37 @@
+name: Publicador (respaldo)
+
+# Cada 5 minutos le avisa al servicio que revise si toca mandar el aviso de las 8 o publicar algo.
+# La llamada principal es cada MINUTO desde cron-job.org (README, "Publicación programada"): GitHub programa los horarios
+# con atraso y puede saltear corridas, así que acá es solo un respaldo. Llamar de más es seguro: el servicio es idempotente
+# (cada pieza se publica una sola vez, pase lo que pase con las llamadas).
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: publicador-tick
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      URL_PUBLICA: ${{ secrets.URL_PUBLICA }}
+      PROGRAMACION_SECRETO: ${{ secrets.PROGRAMACION_SECRETO }}
+    steps:
+      - name: Llamar al servicio
+        run: |
+          if [ -z "$URL_PUBLICA" ] || [ -z "$PROGRAMACION_SECRETO" ]; then
+            echo "Publicación programada sin configurar (faltan los secretos URL_PUBLICA y PROGRAMACION_SECRETO): no hago nada."
+            exit 0
+          fi
+          # Con el plan gratis de Render el servicio puede estar dormido y tardar cerca de un minuto en despertar
+          curl --silent --show-error --fail-with-body --max-time 100 --retry 2 --retry-all-errors \
+            -X POST -H "Authorization: Bearer $PROGRAMACION_SECRETO" \
+            "${URL_PUBLICA%/}/api/programacion/tick"

@@ -1,0 +1,178 @@
+import { after, before, describe, test } from "node:test";
+import assert from "node:assert/strict";
+import express from "express";
+import { crearApp } from "../api/servidor.js";
+import { crearRepositorioMemoria } from "./repositorio-memoria.js";
+import { crearRutasProgramacion, validarPlanEntrante } from "./rutas.js";
+import { crearPieza, crearPlan } from "./ayuda-pruebas.js";
+
+const CLAVE = "clave-de-la-api-de-prueba";
+const SECRETO_WEBHOOK = "secreto-del-webhook-1234";
+
+const levantar = (app) => new Promise((resolver) => { const i = app.listen(0, "127.0.0.1", () => resolver(i)); });
+const cerrar = (i) => new Promise((resolver) => { i.closeAllConnections(); i.close(resolver); });
+
+describe("rutas de la publicación programada", () => {
+  const repo = crearRepositorioMemoria();
+  const llamadas = { actualizaciones: [], ticks: 0, planes: [], fallos: [] };
+  const servicio = {
+    manejarActualizacion: async (u) => { llamadas.actualizaciones.push(u); },
+    tick: async () => { llamadas.ticks++; return { acciones: ["ok"] }; },
+    recibirPlan: async (p) => { llamadas.planes.push(p); return { piezas: p.plan.piezas.length, urgentes: 0 }; },
+    avisarFalloDelPlan: async (f) => { llamadas.fallos.push(f); },
+  };
+  let router;
+  let servidor;
+  let base;
+
+  before(async () => {
+    router = crearRutasProgramacion({ servicio, repo, secretoApi: CLAVE, secretoWebhook: SECRETO_WEBHOOK });
+    const app = express();
+    app.use("/api/programacion", router);
+    servidor = await levantar(app);
+    base = `http://127.0.0.1:${servidor.address().port}/api/programacion`;
+  });
+  after(() => cerrar(servidor));
+
+  const pedir = (ruta, { metodo = "GET", cuerpo, clave, encabezados = {} } = {}) =>
+    fetch(`${base}${ruta}`, {
+      method: metodo,
+      headers: { ...(cuerpo ? { "Content-Type": "application/json" } : {}), ...(clave ? { Authorization: `Bearer ${clave}` } : {}), ...encabezados },
+      body: cuerpo ? JSON.stringify(cuerpo) : undefined,
+    });
+
+  test("el webhook de Telegram rechaza un secreto equivocado o ausente", async () => {
+    const mal = await pedir("/telegram", { metodo: "POST", cuerpo: { update_id: 1 }, encabezados: { "X-Telegram-Bot-Api-Secret-Token": "otro" } });
+    const sin = await pedir("/telegram", { metodo: "POST", cuerpo: { update_id: 1 } });
+    assert.equal(mal.status, 401);
+    assert.equal(sin.status, 401);
+    assert.equal(llamadas.actualizaciones.length, 0);
+  });
+
+  test("el webhook procesa cada actualización una sola vez, aunque Telegram la reenvíe", async () => {
+    const encabezados = { "X-Telegram-Bot-Api-Secret-Token": SECRETO_WEBHOOK };
+    const u = { update_id: 10, message: { text: "hola" } };
+    assert.equal((await pedir("/telegram", { metodo: "POST", cuerpo: u, encabezados })).status, 200);
+    assert.equal((await pedir("/telegram", { metodo: "POST", cuerpo: u, encabezados })).status, 200);
+    await router.esperarPendientes();
+    assert.equal(llamadas.actualizaciones.filter((x) => x.update_id === 10).length, 1);
+
+    // una anterior a la última también se ignora
+    await pedir("/telegram", { metodo: "POST", cuerpo: { update_id: 9 }, encabezados });
+    await router.esperarPendientes();
+    assert.equal(llamadas.actualizaciones.filter((x) => x.update_id === 9).length, 0);
+  });
+
+  test("/tick exige la clave", async () => {
+    assert.equal((await pedir("/tick", { metodo: "POST" })).status, 401);
+    assert.equal((await pedir("/tick", { metodo: "POST", clave: "mala" })).status, 401);
+    assert.equal(llamadas.ticks, 0);
+    const bien = await pedir("/tick", { metodo: "POST", clave: CLAVE });
+    assert.equal(bien.status, 200);
+    assert.deepEqual(await bien.json(), { acciones: ["ok"] });
+    assert.equal(llamadas.ticks, 1);
+  });
+
+  test("sin PROGRAMACION_SECRETO configurado, las rutas con clave quedan cerradas (503), nunca abiertas", async () => {
+    const app = express();
+    app.use("/api/programacion", crearRutasProgramacion({ servicio, repo, secretoApi: "", secretoWebhook: SECRETO_WEBHOOK }));
+    const otro = await levantar(app);
+    try {
+      const r = await fetch(`http://127.0.0.1:${otro.address().port}/api/programacion/tick`, { method: "POST" });
+      assert.equal(r.status, 503);
+    } finally {
+      await cerrar(otro);
+    }
+  });
+
+  test("/plan valida y recibe el plan (también uno de más de 10 kb)", async () => {
+    assert.equal((await pedir("/plan", { metodo: "POST", clave: CLAVE, cuerpo: { semana: "mal", plan: crearPlan([crearPieza()]) } })).status, 400);
+    assert.equal((await pedir("/plan", { metodo: "POST", clave: CLAVE, cuerpo: { semana: "2026-10-26", plan: { piezas: [] } } })).status, 400);
+
+    const grande = crearPieza({ guion: "x".repeat(30_000) });
+    const r = await pedir("/plan", { metodo: "POST", clave: CLAVE, cuerpo: { semana: "2026-10-26", plan: crearPlan([grande]), novedades_usadas: [3] } });
+    assert.equal(r.status, 201);
+    assert.equal(llamadas.planes.at(-1).semana, "2026-10-26");
+    assert.deepEqual(llamadas.planes.at(-1).novedadesUsadas, [3]);
+  });
+
+  test("/plan con un error del workflow se lo avisa a Facundo", async () => {
+    const r = await pedir("/plan", { metodo: "POST", clave: CLAVE, cuerpo: { semana: "2026-10-26", error: "El paso planificar no pasó" } });
+    assert.equal(r.status, 202);
+    assert.equal(llamadas.fallos.at(-1).error, "El paso planificar no pasó");
+  });
+
+  test("/novedades devuelve lo pendiente, con clave", async () => {
+    await repo.agregarNovedad("Llegaron las gorras");
+    assert.equal((await pedir("/novedades")).status, 401);
+    const r = await pedir("/novedades", { clave: CLAVE });
+    assert.deepEqual((await r.json()).novedades.map((n) => n.texto), ["Llegaron las gorras"]);
+  });
+
+  describe("archivos para Meta", () => {
+    let token;
+    before(async () => {
+      ({ token } = await repo.agregarMedio({ piezaId: 1, tipo: "video", mime: "video/mp4", datos: Buffer.from("0123456789") }));
+    });
+
+    test("sirve el archivo con su tipo", async () => {
+      const r = await pedir(`/medios/${token}`);
+      assert.equal(r.status, 200);
+      assert.equal(r.headers.get("content-type"), "video/mp4");
+      assert.equal(r.headers.get("accept-ranges"), "bytes");
+      assert.equal(Buffer.from(await r.arrayBuffer()).toString(), "0123456789");
+    });
+
+    test("soporta pedidos por partes (Range)", async () => {
+      const r = await pedir(`/medios/${token}`, { encabezados: { Range: "bytes=2-5" } });
+      assert.equal(r.status, 206);
+      assert.equal(r.headers.get("content-range"), "bytes 2-5/10");
+      assert.equal(Buffer.from(await r.arrayBuffer()).toString(), "2345");
+      const final = await pedir(`/medios/${token}`, { encabezados: { Range: "bytes=7-" } });
+      assert.equal(Buffer.from(await final.arrayBuffer()).toString(), "789");
+      const ultimos = await pedir(`/medios/${token}`, { encabezados: { Range: "bytes=-3" } });
+      assert.equal(Buffer.from(await ultimos.arrayBuffer()).toString(), "789");
+      assert.equal((await pedir(`/medios/${token}`, { encabezados: { Range: "bytes=50-60" } })).status, 416);
+    });
+
+    test("un token inexistente o con formato raro da 404", async () => {
+      assert.equal((await pedir(`/medios/${"a".repeat(48)}`)).status, 404);
+      assert.equal((await pedir("/medios/1")).status, 404);
+      assert.equal((await pedir("/medios/..%2F..%2Fetc")).status, 404);
+    });
+  });
+});
+
+describe("dentro de la API de VOW", () => {
+  test("el router va antes del parser de 10 kb y el resto de la API conserva su límite", async () => {
+    const llamadas = [];
+    const servicio = { recibirPlan: async (p) => { llamadas.push(p); return { piezas: 1, urgentes: 0 }; } };
+    const router = crearRutasProgramacion({ servicio, repo: crearRepositorioMemoria(), secretoApi: CLAVE, secretoWebhook: SECRETO_WEBHOOK });
+    const app = crearApp({ pool: null, origenesPermitidos: [], programacion: router });
+    const servidor = await levantar(app);
+    const url = `http://127.0.0.1:${servidor.address().port}`;
+    try {
+      const plan = await fetch(`${url}/api/programacion/plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${CLAVE}` },
+        body: JSON.stringify({ semana: "2026-10-26", plan: crearPlan([crearPieza({ guion: "x".repeat(20_000) })]) }),
+      });
+      assert.equal(plan.status, 201);
+
+      const lista = await fetch(`${url}/api/lista-espera`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: "a@b.co", origen: "x".repeat(20_000) }) });
+      assert.equal(lista.status, 413, "la lista de espera sigue limitada a 10 kb");
+      assert.equal((await fetch(`${url}/api/salud`)).status, 200);
+    } finally {
+      await cerrar(servidor);
+    }
+  });
+});
+
+test("validarPlanEntrante rechaza planes mal formados", () => {
+  assert.equal(validarPlanEntrante({ semana: "2026-10-26", plan: crearPlan([crearPieza()]) }), null);
+  assert.match(validarPlanEntrante({ plan: crearPlan([crearPieza()]) }), /semana/);
+  assert.match(validarPlanEntrante({ semana: "2026-10-26", plan: crearPlan([crearPieza({ hora: "25:00" })]) }), /hora inválida/);
+  assert.match(validarPlanEntrante({ semana: "2026-10-26", plan: crearPlan([crearPieza({ fecha: "mañana" })]) }), /fecha, formato y gancho/);
+  assert.match(validarPlanEntrante({ semana: "2026-10-26", plan: crearPlan(Array(6).fill(crearPieza())) }), /de 1 a 5 piezas/);
+  assert.match(validarPlanEntrante({ semana: "2026-10-26", plan: crearPlan([crearPieza()]), novedades_usadas: ["x"] }), /novedades_usadas/);
+});
