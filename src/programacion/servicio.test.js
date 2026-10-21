@@ -724,7 +724,7 @@ describe("imágenes con IA", () => {
     assert.match(reel.telegram.ultimo().texto, /solo las piezas de tipo imagen/);
     const { e, fila } = await escenarioConImagen({ sinGenerador: true });
     await e.mandar(e.actualizacion.boton(`ia:${fila.id}`));
-    assert.match(e.telegram.ultimo().texto, /falta GEMINI_API_KEY/);
+    assert.match(e.telegram.ultimo().texto, /faltan CLOUDFLARE_ACCOUNT_ID y CLOUDFLARE_API_TOKEN/);
   });
 
   test("usar una imagen sobre una pieza ya confirmada borra la confirmación", async () => {

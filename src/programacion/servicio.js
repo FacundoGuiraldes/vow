@@ -304,7 +304,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
 
   async function generarConIA(fila, { descripcion = "", responder, mensajeId }) {
     const { fecha: hoy } = ahora();
-    if (!generadorImagen) return responder("La generación de imágenes con IA no está configurada (falta GEMINI_API_KEY en el servicio).");
+    if (!generadorImagen) return responder("La generación de imágenes con IA no está configurada (faltan CLOUDFLARE_ACCOUNT_ID y CLOUDFLARE_API_TOKEN en el servicio).");
     if (fila.pieza.formato !== "imagen") return responder(`Por ahora genero con IA solo las piezas de tipo imagen. Esta es un ${fila.pieza.formato}: mandame los archivos vos.`);
     if (!VIVAS.includes(fila.estado)) return responder(`Esa pieza está ${ESTADOS_LEGIBLES[fila.estado]}: ya no puedo cambiarle la imagen.`);
 

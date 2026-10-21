@@ -26,8 +26,14 @@ export async function construirProgramacion({ pool, env = process.env, fetchFn =
     editor = crearEditor({ cliente: new Anthropic() });
   }
 
-  // Imágenes con IA (plan gratis de Gemini): opcional, sin la clave las piezas se arman con archivos que manda Facundo
-  const generadorImagen = env.GEMINI_API_KEY ? crearGeneradorImagen({ apiKey: env.GEMINI_API_KEY, modelo: env.GEMINI_MODELO || undefined, fetchFn }) : null;
+  // Imágenes con IA: opcional, sin claves las piezas se arman con archivos que manda Facundo.
+  // Cloudflare (FLUX, con cupo gratis diario) tiene prioridad; Gemini solo sirve con plan pago de Google.
+  let generadorImagen = null;
+  if (env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN) {
+    generadorImagen = crearGeneradorImagen({ proveedor: "cloudflare", accountId: env.CLOUDFLARE_ACCOUNT_ID, apiToken: env.CLOUDFLARE_API_TOKEN, fetchFn });
+  } else if (env.GEMINI_API_KEY) {
+    generadorImagen = crearGeneradorImagen({ proveedor: "gemini", apiKey: env.GEMINI_API_KEY, modelo: env.GEMINI_MODELO || undefined, fetchFn });
+  }
 
   const servicio = crearServicio({ repo, telegram, meta, editor, generadorImagen, urlPublica: env.URL_PUBLICA, permitirPublicar });
   const router = crearRutasProgramacion({ servicio, repo, secretoApi: env.PROGRAMACION_SECRETO, secretoWebhook: env.TELEGRAM_WEBHOOK_SECRETO });
