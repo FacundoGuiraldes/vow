@@ -28,7 +28,8 @@
     "evals:online": "node evals/ejecutar-online.js",
     "investigar": "node src/investigar-datos.js",
     "analizar": "node src/investigar-analisis.js",
-    "gasto": "node src/gasto.js"
+    "gasto": "node src/gasto.js",
+    "mcp:instagram": "node src/mcp/instagram/servidor.js"
   },
   "repository": {
     "type": "git",
@@ -44,12 +45,14 @@
   "homepage": "https://github.com/FacundoGuiraldes/vow#readme",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
+    "@modelcontextprotocol/sdk": "1.32.1",
     "cors": "^2.8.6",
     "dotenv": "^18.0.5",
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",
     "helmet": "^8.3.0",
-    "pg": "^8.23.1"
+    "pg": "^8.23.1",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
