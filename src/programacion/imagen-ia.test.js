@@ -10,12 +10,13 @@ const conImagenCloudflare = async () => respuesta({ success: true, result: { ima
 const conImagen = async () => respuesta({ candidates: [{ content: { parts: [{ text: "ok" }, { inlineData: { mimeType: "image/png", data: (await imagenDePrueba()).toString("base64") } }] } }] });
 
 describe("imagen con IA", () => {
-  test("el pedido lleva el estilo de VOW y le prohíbe a la IA dibujar texto o logos", () => {
+  test("el pedido arranca con la descripción y agrega el estilo, todo en positivo (sin prohibiciones ni ropa que desvíen a la IA)", () => {
     const pedido = armarPedido("  una mesa de madera con luz de ventana ");
-    assert.match(pedido, /VOW/);
-    assert.match(pedido, /NO incluyas texto/);
-    assert.match(pedido, /#0A0A0A/);
-    assert.match(pedido, /una mesa de madera con luz de ventana$/);
+    assert.ok(pedido.startsWith("una mesa de madera con luz de ventana."), "la descripción va primero");
+    assert.match(pedido, /minimalista/);
+    assert.match(pedido, /negro profundo, hueso y beige/);
+    assert.doesNotMatch(pedido, /\b(no|sin|nunca|ni)\b/i, "FLUX no entiende negaciones: nombrar algo lo dibuja");
+    assert.doesNotMatch(pedido, /ropa|entrenar|accesorios|marca/i, "no se le da un tema que compita con la descripción");
   });
 
   test("compone: recorta a 1080x1350 en JPEG y le pone el isotipo (el resultado cambia en la esquina)", async () => {
