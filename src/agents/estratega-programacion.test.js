@@ -53,3 +53,43 @@ test("las instrucciones del Estratega piden hora, material a producir y filmar d
   assert.match(texto, /de jueves en adelante/);
   assert.match(texto, /música de la biblioteca de Instagram/);
 });
+
+const INDICACION = "Imagen vertical 4:5 de 1080x1350, fondo negro #0A0A0A con mucho espacio vacío y luz suave. Texto exacto: DROP 01. 2027. Revisá la ortografía.";
+
+test("una pieza con IA pasa si trae una indicación completa; las viejas sin 'produccion' siguen valiendo", () => {
+  assert.equal(validar(crearPieza({ produccion: "ia", instrucciones_ia: INDICACION })).ok, true);
+  assert.equal(validar(crearPieza({ produccion: "mixto", instrucciones_ia: INDICACION })).ok, true);
+  assert.equal(validar(crearPieza({ produccion: "propio", instrucciones_ia: "" })).ok, true);
+  const { produccion, instrucciones_ia: indicacion, ...vieja } = crearPieza();
+  void produccion;
+  void indicacion;
+  assert.equal(validar(vieja).ok, true);
+});
+
+test("una pieza con IA sin indicación (o con una de una palabra) no pasa", () => {
+  for (const instrucciones_ia of [undefined, "", "   ", "Una imagen linda"]) {
+    const { ok, errores } = validar(crearPieza({ produccion: "ia", instrucciones_ia }));
+    assert.equal(ok, false, `${JSON.stringify(instrucciones_ia)} no debería pasar`);
+    assert.match(errores.join(" "), /instrucciones_ia/);
+  }
+});
+
+test("'produccion' solo acepta propio, ia o mixto", () => {
+  for (const produccion of ["video", "IA", "", null, 3]) assert.match(validar(crearPieza({ produccion })).errores.join(" "), /produccion tiene que ser/);
+});
+
+test("la indicación para la IA también respeta las reglas de marca", () => {
+  const { ok, errores } = validar(crearPieza({ produccion: "ia", instrucciones_ia: `${INDICACION} Mostrá unas mancuernas sobre un banco.` }));
+  assert.equal(ok, false);
+  assert.match(errores.join(" "), /instrucciones para la IA/);
+});
+
+test("la herramienta del plan pide 'produccion' e 'instrucciones_ia', y el prompt explica cuándo usar cada una y cómo escribir la indicación", async () => {
+  const item = HERRAMIENTA_PLAN.input_schema.properties.piezas.items;
+  assert.ok(item.required.includes("produccion") && item.required.includes("instrucciones_ia"));
+  assert.deepEqual(item.properties.produccion.enum, ["propio", "ia", "mixto"]);
+  const { texto } = await construirSistema();
+  assert.match(texto, /instrucciones_ia es la indicación para copiar y pegar/);
+  assert.match(texto, /textos EXACTOS de texto_en_pantalla/);
+  assert.match(texto, /nunca lo que no tiene que aparecer/);
+});

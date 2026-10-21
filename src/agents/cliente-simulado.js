@@ -19,6 +19,8 @@ export const crearClienteSimulado = (semana) => ({
                 ganchos_alternativos: ["Hecho con calma. Hecho bien.", "Cada detalle cuenta.", "Lo simple se sostiene."],
                 guion: "Video corto de texto sobre fondo hueso, una frase por vez.",
                 texto_en_pantalla: ["Una cosa por vez.", "Sin apuro. Sin ruido."],
+                produccion: "propio",
+                instrucciones_ia: "",
                 epigrafe: "Se hace despacio y se hace bien. Anotate en la lista: link en la bio.",
                 palabras_clave: ["proceso", "constancia"],
                 cta: "Anotate en la lista de espera.",

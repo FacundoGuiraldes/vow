@@ -7,6 +7,8 @@ import { revisarReglas, revisarGuion, revisarTextoAlPublico, cifrasNoPermitidas,
 
 export const MODELO_ESTRATEGA = "claude-sonnet-5-5";
 export const FORMATOS = ["reel", "carrusel", "imagen", "story"];
+export const PRODUCCIONES = ["propio", "ia", "mixto"];
+export const LARGO_MINIMO_INSTRUCCIONES_IA = 40; // una indicación de verdad dice qué mostrar, cómo encuadrar y qué colores usar
 export const PILARES = ["promesa", "proceso", "producto en uso", "gente que entrena", "lanzamiento"];
 export const MAXIMO_PIEZAS = 5;
 const INTENTOS_MAXIMOS = 2;
@@ -48,7 +50,7 @@ export const HERRAMIENTA_PLAN = {
         maxItems: MAXIMO_PIEZAS,
         items: {
           type: "object",
-          required: ["fecha", "hora", "formato", "pilar", "gancho", "ganchos_alternativos", "guion", "texto_en_pantalla", "epigrafe", "palabras_clave", "cta", "recursos", "material_a_producir", "justificacion"],
+          required: ["fecha", "hora", "formato", "pilar", "gancho", "ganchos_alternativos", "guion", "texto_en_pantalla", "epigrafe", "palabras_clave", "cta", "recursos", "material_a_producir", "produccion", "instrucciones_ia", "justificacion"],
           properties: {
             fecha: { type: "string", description: "AAAA-MM-DD, dentro de la semana pedida." },
             hora: {
@@ -73,6 +75,15 @@ export const HERRAMIENTA_PLAN = {
               type: "array",
               items: { type: "string" },
               description: "Lo que Facundo tiene que filmar o fotografiar él mismo para esta pieza, una toma concreta por ítem. Lista vacía si la pieza sale de material que ya existe o de código.",
+            },
+            produccion: {
+              type: "string",
+              enum: PRODUCCIONES,
+              description: "Cómo hace Facundo esta pieza: \"propio\" (la filma o fotografía él), \"ia\" (la crea con una herramienta de IA siguiendo instrucciones_ia) o \"mixto\" (parte filmada, parte con IA).",
+            },
+            instrucciones_ia: {
+              type: "string",
+              description: "Si produccion es \"ia\" o \"mixto\": indicación en español, lista para copiar y pegar en una herramienta de IA de imágenes o video. Si es \"propio\": cadena vacía.",
             },
             justificacion: { type: "string", description: "Por qué esta pieza, con apoyo en la marca o en las referencias." },
             referencias: { type: "array", items: { type: "string" }, description: "Cuentas de referencia que inspiran la pieza, si aplica." },
@@ -198,6 +209,16 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
         }
       }
     }
+    // Cómo se produce: opcional para los planes viejos (se toma como "propio"); si es con IA, tiene que traer la indicación
+    if (pieza.produccion !== undefined && !PRODUCCIONES.includes(pieza.produccion)) {
+      errores.push(`${etiqueta}: produccion tiene que ser ${PRODUCCIONES.map((v) => `"${v}"`).join(", ")}.`);
+    } else if (pieza.produccion === "ia" || pieza.produccion === "mixto") {
+      if (typeof pieza.instrucciones_ia !== "string" || pieza.instrucciones_ia.trim().length < LARGO_MINIMO_INSTRUCCIONES_IA) {
+        errores.push(`${etiqueta}: si se hace con IA, instrucciones_ia tiene que ser una indicación completa (qué mostrar, encuadre y colores, al menos ${LARGO_MINIMO_INSTRUCCIONES_IA} caracteres).`);
+      } else {
+        for (const { regla, fragmento } of revisarReglas(pieza.instrucciones_ia)) errores.push(`${etiqueta}: ${regla} en las instrucciones para la IA ("${fragmento}").`);
+      }
+    }
     if (typeof pieza.gancho === "string" && pieza.gancho.trim() !== "") errores.push(...revisarGancho(pieza.gancho, `${etiqueta}: el gancho`, { reglas: false }));
     // Ganchos alternativos: tienen que ser nuevos, distintos entre sí y cumplir las mismas reglas
     if (!Array.isArray(pieza.ganchos_alternativos) || pieza.ganchos_alternativos.length < ALTERNATIVAS_MINIMAS) {
@@ -311,6 +332,8 @@ Reglas:
 - Solo podés proponer piezas que se puedan hacer con los recursos disponibles que te indican. Si no hay producto, no propongas mostrar producto.
 - Cada pieza lleva su hora de publicación (hora de Argentina, entre ${HORA_MINIMA_PUBLICACION} y ${HORA_MAXIMA_PUBLICACION}). Si hay un RENDIMIENTO de @vow_ar, elegí la hora con esos datos; si no, una hora de buena actividad como 19:00. Nunca inventes que una hora "rinde mejor" sin datos.
 - En material_a_producir listá, una toma por ítem, lo que Facundo tiene que filmar o fotografiar él mismo. Si la pieza sale de material que ya existe o se genera con código, dejá la lista vacía. Facundo recibe el plan el lunes y se le recuerda 3 días antes de publicar: ubicá las piezas que necesitan filmación de jueves en adelante.
+- En produccion elegí cómo hace Facundo cada pieza: "propio" cuando lo real es el valor (su proceso, gente que entrena, producto real); "ia" para escenas, texturas, fondos o piezas tipográficas que crea él con una herramienta de IA; "mixto" si lleva ambas. La IA nunca puede mostrar producto que no existe ni gente que entrena sin confirmar: valen las mismas reglas de recursos.
+- Si produccion es "ia" o "mixto", instrucciones_ia es la indicación para copiar y pegar en esa herramienta: qué mostrar con un tema concreto (describí lo que se ve, nunca lo que no tiene que aparecer), formato vertical (video 9:16; imagen 4:5, 1080x1350), luz sobria, la paleta de la marca (negro #0A0A0A, hueso #ECE8E1, beige #CDBFA6 y bordó #7A1F24 solo como acento) y sin música. Si la pieza lleva texto en pantalla, copiá en la indicación los textos EXACTOS de texto_en_pantalla y pedí revisar la ortografía; las IA suelen deformar letras, así que también sugerí agregar el texto aparte con un editor, en Unbounded ExtraBold en mayúsculas y Space Mono. Si produccion es "propio", instrucciones_ia va vacía. En una pieza con IA, material_a_producir lista el archivo que hay que crear.
 - Las piezas se publican solas por la API de Instagram, que no permite agregar música de la biblioteca de Instagram: no la pidas en los recursos. Si una pieza lleva sonido, tiene que venir en el propio archivo (por ejemplo, el sonido ambiente real).
 - Las referencias son inspiración, no datos para citar. No copies sus textos ni sus ideas al pie de la letra.
 - Los ganchos tienen que ser potentes y sobrios, como pide la sección 8 del cerebro de marca: afirmaciones cortas de 3 a 8 palabras, en imperativo, que comprometen. Nunca tono de tutorial, de consejo ni de lo que falta.
