@@ -21,6 +21,8 @@ export const crearPieza = (extra = {}) => ({
   cta: "Anotarse en la lista de espera (link en la bio).",
   recursos: ["Celular vertical y un lugar donde apoyarlo", "Luz natural"],
   material_a_producir: ["Pies y manos atando el cordón, plano vertical"],
+  produccion: "propio",
+  instrucciones_ia: "",
   justificacion: "Muestra gente entrenando de verdad y un proceso real, sin físico y sin producto.",
   ...extra,
 });
