@@ -1,6 +1,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { crearEscenario, crearPieza, crearPlan, URL_PUBLICA } from "./ayuda-pruebas.js";
+import { HERRAMIENTAS_CHAT, MENSAJES_MAXIMOS_POR_DIA } from "./conversacion.js";
 import { faltaArchivo, IMAGENES_IA_MAXIMAS_POR_DIA, INTENTOS_IA_POR_PIEZA, TOLERANCIA_MINUTOS } from "./servicio.js";
 
 const VIDEO = Buffer.from("video-de-prueba");
@@ -747,5 +748,229 @@ describe("imágenes con IA", () => {
     const { e, fila, generador } = await escenarioConImagen();
     await e.mandar(e.actualizacion.boton(`ia:${fila.id}`, 1, 999));
     assert.equal(generador.descripciones.length, 0);
+  });
+});
+
+// ───────────────────────── Chat con la IA ─────────────────────────
+// IA falsa: recibe lo mismo que Gemini (sistema, charla, herramientas) y un guion que decide qué hacer con las herramientas
+function llmFalso(guion = async () => "Listo.") {
+  const llamadas = [];
+  return { llamadas, async conversar(argumentos) { llamadas.push(argumentos); return guion(argumentos); } };
+}
+
+describe("chat con la IA", () => {
+  async function escenarioChat(guion, opciones = {}) {
+    const llm = llmFalso(guion);
+    const e = crearEscenario({ fecha: "2026-10-30", hora: "10:00", llm, ...opciones });
+    const fila = await e.cargarPieza();
+    await e.mandar(e.actualizacion.boton(`aprobar:${fila.id}`));
+    return { e, fila, llm, ultimo: () => e.telegram.ultimo() };
+  }
+  const escribir = (e, texto, opciones) => e.mandar(e.actualizacion.texto(texto, opciones));
+
+  test("un mensaje suelto va a la IA con la fecha de hoy y el calendario, y su respuesta le llega a Facundo", async () => {
+    const { e, llm } = await escenarioChat(async () => "Esta semana tenés una pieza.");
+    await escribir(e, "¿qué tengo esta semana?");
+    assert.equal(llm.llamadas.length, 1);
+    assert.match(llm.llamadas[0].sistema, /viernes 2026-10-30, 10:00/);
+    assert.match(llm.llamadas[0].sistema, /mañana: sábado 31\/10 = 2026-10-31/);
+    assert.match(llm.llamadas[0].sistema, /NUNCA confirmás ni cancelás/);
+    assert.equal(e.telegram.ultimo().texto, "Esta semana tenés una pieza.");
+    assert.deepEqual(await e.repo.novedadesPendientes(), [], "no es una novedad");
+  });
+
+  test("recuerda la charla: el segundo mensaje llega con el anterior y la respuesta anterior", async () => {
+    const { e, llm } = await escenarioChat(async ({ historial }) => `Mensajes que veo: ${historial.length}`);
+    await escribir(e, "hola");
+    await escribir(e, "y ahora?");
+    assert.deepEqual(llm.llamadas[1].historial.map((m) => [m.rol, m.texto]), [["usuario", "hola"], ["asistente", "Mensajes que veo: 1"], ["usuario", "y ahora?"]]);
+  });
+
+  test("al responder a una pieza, la IA sabe de cuál se habla", async () => {
+    const { e, fila, llm } = await escenarioChat(async () => "ok");
+    const mensaje = (await e.repo.obtenerPieza(fila.id)).mensajes[0];
+    await escribir(e, "cambiale la hora", { respondeA: mensaje });
+    assert.match(llm.llamadas[0].historial.at(-1).texto, new RegExp(`pieza ${fila.id} del viernes 30/10`));
+  });
+
+  test("ver_semana y ver_pieza muestran lo que hay, con IDs", async () => {
+    let semana, pieza;
+    const { e, fila } = await escenarioChat(async ({ ejecutar }) => {
+      semana = await ejecutar("ver_semana", {});
+      pieza = await ejecutar("ver_pieza", { id: semana.piezas[0].id });
+      return "ok";
+    });
+    await escribir(e, "mostrame todo");
+    assert.equal(semana.piezas.length, 1);
+    assert.deepEqual([semana.piezas[0].id, semana.piezas[0].fecha, semana.piezas[0].estado.split(" ")[0], semana.piezas[0].confirmada_hoy], [fila.id, "2026-10-30", "aprobada", false]);
+    assert.equal(pieza.pieza.gancho, "Atate el compromiso. Salí.");
+  });
+
+  test("modificar_pieza cambia la fecha y la hora, borra la confirmación, reprograma el recordatorio y le muestra la pieza con sus botones", async () => {
+    let resultado;
+    const { e, fila } = await escenarioChat(async ({ ejecutar }) => {
+      resultado = await ejecutar("modificar_pieza", { id: 1, cambios: { fecha: "2026-11-03", hora: "20:30" }, que_cambio: "La pasé al martes 03/11 a las 20:30." });
+      return "Listo, la pasé al martes.";
+    });
+    await e.mandar(e.actualizacion.boton(`confirmar:${fila.id}`)); // confirmada hoy, y después la cambia
+    await escribir(e, "pasala al martes a las 20:30");
+    assert.equal(resultado.ok, true, JSON.stringify(resultado));
+    const despues = await e.repo.obtenerPieza(fila.id);
+    assert.deepEqual([despues.fecha, despues.hora, despues.estado, despues.confirmada_el], ["2026-11-03", "20:30", "propuesta", null]);
+    const tarjeta = e.telegram.buscar("La pasé al martes 03/11");
+    assert.ok(tarjeta.botones.flat().some((b) => b.dato === `aprobar:${fila.id}`));
+    const pendientes = await e.repo.recordatoriosPendientes("2026-11-30");
+    assert.ok(pendientes.some((r) => r.pieza_id === fila.id && r.fecha === "2026-10-31"), "recordatorio 3 días antes de la fecha nueva");
+  });
+
+  test("modificar_pieza respeta las reglas de marca: si las rompe, no guarda nada y explica por qué", async () => {
+    let resultado;
+    const { e, fila } = await escenarioChat(async ({ ejecutar }) => {
+      resultado = await ejecutar("modificar_pieza", { id: 1, cambios: { epigrafe: "Entrená con mancuernas y barras todos los días." }, que_cambio: "x" });
+      return "No se pudo.";
+    });
+    await escribir(e, "poné mancuernas en el epígrafe");
+    assert.equal(resultado.ok, false);
+    assert.ok(resultado.errores.length > 0);
+    const despues = await e.repo.obtenerPieza(fila.id);
+    assert.equal(despues.pieza.epigrafe, fila.pieza.epigrafe);
+    assert.equal(despues.estado, "aprobada", "no se tocó nada");
+  });
+
+  test("modificar_pieza rechaza campos que no son editables, cambios vacíos, piezas inexistentes y piezas ya publicadas", async () => {
+    const resultados = [];
+    const { e, fila } = await escenarioChat(async ({ ejecutar }) => {
+      resultados.push(await ejecutar("modificar_pieza", { id: 1, cambios: { estado: "publicada", id: 9 }, que_cambio: "x" }));
+      resultados.push(await ejecutar("modificar_pieza", { id: 1, cambios: {}, que_cambio: "x" }));
+      resultados.push(await ejecutar("modificar_pieza", { id: 999, cambios: { hora: "20:00" }, que_cambio: "x" }));
+      await e.repo.actualizarPieza(1, { estado: "publicada" });
+      resultados.push(await ejecutar("modificar_pieza", { id: 1, cambios: { hora: "20:00" }, que_cambio: "x" }));
+      return "ok";
+    });
+    await escribir(e, "hacé cosas raras");
+    assert.match(resultados[0].error, /no se pueden cambiar: estado, id/);
+    assert.match(resultados[1].error, /ningún cambio/);
+    assert.match(resultados[2].error, /No existe una pieza/);
+    assert.match(resultados[3].error, /ya no se puede modificar/);
+    assert.equal((await e.repo.obtenerPieza(fila.id)).hora, "19:00");
+  });
+
+  test("la IA no puede confirmar, cancelar ni publicar: no existe la herramienta, y las que mandan un botón no cambian el estado", async () => {
+    const nombres = HERRAMIENTAS_CHAT.map((h) => h.name);
+    for (const prohibida of ["confirmar", "confirmar_pieza", "cancelar_pieza", "cancelar", "publicar", "publicar_ahora"]) assert.ok(!nombres.includes(prohibida));
+
+    const respuestas = {};
+    const { e, fila } = await escenarioChat(async ({ ejecutar }) => {
+      respuestas.inventada = await ejecutar("confirmar_pieza", { id: 1 });
+      respuestas.confirmacion = await ejecutar("pedir_confirmacion", { id: 1 });
+      respuestas.cancelacion = await ejecutar("pedir_cancelacion", { id: 1 });
+      return "Te mandé los botones.";
+    });
+    await escribir(e, "confirmá y después cancelá la de hoy");
+    assert.match(respuestas.inventada.error, /No existe la herramienta/);
+    assert.match(respuestas.confirmacion.nota, /Falta que Facundo lo toque/);
+    assert.match(respuestas.cancelacion.nota, /Falta que Facundo lo toque/);
+    const pieza = await e.repo.obtenerPieza(fila.id);
+    assert.deepEqual([pieza.estado, pieza.confirmada_el], ["aprobada", null], "nada quedó confirmado ni cancelado");
+    assert.ok(e.telegram.buscar("Hoy se publica a las 19:00").botones.flat().some((b) => b.dato === `confirmar:${fila.id}`));
+    const preguntaCancelar = e.telegram.buscar("¿Cancelo la pieza");
+    assert.deepEqual(preguntaCancelar.botones.flat().map((b) => b.dato), [`cancelar:${fila.id}`, `dejar:${fila.id}`]);
+
+    // Recién al tocar el botón se cancela; "Dejarla" no toca nada
+    await e.mandar(e.actualizacion.boton(`dejar:${fila.id}`, preguntaCancelar.id));
+    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "aprobada");
+    await e.mandar(e.actualizacion.boton(`cancelar:${fila.id}`, preguntaCancelar.id));
+    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "cancelada");
+  });
+
+  test("ninguna herramienta de la IA deja una pieza confirmada, publicándose o cancelada (barrido de todas con una pieza de hoy)", async () => {
+    const { e, fila } = await escenarioChat(async ({ ejecutar }) => {
+      for (const { name } of HERRAMIENTAS_CHAT) {
+        await ejecutar(name, { id: 1, texto: "algo", cambios: { hora: "21:00" }, que_cambio: "x" });
+      }
+      return "ok";
+    });
+    await escribir(e, "probá todo");
+    const pieza = await e.repo.obtenerPieza(fila.id);
+    assert.ok(["propuesta", "aprobada"].includes(pieza.estado), `quedó ${pieza.estado}`);
+    assert.equal(pieza.confirmada_el, null);
+    assert.equal(e.meta.llamadas.length, 0);
+  });
+
+  test("pedir_confirmacion solo sirve para piezas de hoy; las de otro día se rechazan", async () => {
+    let resultado;
+    const { e } = await escenarioChat(async ({ ejecutar }) => {
+      await ejecutar("modificar_pieza", { id: 1, cambios: { fecha: "2026-11-03" }, que_cambio: "x" });
+      resultado = await ejecutar("pedir_confirmacion", { id: 1 });
+      return "ok";
+    });
+    await escribir(e, "mandame para confirmar");
+    assert.match(resultado.error, /solo vale el mismo día/);
+  });
+
+  test("aprobar_pieza aprueba una propuesta, anotar_novedad guarda para el plan, y pausar/reanudar frenan y reactivan", async () => {
+    const resultados = {};
+    const { e } = await escenarioChat(async ({ ejecutar }) => {
+      await ejecutar("modificar_pieza", { id: 1, cambios: { hora: "21:00" }, que_cambio: "x" }); // vuelve a propuesta
+      resultados.aprobar = await ejecutar("aprobar_pieza", { id: 1 });
+      resultados.aprobarDeNuevo = await ejecutar("aprobar_pieza", { id: 1 });
+      resultados.novedad = await ejecutar("anotar_novedad", { texto: "Llegaron las gorras" });
+      resultados.vacia = await ejecutar("anotar_novedad", { texto: "  " });
+      await ejecutar("pausar_publicaciones", {});
+      resultados.pausado = (await ejecutar("estado_del_sistema", {})).pausado;
+      await ejecutar("reanudar_publicaciones", {});
+      resultados.reanudado = (await ejecutar("estado_del_sistema", {})).pausado;
+      return "ok";
+    });
+    await escribir(e, "hacé todo esto");
+    assert.equal(resultados.aprobar.ok, true);
+    assert.match(resultados.aprobarDeNuevo.error, /no hace falta aprobarla/);
+    assert.equal(resultados.novedad.ok, true);
+    assert.match(resultados.vacia.error, /vacía/);
+    assert.deepEqual([resultados.pausado, resultados.reanudado], [true, false]);
+    assert.deepEqual((await e.repo.novedadesPendientes()).map((n) => n.texto), ["Llegaron las gorras"]);
+  });
+
+  test("tiene un tope de mensajes por día; los botones y comandos siguen funcionando", async () => {
+    const { e, llm, fila } = await escenarioChat();
+    await e.repo.guardarEstado("chat-dia:2026-10-30", MENSAJES_MAXIMOS_POR_DIA);
+    await escribir(e, "hola");
+    assert.equal(llm.llamadas.length, 0);
+    assert.match(e.telegram.ultimo().texto, new RegExp(`máximo de ${MENSAJES_MAXIMOS_POR_DIA} mensajes`));
+    await escribir(e, "/estado");
+    assert.match(e.telegram.ultimo().texto, /Activo/);
+    e.telegram.archivos.set("v1", Buffer.from("video"));
+    await e.mandar(e.actualizacion.video("v1", { respondeA: (await e.repo.obtenerPieza(fila.id)).mensajes[0] }));
+    await e.mandar(e.actualizacion.boton(`confirmar:${fila.id}`));
+    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "confirmada");
+  });
+
+  test("si la IA falla, un mensaje suelto queda como novedad (no se pierde) y uno respondido a una pieza pide reintentar", async () => {
+    const { e, fila } = await escenarioChat(async () => { throw new Error("Se agotó el cupo gratis de la IA por ahora."); });
+    await escribir(e, "Llegaron las gorras");
+    assert.match(e.telegram.ultimo().texto, /cupo gratis de la IA/);
+    assert.match(e.telegram.ultimo().texto, /Lo anoté como novedad/);
+    assert.deepEqual((await e.repo.novedadesPendientes()).map((n) => n.texto), ["Llegaron las gorras"]);
+
+    const mensaje = (await e.repo.obtenerPieza(fila.id)).mensajes[0];
+    await escribir(e, "cambiale la hora", { respondeA: mensaje });
+    assert.match(e.telegram.ultimo().texto, /Probá de nuevo en un rato/);
+    assert.equal((await e.repo.novedadesPendientes()).length, 1, "lo respondido a una pieza no es una novedad");
+  });
+
+  test("los archivos y los comandos no pasan por la IA", async () => {
+    const { e, fila, llm } = await escenarioChat();
+    e.telegram.archivos.set("v1", Buffer.from("video"));
+    const mensaje = (await e.repo.obtenerPieza(fila.id)).mensajes[0];
+    await e.mandar(e.actualizacion.video("v1", { respondeA: mensaje }));
+    assert.equal((await e.repo.mediosDePieza(fila.id)).length, 1);
+    await escribir(e, "/pausar");
+    assert.equal(llm.llamadas.length, 0);
+  });
+
+  test("sin IA configurada, el bot sigue como antes: un mensaje suelto es una novedad", async () => {
+    const e = crearEscenario({ fecha: "2026-10-30", hora: "10:00" });
+    await escribir(e, "Llegaron las gorras");
+    assert.match(e.telegram.ultimo().texto, /Anotado/);
   });
 });

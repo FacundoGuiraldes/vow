@@ -74,6 +74,9 @@ export function crearClienteTelegram({ token, chatId, fetchFn = fetch } = {}) {
     quitarBotones: (mensajeId) =>
       llamar("editMessageReplyMarkup", { chat_id: chatId, message_id: mensajeId, reply_markup: { inline_keyboard: [] } }).catch(() => null),
 
+    // "escribiendo…" mientras la IA piensa (dura unos segundos; si falla no importa)
+    escribiendo: () => llamar("sendChatAction", { chat_id: chatId, action: "typing" }).catch(() => null),
+
     responderBoton: (idCallback, texto = "") => llamar("answerCallbackQuery", { callback_query_id: idCallback, text: texto.slice(0, 200) }).catch(() => null),
 
     async descargarArchivo(fileId) {

@@ -132,4 +132,6 @@ export const botonesImagenIA = (id) => [
   [{ texto: "✅ Usar esta", dato: `ia_usar:${id}` }, { texto: "🔁 Otra", dato: `ia_otra:${id}` }],
   [{ texto: "✏️ Cambiar indicación", dato: `ia_cambiar:${id}` }],
 ];
+// Cuando la IA propone cancelar: la decisión la toma Facundo con este botón
+export const botonesCancelar = (id) => [[{ texto: "🚫 Sí, cancelarla", dato: `cancelar:${id}` }, { texto: "↩️ Dejarla", dato: `dejar:${id}` }]];
 export const botonesTarde = (id) => [[{ texto: "▶️ Publicar ahora", dato: `publicar_ahora:${id}` }, { texto: "🚫 Cancelar", dato: `cancelar:${id}` }]];

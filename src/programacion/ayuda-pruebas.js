@@ -1,5 +1,6 @@
 // Piezas de apoyo para los tests de la publicación programada: una pieza real de ejemplo, un Telegram y un Meta falsos
 // (anotan lo que se les pidió) y un reloj que se mueve a mano. Ningún test toca la red, la base ni la cuenta real.
+import { crearValidadorEdicion } from "./editor.js";
 import { crearRepositorioMemoria } from "./repositorio-memoria.js";
 import { crearServicio } from "./servicio.js";
 
@@ -51,6 +52,7 @@ export function crearTelegramFalso() {
       enviados.push({ id, texto: opciones.texto ?? "", foto: true, fileId, ...opciones });
       return { id, fileId };
     },
+    async escribiendo() {},
     async enviarA(destino, texto) {
       enviados.push({ destino, texto });
     },
@@ -94,12 +96,12 @@ export function crearMetaFalso() {
 }
 
 // Escenario completo: servicio + repositorio en memoria + Telegram y Meta falsos + reloj manual
-export function crearEscenario({ fecha = "2026-10-30", hora = "08:00", permitirPublicar = true, editor = null, sinMeta = false, generadorImagen = null } = {}) {
+export function crearEscenario({ fecha = "2026-10-30", hora = "08:00", permitirPublicar = true, editor = null, sinMeta = false, generadorImagen = null, llm = null } = {}) {
   const reloj = { fecha, hora };
   const repo = crearRepositorioMemoria();
   const telegram = crearTelegramFalso();
   const meta = sinMeta ? null : crearMetaFalso();
-  const servicio = crearServicio({ repo, telegram, meta, editor, generadorImagen, ahora: () => ({ ...reloj }), urlPublica: URL_PUBLICA, permitirPublicar });
+  const servicio = crearServicio({ repo, telegram, meta, editor, generadorImagen, llm, validarEdicion: llm ? crearValidadorEdicion() : null, ahora: () => ({ ...reloj }), urlPublica: URL_PUBLICA, permitirPublicar });
   let mensajeEntrante = 5000;
 
   const actualizacion = {

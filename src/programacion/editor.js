@@ -17,6 +17,19 @@ export const HERRAMIENTA_EDICION = {
   },
 };
 
+// Valida una pieza editada con las mismas reglas que el Estratega (la usan el editor con Claude y el chat). Devuelve la lista de errores.
+export function crearValidadorEdicion({ leer, listar } = {}) {
+  let conocidos = null;
+  return async function validarEdicion({ fila, pieza, hoy }) {
+    if (!conocidos) ({ conocidos } = extraerGanchosConocidos((await construirSistema(leer, { listar })).cerebro));
+    // Se permite lo que la pieza ya tenía: editar un texto no vuelve a discutir si había producto o gente
+    const recursos = { producto: fila.pieza.pilar === "producto en uso", gente: fila.pieza.pilar === "gente que entrena" };
+    const { errores } = validarPlan({ resumen: "edición", piezas: [pieza] }, { piezas: 1, recursos, ganchosConocidos: conocidos });
+    if (typeof pieza.fecha === "string" && pieza.fecha < hoy) errores.push(`La fecha ${pieza.fecha} ya pasó.`);
+    return errores;
+  };
+}
+
 export function crearEditor({ cliente, modelo = MODELO_ESTRATEGA, leer, listar } = {}) {
   if (!cliente) throw new Error("Falta el cliente de Anthropic para el editor.");
 
