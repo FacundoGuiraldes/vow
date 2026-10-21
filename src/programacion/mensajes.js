@@ -100,9 +100,20 @@ export function textoResumenDiario(fila, { faltaArchivo = null } = {}) {
   );
 }
 
-export const botonesPlan = (id) => [[{ texto: "✅ Aprobar", dato: `aprobar:${id}` }, { texto: "✏️ Modificar", dato: `modificar:${id}` }]];
-export const botonesDia = (id, hora) => [
+// `conIA`: la pieza es una imagen y el generador está configurado, así que se ofrece el botón de generarla
+const filaIA = (id) => [{ texto: "🎨 Generar con IA", dato: `ia:${id}` }];
+export const botonesPlan = (id, { conIA = false } = {}) => [
+  [{ texto: "✅ Aprobar", dato: `aprobar:${id}` }, { texto: "✏️ Modificar", dato: `modificar:${id}` }],
+  ...(conIA ? [filaIA(id)] : []),
+];
+export const botonesDia = (id, hora, { conIA = false } = {}) => [
   [{ texto: `✅ Confirmar ${hora} hs`, dato: `confirmar:${id}` }],
   [{ texto: "✏️ Modificar", dato: `modificar:${id}` }, { texto: "🚫 Cancelar", dato: `cancelar:${id}` }],
+  ...(conIA ? [filaIA(id)] : []),
+];
+// Debajo de la imagen que generó la IA
+export const botonesImagenIA = (id) => [
+  [{ texto: "✅ Usar esta", dato: `ia_usar:${id}` }, { texto: "🔁 Otra", dato: `ia_otra:${id}` }],
+  [{ texto: "✏️ Cambiar indicación", dato: `ia_cambiar:${id}` }],
 ];
 export const botonesTarde = (id) => [[{ texto: "▶️ Publicar ahora", dato: `publicar_ahora:${id}` }, { texto: "🚫 Cancelar", dato: `cancelar:${id}` }]];

@@ -1,7 +1,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { crearEscenario, crearPieza, crearPlan, URL_PUBLICA } from "./ayuda-pruebas.js";
-import { faltaArchivo, TOLERANCIA_MINUTOS } from "./servicio.js";
+import { faltaArchivo, IMAGENES_IA_MAXIMAS_POR_DIA, INTENTOS_IA_POR_PIEZA, TOLERANCIA_MINUTOS } from "./servicio.js";
 
 const VIDEO = Buffer.from("video-de-prueba");
 
@@ -592,5 +592,160 @@ describe("seguridad del chat", () => {
     await e.mandar(e.actualizacion.texto("/estado"));
     assert.match(e.telegram.ultimo().texto, /Modo simulación/);
     assert.match(e.telegram.ultimo().texto, /viernes 30\/10 19:00 hs · reel/);
+  });
+});
+
+// ───────────────────────── Imágenes con IA ─────────────────────────
+// Generador falso: anota las descripciones y devuelve bytes distintos en cada intento
+function generadorFalso({ falla = null } = {}) {
+  const descripciones = [];
+  return {
+    descripciones,
+    async generar({ descripcion }) {
+      if (falla) throw new Error(falla);
+      descripciones.push(descripcion);
+      return Buffer.from(`imagen-${descripciones.length}`);
+    },
+  };
+}
+const todosLosBotones = (mensaje) => (mensaje.botones ?? []).flat().map((b) => b.dato);
+// La tarjeta de la pieza (la primera con botón de aprobar esa pieza; el primer mensaje del plan es el resumen)
+const tarjetaDePieza = (e) => e.telegram.enviados.find((m) => todosLosBotones(m).some((d) => /^aprobar:/.test(d)));
+
+describe("imágenes con IA", () => {
+  async function escenarioConImagen(opciones = {}) {
+    const generador = generadorFalso(opciones);
+    const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00", generadorImagen: opciones.sinGenerador ? null : generador });
+    const fila = await e.cargarPieza({ formato: "imagen", guion: "Fondo negro liso con espacio vacío.", gancho: "Estate en la lista." });
+    const mensajePieza = (await e.repo.obtenerPieza(fila.id)).mensajes[0];
+    return { e, fila, mensajePieza, generador };
+  }
+
+  test("la tarjeta de una imagen ofrece el botón de IA; la de un reel o sin generador, no", async () => {
+    const { e } = await escenarioConImagen();
+    assert.ok(todosLosBotones(tarjetaDePieza(e)).some((d) => d.startsWith("ia:")));
+    const reel = crearEscenario({ generadorImagen: generadorFalso() });
+    await reel.cargarPieza({ formato: "reel" });
+    assert.ok(!todosLosBotones(tarjetaDePieza(reel)).some((d) => d.startsWith("ia:")));
+    const sin = await escenarioConImagen({ sinGenerador: true });
+    assert.ok(!todosLosBotones(tarjetaDePieza(sin.e)).some((d) => d.startsWith("ia:")));
+  });
+
+  test("generar → ver la imagen en Telegram → 'Usar esta' la guarda como archivo de la pieza", async () => {
+    const { e, fila, generador } = await escenarioConImagen();
+    await e.mandar(e.actualizacion.boton(`ia:${fila.id}`));
+    assert.equal(generador.descripciones.length, 1);
+    assert.match(generador.descripciones[0], /Fondo negro liso/, "sin indicación usa el guion de la pieza");
+    const foto = e.telegram.enviados.find((m) => m.foto);
+    assert.deepEqual(todosLosBotones(foto), [`ia_usar:${fila.id}`, `ia_otra:${fila.id}`, `ia_cambiar:${fila.id}`]);
+    assert.match(foto.texto, /1 de 3/);
+    assert.equal(await e.repo.leerEstado("ia-dia:2026-10-30"), 1, "cuenta la imagen en el tope diario");
+    assert.deepEqual(await e.repo.mediosDePieza(fila.id), [], "todavía no se usó: no hay archivo");
+
+    await e.mandar(e.actualizacion.boton(`ia_usar:${fila.id}`, foto.id));
+    const medios = await e.repo.mediosDePieza(fila.id);
+    assert.equal(medios.length, 1);
+    assert.equal(medios[0].tipo, "imagen");
+    assert.equal(medios[0].mime, "image/jpeg");
+    assert.equal((await e.repo.medioPorToken(medios[0].token)).datos.toString(), "imagen-1");
+    assert.ok(e.telegram.quitados.includes(foto.id), "se sacan los botones de la imagen usada");
+    assert.match(e.telegram.ultimo().texto, /Ya tiene todo el material/);
+
+    // y desde ahí se puede confirmar como cualquier otra pieza
+    await e.mandar(e.actualizacion.boton(`aprobar:${fila.id}`));
+    await e.mandar(e.actualizacion.boton(`confirmar:${fila.id}`));
+    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "confirmada");
+  });
+
+  test("'Otra' genera de nuevo con la misma indicación, saca los botones de la anterior y la anterior ya no se puede usar", async () => {
+    const { e, fila, generador } = await escenarioConImagen();
+    await e.mandar(e.actualizacion.boton(`ia:${fila.id}`));
+    const primera = e.telegram.enviados.find((m) => m.foto);
+    await e.mandar(e.actualizacion.boton(`ia_otra:${fila.id}`, primera.id));
+    const fotos = e.telegram.enviados.filter((m) => m.foto);
+    assert.equal(fotos.length, 2);
+    assert.match(fotos[1].texto, /2 de 3/);
+    assert.equal(generador.descripciones[1], generador.descripciones[0]);
+    assert.ok(e.telegram.quitados.includes(primera.id));
+
+    await e.mandar(e.actualizacion.boton(`ia_usar:${fila.id}`, primera.id)); // botón viejo
+    assert.match(e.telegram.ultimo().texto, /ya no es la última/);
+    assert.deepEqual(await e.repo.mediosDePieza(fila.id), []);
+    await e.mandar(e.actualizacion.boton(`ia_usar:${fila.id}`, fotos[1].id));
+    const [medio] = await e.repo.mediosDePieza(fila.id);
+    assert.equal((await e.repo.medioPorToken(medio.token)).datos.toString(), "imagen-2");
+  });
+
+  test("tiene tope de intentos por pieza y de imágenes por día", async () => {
+    const { e, fila } = await escenarioConImagen();
+    for (let i = 0; i < INTENTOS_IA_POR_PIEZA + 1; i++) await e.mandar(e.actualizacion.boton(`ia:${fila.id}`));
+    assert.equal(e.telegram.enviados.filter((m) => m.foto).length, INTENTOS_IA_POR_PIEZA);
+    assert.match(e.telegram.ultimo().texto, new RegExp(`Ya hice ${INTENTOS_IA_POR_PIEZA} imágenes`));
+
+    const { e: dia } = await escenarioConImagen();
+    await dia.repo.guardarEstado("ia-dia:2026-10-30", IMAGENES_IA_MAXIMAS_POR_DIA);
+    const [cualquiera] = await dia.repo.piezasDeSemana("2026-10-26");
+    await dia.mandar(dia.actualizacion.boton(`ia:${cualquiera.id}`));
+    assert.equal(dia.telegram.enviados.filter((m) => m.foto).length, 0);
+    assert.match(dia.telegram.ultimo().texto, /máximo de 10 imágenes con IA por día/);
+  });
+
+  test("/ia respondiendo a la pieza usa la indicación que escribís; sin responder explica cómo", async () => {
+    const { e, mensajePieza, generador } = await escenarioConImagen();
+    await e.mandar(e.actualizacion.texto("/ia una mesa de madera con luz de ventana", { respondeA: mensajePieza }));
+    assert.deepEqual(generador.descripciones, ["una mesa de madera con luz de ventana"]);
+    assert.equal(e.telegram.enviados.filter((m) => m.foto).length, 1);
+    await e.mandar(e.actualizacion.texto("/ia otra cosa"));
+    assert.match(e.telegram.ultimo().texto, /Respondé al mensaje de una pieza con \/ia/);
+    assert.equal(generador.descripciones.length, 1);
+  });
+
+  test("'Otra' después de /ia mantiene la indicación nueva, no vuelve al guion", async () => {
+    const { e, fila, mensajePieza, generador } = await escenarioConImagen();
+    await e.mandar(e.actualizacion.texto("/ia un fondo beige", { respondeA: mensajePieza }));
+    const foto = e.telegram.enviados.find((m) => m.foto);
+    await e.mandar(e.actualizacion.boton(`ia_otra:${fila.id}`, foto.id));
+    assert.deepEqual(generador.descripciones, ["un fondo beige", "un fondo beige"]);
+  });
+
+  test("si el generador falla, lo cuenta, no gasta un intento y no deja nada a medias", async () => {
+    const { e, fila } = await escenarioConImagen({ falla: "Se agotó el cupo gratis de imágenes por ahora." });
+    await e.mandar(e.actualizacion.boton(`ia:${fila.id}`));
+    assert.match(e.telegram.ultimo().texto, /No pude generar la imagen: Se agotó el cupo gratis/);
+    assert.equal(await e.repo.leerEstado(`ia:${fila.id}`), null);
+    assert.equal(await e.repo.leerEstado("ia-dia:2026-10-30"), null);
+    assert.equal(e.telegram.enviados.filter((m) => m.foto).length, 0);
+  });
+
+  test("solo genera imágenes: un reel se rechaza, y sin la clave lo dice", async () => {
+    const reel = crearEscenario({ generadorImagen: generadorFalso() });
+    const filaReel = await reel.cargarPieza({ formato: "reel" });
+    await reel.mandar(reel.actualizacion.boton(`ia:${filaReel.id}`));
+    assert.match(reel.telegram.ultimo().texto, /solo las piezas de tipo imagen/);
+    const { e, fila } = await escenarioConImagen({ sinGenerador: true });
+    await e.mandar(e.actualizacion.boton(`ia:${fila.id}`));
+    assert.match(e.telegram.ultimo().texto, /falta GEMINI_API_KEY/);
+  });
+
+  test("usar una imagen sobre una pieza ya confirmada borra la confirmación", async () => {
+    const { e, fila } = await escenarioConImagen();
+    e.telegram.archivos.set("f1", Buffer.from("foto-propia"));
+    await e.mandar(e.actualizacion.foto("f1", { respondeA: (await e.repo.obtenerPieza(fila.id)).mensajes[0] }));
+    await e.mandar(e.actualizacion.boton(`aprobar:${fila.id}`));
+    await e.mandar(e.actualizacion.boton(`confirmar:${fila.id}`));
+    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "confirmada");
+    await e.mandar(e.actualizacion.boton(`ia:${fila.id}`));
+    const foto = e.telegram.enviados.find((m) => m.foto);
+    await e.mandar(e.actualizacion.boton(`ia_usar:${fila.id}`, foto.id));
+    const despues = await e.repo.obtenerPieza(fila.id);
+    assert.equal(despues.estado, "aprobada");
+    assert.equal(despues.confirmada_el, null);
+    assert.match(e.telegram.ultimo().texto, /volver a confirmar/);
+  });
+
+  test("ignora el botón de IA si viene de otro chat", async () => {
+    const { e, fila, generador } = await escenarioConImagen();
+    await e.mandar(e.actualizacion.boton(`ia:${fila.id}`, 1, 999));
+    assert.equal(generador.descripciones.length, 0);
   });
 });

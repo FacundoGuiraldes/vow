@@ -30,20 +30,29 @@ export const crearPlan = (piezas) => ({ resumen: "Plan de prueba.", piezas });
 export function crearTelegramFalso() {
   const enviados = [];
   const archivos = new Map();
+  const quitados = [];
   let siguiente = 100;
   return {
     chatId: String(CHAT),
     enviados,
     archivos,
+    quitados,
     async enviarMensaje(texto, opciones = {}) {
       const id = siguiente++;
       enviados.push({ id, texto, ...opciones });
       return id;
     },
+    async enviarFoto(foto, opciones = {}) {
+      const id = siguiente++;
+      const fileId = `foto-ia-${id}`;
+      archivos.set(fileId, foto); // igual que Telegram: la foto enviada se puede volver a bajar con su file_id
+      enviados.push({ id, texto: opciones.texto ?? "", foto: true, fileId, ...opciones });
+      return { id, fileId };
+    },
     async enviarA(destino, texto) {
       enviados.push({ destino, texto });
     },
-    async quitarBotones() {},
+    async quitarBotones(mensajeId) { quitados.push(mensajeId); },
     async responderBoton() {},
     async descargarArchivo(fileId) {
       if (!archivos.has(fileId)) throw new Error("No existe ese archivo.");
@@ -83,12 +92,12 @@ export function crearMetaFalso() {
 }
 
 // Escenario completo: servicio + repositorio en memoria + Telegram y Meta falsos + reloj manual
-export function crearEscenario({ fecha = "2026-10-30", hora = "08:00", permitirPublicar = true, editor = null, sinMeta = false } = {}) {
+export function crearEscenario({ fecha = "2026-10-30", hora = "08:00", permitirPublicar = true, editor = null, sinMeta = false, generadorImagen = null } = {}) {
   const reloj = { fecha, hora };
   const repo = crearRepositorioMemoria();
   const telegram = crearTelegramFalso();
   const meta = sinMeta ? null : crearMetaFalso();
-  const servicio = crearServicio({ repo, telegram, meta, editor, ahora: () => ({ ...reloj }), urlPublica: URL_PUBLICA, permitirPublicar });
+  const servicio = crearServicio({ repo, telegram, meta, editor, generadorImagen, ahora: () => ({ ...reloj }), urlPublica: URL_PUBLICA, permitirPublicar });
   let mensajeEntrante = 5000;
 
   const actualizacion = {

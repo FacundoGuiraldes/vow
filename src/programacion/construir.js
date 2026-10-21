@@ -2,6 +2,7 @@
 // Si falta alguna variable obligatoria, no se monta nada: la API sigue funcionando igual y el log dice qué falta.
 import { crearClienteMeta } from "../mcp/instagram/api.js";
 import { crearEditor } from "./editor.js";
+import { crearGeneradorImagen } from "./imagen-ia.js";
 import { crearRepositorio } from "./repositorio.js";
 import { crearRutasProgramacion } from "./rutas.js";
 import { crearServicio } from "./servicio.js";
@@ -25,7 +26,10 @@ export async function construirProgramacion({ pool, env = process.env, fetchFn =
     editor = crearEditor({ cliente: new Anthropic() });
   }
 
-  const servicio = crearServicio({ repo, telegram, meta, editor, urlPublica: env.URL_PUBLICA, permitirPublicar });
+  // Imágenes con IA (plan gratis de Gemini): opcional, sin la clave las piezas se arman con archivos que manda Facundo
+  const generadorImagen = env.GEMINI_API_KEY ? crearGeneradorImagen({ apiKey: env.GEMINI_API_KEY, modelo: env.GEMINI_MODELO || undefined, fetchFn }) : null;
+
+  const servicio = crearServicio({ repo, telegram, meta, editor, generadorImagen, urlPublica: env.URL_PUBLICA, permitirPublicar });
   const router = crearRutasProgramacion({ servicio, repo, secretoApi: env.PROGRAMACION_SECRETO, secretoWebhook: env.TELEGRAM_WEBHOOK_SECRETO });
-  return { router, servicio, telegram, permitirPublicar, edicionConIA: editor !== null };
+  return { router, servicio, telegram, permitirPublicar, edicionConIA: editor !== null, imagenesConIA: generadorImagen !== null };
 }

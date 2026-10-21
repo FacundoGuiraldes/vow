@@ -12,7 +12,7 @@
 import { revisarTextoPublico, validarUrlPublica } from "../mcp/instagram/validaciones.js";
 import { ahoraArgentina, esHoraValida, fechaLegible, horaDesdeMinutos, minutosDelDia, sumarDias, diasHasta } from "./fechas.js";
 import {
-  ESTADOS_LEGIBLES, botonesDia, botonesPlan, botonesTarde, fechaDeAviso, textoPieza, textoPlanSemanal, textoRecordatorio, textoResumenDiario,
+  ESTADOS_LEGIBLES, botonesDia, botonesImagenIA, botonesPlan, botonesTarde, fechaDeAviso, textoPieza, textoPlanSemanal, textoRecordatorio, textoResumenDiario,
 } from "./mensajes.js";
 
 export const HORA_RESUMEN = "08:00";
@@ -22,6 +22,8 @@ export const TOLERANCIA_MINUTOS = 20; // pasado este margen, no se publica sola
 export const INTENTOS_PREPARAR = 3;
 export const EDICIONES_MAXIMAS_POR_DIA = 30; // freno de gasto de la IA (el tope duro es el de la consola de Anthropic)
 export const MINUTOS_PUBLICAR_AHORA = 5;
+export const INTENTOS_IA_POR_PIEZA = 3; // imágenes con IA por pieza (el plan gratis tiene cupo diario)
+export const IMAGENES_IA_MAXIMAS_POR_DIA = 10;
 export const MINUTOS_AVISO_SIN_CONFIRMAR = 120; // si dos horas antes todavía no confirmó, se lo recuerda
 
 // Qué archivos necesita cada formato. Las stories todavía no se publican solas.
@@ -59,7 +61,7 @@ function elegirArchivo(msg) {
   return null;
 }
 
-export function crearServicio({ repo, telegram, meta = null, editor = null, ahora = () => ahoraArgentina(), urlPublica = "", permitirPublicar = false } = {}) {
+export function crearServicio({ repo, telegram, meta = null, editor = null, generadorImagen = null, ahora = () => ahoraArgentina(), urlPublica = "", permitirPublicar = false } = {}) {
   const decir = (texto, opciones) => telegram.enviarMensaje(texto, opciones);
   const decirDePieza = async (fila, texto, opciones) => {
     const id = await telegram.enviarMensaje(texto, opciones);
@@ -68,6 +70,8 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, ahor
   };
   // En los avisos del sistema, un fallo de Telegram no puede tirar abajo el resto del trabajo
   const avisar = (fila, texto, opciones) => decirDePieza(fila, texto, opciones).catch((error) => console.error(`No se pudo avisar por Telegram: ${error.message}`));
+  // Solo las piezas de tipo imagen se pueden generar con IA, y solo si el generador está configurado
+  const conIA = (fila) => generadorImagen !== null && fila.pieza.formato === "imagen";
   const autorizado = (chatId) => telegram.chatId !== null && String(chatId) === telegram.chatId;
 
   // ───────────────────────── Plan de la semana ─────────────────────────
@@ -93,7 +97,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, ahor
     await decir(textoPlanSemanal({ semana, resumen: plan.resumen, filas, urgentes, hoy }), {
       botones: [[{ texto: "✅ Aprobar todas", dato: `aprobar_semana:${semana}` }]],
     });
-    for (const fila of filas) await decirDePieza(fila, textoPieza(fila), { botones: botonesPlan(fila.id) });
+    for (const fila of filas) await decirDePieza(fila, textoPieza(fila), { botones: botonesPlan(fila.id, { conIA: conIA(fila) }) });
     return { piezas: filas.length, urgentes: urgentes.length };
   }
 
@@ -118,6 +122,9 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, ahor
     if (accion === "modificar") {
       return decirDePieza(fila, `✏️ Respondé a ESTE mensaje con el cambio que querés para la pieza del ${fechaLegible(fila.fecha)}. Por ejemplo: «cambiá el gancho», «pasala a las 20:30» o «pasala al viernes». Si cambia algo, tenés que volver a confirmar.`, { responderA: mensajeId });
     }
+    if (accion === "ia" || accion === "ia_otra") return generarConIA(fila, { responder, mensajeId });
+    if (accion === "ia_usar") return usarImagenIA(fila, responder, mensajeId);
+    if (accion === "ia_cambiar") return responder("✏️ Respondé a la pieza (o a la imagen) con /ia y lo que querés ver. Por ejemplo: /ia fondo negro con una sombra suave y mucho espacio vacío.");
     if (accion === "cancelar") return cancelar(fila, responder, mensajeId);
     if (accion === "publicar_ahora") return publicarAhora(fila, responder, mensajeId);
     return responder("No entendí ese botón.");
@@ -214,6 +221,11 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, ahor
       await repo.guardarEstado("pausa", false);
       return responder("▶️ Reanudado. Lo que esté confirmado para hoy se publica a su hora.");
     }
+    if (nombre === "/ia") {
+      const fila = msg.reply_to_message ? await repo.piezaPorMensaje(msg.reply_to_message.message_id) : null;
+      if (!fila) return responder("Respondé al mensaje de una pieza con /ia y lo que querés ver. Por ejemplo: /ia una mesa de madera con luz de ventana.");
+      return generarConIA(fila, { descripcion: texto.replace(/^\/ia(@\w+)?\s*/i, ""), responder: (t, o) => decir(t, { responderA: msg.message_id, ...o }), mensajeId: msg.message_id });
+    }
     if (nombre === "/hoy") {
       const cantidad = await enviarResumenDiario(ahora().fecha);
       return cantidad === 0 ? responder("Hoy no tenés nada pendiente de confirmar.") : { enviadas: cantidad };
@@ -230,12 +242,25 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, ahor
         ].join("\n"),
       );
     }
-    return responder("Comandos: /hoy (reenvía lo de hoy), /estado, /pausar y /reanudar. Respondé a una pieza para cambiarla, mandame el archivo respondiendo a su recordatorio, o escribime sin responder para dejar una novedad de VOW.");
+    return responder("Comandos: /hoy (reenvía lo de hoy), /estado, /pausar y /reanudar; respondiendo a una pieza de tipo imagen, /ia genera la imagen con IA. Respondé a una pieza para cambiarla, mandame el archivo respondiendo a su recordatorio, o escribime sin responder para dejar una novedad de VOW.");
   }
 
   async function novedad(msg, texto) {
     await repo.agregarNovedad(texto);
     return decir("📝 Anotado. Se lo paso al Estratega en el próximo plan del lunes. Si querías cambiar una pieza, respondé a su mensaje.", { responderA: msg.message_id });
+  }
+
+  // Guarda un archivo como material de la pieza. Si cambió el material, lo que estaba confirmado ya no vale.
+  async function guardarMaterial(fila, requerido, archivo, datos) {
+    if (requerido.maximo === 1) await repo.borrarMedios(fila.id);
+    else if ((await repo.mediosDePieza(fila.id)).length >= requerido.maximo) return { error: `Ya hay ${requerido.maximo} fotos: es el máximo de Instagram.` };
+    await repo.agregarMedio({ piezaId: fila.id, tipo: archivo.tipo, mime: archivo.mime, datos });
+    let nota = "";
+    if (["confirmada", "preparada"].includes(fila.estado)) {
+      await repo.actualizarPieza(fila.id, { estado: "aprobada", confirmada_el: null, contenedor: null });
+      nota = " Como cambió el archivo, tenés que volver a confirmar la publicación.";
+    }
+    return { nota };
   }
 
   async function recibirArchivo(msg) {
@@ -267,18 +292,68 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, ahor
     } catch (error) {
       return responder(`No pude bajar el archivo: ${error.message} Mandalo como video (no como archivo) o comprimilo.`);
     }
-    if (requerido.maximo === 1) await repo.borrarMedios(fila.id);
-    else if ((await repo.mediosDePieza(fila.id)).length >= requerido.maximo) return responder(`Ya hay ${requerido.maximo} fotos: es el máximo de Instagram.`);
-    await repo.agregarMedio({ piezaId: fila.id, tipo: archivo.tipo, mime: archivo.mime, datos });
-
-    // Cambió el material: lo que estaba confirmado ya no vale
-    let nota = "";
-    if (["confirmada", "preparada"].includes(fila.estado)) {
-      await repo.actualizarPieza(fila.id, { estado: "aprobada", confirmada_el: null, contenedor: null });
-      nota = " Como cambió el archivo, tenés que volver a confirmar la publicación.";
-    }
+    const guardado = await guardarMaterial(fila, requerido, archivo, datos);
+    if (guardado.error) return responder(guardado.error);
+    const nota = guardado.nota;
     const falta = faltaArchivo(fila, await repo.mediosDePieza(fila.id));
     return responder(`📎 Recibido para la pieza del ${fechaLegible(fila.fecha)}. ${falta ?? "Ya tiene todo el material."}${nota}`);
+  }
+
+  // ───────────────────────── Imágenes con IA ─────────────────────────
+  const descripcionPorDefecto = (fila) => `${fila.pieza.guion ?? ""} ${fila.pieza.gancho ?? ""}`.trim().slice(0, 700);
+
+  async function generarConIA(fila, { descripcion = "", responder, mensajeId }) {
+    const { fecha: hoy } = ahora();
+    if (!generadorImagen) return responder("La generación de imágenes con IA no está configurada (falta GEMINI_API_KEY en el servicio).");
+    if (fila.pieza.formato !== "imagen") return responder(`Por ahora genero con IA solo las piezas de tipo imagen. Esta es un ${fila.pieza.formato}: mandame los archivos vos.`);
+    if (!VIVAS.includes(fila.estado)) return responder(`Esa pieza está ${ESTADOS_LEGIBLES[fila.estado]}: ya no puedo cambiarle la imagen.`);
+
+    const previo = (await repo.leerEstado(`ia:${fila.id}`)) ?? {};
+    const intentos = previo.intentos ?? 0;
+    if (intentos >= INTENTOS_IA_POR_PIEZA) return responder(`Ya hice ${INTENTOS_IA_POR_PIEZA} imágenes para esta pieza. Mandame la foto vos, respondiendo al mensaje de la pieza.`);
+    const clave = `ia-dia:${hoy}`;
+    const hechas = Number(await repo.leerEstado(clave)) || 0;
+    if (hechas >= IMAGENES_IA_MAXIMAS_POR_DIA) return responder(`Llegué al máximo de ${IMAGENES_IA_MAXIMAS_POR_DIA} imágenes con IA por día (es un freno por el cupo gratis). Mañana seguimos, o mandame la foto vos.`);
+
+    const texto = descripcion.trim() || previo.descripcion || descripcionPorDefecto(fila);
+    await responder("🎨 Generando la imagen… puede tardar un minuto.");
+    let imagen;
+    try {
+      imagen = await generadorImagen.generar({ descripcion: texto });
+    } catch (error) {
+      return responder(`❌ No pude generar la imagen: ${error.message}`);
+    }
+    await repo.guardarEstado(clave, hechas + 1);
+    // Los botones de la imagen anterior ya no sirven: se sacan para que no se pueda usar una vieja por error
+    if (previo.mensajeFoto) await telegram.quitarBotones(previo.mensajeFoto);
+
+    const { id, fileId } = await telegram.enviarFoto(imagen, {
+      texto: `🎨 Imagen con IA (${intentos + 1} de ${INTENTOS_IA_POR_PIEZA}) para la pieza del ${fechaLegible(fila.fecha)}. El logo lo puse yo; la IA no dibuja textos.\n¿Te sirve?`,
+      botones: botonesImagenIA(fila.id),
+      responderA: mensajeId,
+    });
+    await repo.agregarMensaje(fila.id, id);
+    await repo.guardarEstado(`ia:${fila.id}`, { intentos: intentos + 1, descripcion: texto, fileId, mensajeFoto: id });
+  }
+
+  async function usarImagenIA(fila, responder, mensajeId) {
+    const requerido = MEDIOS_REQUERIDOS[fila.pieza.formato];
+    if (!requerido) return responder("Esta pieza no lleva imagen.");
+    if (!VIVAS.includes(fila.estado)) return responder(`Esa pieza está ${ESTADOS_LEGIBLES[fila.estado]}: ya no puedo cambiarle la imagen.`);
+    const estado = await repo.leerEstado(`ia:${fila.id}`);
+    if (!estado?.fileId) return responder("No tengo una imagen para usar. Generala de nuevo con el botón 🎨.");
+    if (estado.mensajeFoto !== mensajeId) return responder("Esa imagen ya no es la última. Usá los botones de la más nueva.");
+    let datos;
+    try {
+      datos = await telegram.descargarArchivo(estado.fileId);
+    } catch (error) {
+      return responder(`No pude recuperar la imagen: ${error.message} Generala de nuevo.`);
+    }
+    const guardado = await guardarMaterial(fila, requerido, { tipo: "imagen", mime: "image/jpeg" }, datos);
+    if (guardado.error) return responder(guardado.error);
+    await telegram.quitarBotones(mensajeId);
+    const falta = faltaArchivo(fila, await repo.mediosDePieza(fila.id));
+    return responder(`✅ Listo, usé esa imagen para la pieza del ${fechaLegible(fila.fecha)}. ${falta ?? "Ya tiene todo el material."}${guardado.nota}`);
   }
 
   async function editar(msg, instruccion) {
@@ -316,7 +391,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, ahor
       if (diaAviso > hoy) await repo.crearRecordatorio({ piezaId: fila.id, fecha: diaAviso });
       else if (diaAviso < hoy) aviso = "\n⚠️ Con esta fecha te quedan menos de 3 días para filmar.";
     }
-    return decirDePieza(nueva, `${resultado.queCambio ? `✏️ ${resultado.queCambio}\n\n` : ""}${textoPieza(nueva)}${aviso}`, { botones: botonesPlan(fila.id), responderA: msg.message_id });
+    return decirDePieza(nueva, `${resultado.queCambio ? `✏️ ${resultado.queCambio}\n\n` : ""}${textoPieza(nueva)}${aviso}`, { botones: botonesPlan(fila.id, { conIA: conIA(nueva) }), responderA: msg.message_id });
   }
 
   async function manejarActualizacion(actualizacion) {
@@ -343,7 +418,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, ahor
     const pendientes = (await repo.piezasDelDia(hoy)).filter((f) => ["propuesta", "aprobada"].includes(f.estado));
     for (const fila of pendientes) {
       const falta = faltaArchivo(fila, await repo.mediosDePieza(fila.id));
-      await decirDePieza(fila, textoResumenDiario(fila, { faltaArchivo: falta }), { botones: botonesDia(fila.id, fila.hora) });
+      await decirDePieza(fila, textoResumenDiario(fila, { faltaArchivo: falta }), { botones: botonesDia(fila.id, fila.hora, { conIA: conIA(fila) }) });
     }
     return pendientes.length;
   }
@@ -387,7 +462,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, ahor
         return "reintento";
       }
       await repo.actualizarPieza(fila.id, { estado: "aprobada", confirmada_el: null, intentos, error: error.message });
-      await avisar(fila, `❌ No pude preparar la publicación de las ${fila.hora}: ${error.message}\nNo se publicó nada. Cuando lo arregles, confirmala de nuevo.`, { botones: botonesDia(fila.id, fila.hora) });
+      await avisar(fila, `❌ No pude preparar la publicación de las ${fila.hora}: ${error.message}\nNo se publicó nada. Cuando lo arregles, confirmala de nuevo.`, { botones: botonesDia(fila.id, fila.hora, { conIA: conIA(fila) }) });
       return "no-preparada";
     }
   }
@@ -415,7 +490,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, ahor
     }
     if (estado !== "FINISHED") {
       await repo.actualizarPieza(fila.id, { estado: "aprobada", confirmada_el: null, contenedor: null, error: `Meta no pudo procesar el archivo (estado ${estado}).` });
-      await avisar(fila, `❌ Meta no pudo procesar el archivo de las ${fila.hora} (estado ${estado}). No se publicó nada. Mandame el archivo de nuevo y confirmala otra vez.`, { botones: botonesDia(fila.id, fila.hora) });
+      await avisar(fila, `❌ Meta no pudo procesar el archivo de las ${fila.hora} (estado ${estado}). No se publicó nada. Mandame el archivo de nuevo y confirmala otra vez.`, { botones: botonesDia(fila.id, fila.hora, { conIA: conIA(fila) }) });
       return "contenedor-con-error";
     }
 
@@ -463,7 +538,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, ahor
         await decirDePieza(
           fila,
           `⏳ Faltan 2 horas para las ${fila.hora} hs y esta pieza sigue sin confirmar.\n\n${textoPieza(fila)}\n\n${falta ? `⚠️ ${falta}\n\n` : ""}¿Querés cambiar algo antes de confirmarla? Respondé a este mensaje con el cambio, o tocá Confirmar. Si no respondés, no se publica nada.`,
-          { botones: botonesDia(fila.id, fila.hora) },
+          { botones: botonesDia(fila.id, fila.hora, { conIA: conIA(fila) }) },
         ).catch((error) => console.error(`No se pudo avisar por Telegram: ${error.message}`));
         return "aviso-2h";
       }
