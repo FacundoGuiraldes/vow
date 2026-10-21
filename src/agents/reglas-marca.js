@@ -29,7 +29,7 @@ const REGLAS = [
     patron: /(?<!\p{L})(barras?|mancuernas?|pesas|kettlebells?|fierros?|hierros?|discos? de peso)(?!\p{L})/iu,
   },
   // La promesa es de uno consigo mismo, no un papel (corregido por Facundo)
-  { regla: "promesa en papel", patron: /a mano|lapicera|birome|l[aá]piz|cartulina/i },
+  { regla: "promesa en papel", patron: /\ba mano\b|lapicera|birome|l[aá]piz|cartulina/i },
   // Cadenas de signos de exclamación
   { regla: "exceso de exclamaciones", patron: /!{2,}/ },
   // "Drop" suelto: solo se acepta "Drop 01"
@@ -69,7 +69,7 @@ export function revisarReglas(texto) {
   return problemas;
 }
 
-const NUMERACION_DE_PARTES = /(?<!\p{L})(l[aá]minas?|slides?|stor(?:y|ies)|paso|pasos|escenas?|planos?|tomas?|pantallas?|frames?|p[aá]ginas?)\s+\d+(?:\s*(?:y|a|-|–)\s*\d+)?/giu;
+const NUMERACION_DE_PARTES = /(?<!\p{L})(l[aá]minas?|slides?|stor(?:y|ies)|paso|pasos|escenas?|planos?|tomas?|cuadros?|pantallas?|frames?|p[aá]ginas?)\s+\d+(?:\s*(?:y|a|-|–)\s*\d+)?/giu;
 
 // Marcadores de lista de un guion: "1) Aparece el gancho. 2) Entra la frase" o "1. Primero" al empezar una línea
 const MARCADORES_DE_LISTA = /(?<![\p{L}\p{N}.,])\d+\)(?=\s)|^[ \t]*\d+\.(?=\s)/gmu;

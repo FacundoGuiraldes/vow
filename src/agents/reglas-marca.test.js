@@ -73,6 +73,10 @@ test("la promesa no se escribe a mano ni en papel", () => {
   assert.deepEqual(reglasDe("Escribila a mano con lapicera"), ["promesa en papel"]);
   assert.deepEqual(reglasDe("Una cartulina beige"), ["promesa en papel"]);
   assert.deepEqual(revisarReglas("Escribí tu promesa. Después cumplila."), []);
+  // "a mano" como palabra suelta: "una mano" o "la mano" son gestos, no escritura (falso positivo del 21/10)
+  assert.deepEqual(revisarReglas("Una mano cierra la puerta."), []);
+  assert.deepEqual(revisarReglas("Primer plano de la mano atando los cordones."), []);
+  assert.deepEqual(revisarReglas("Llegó a manos de quien entrena."), []);
 });
 
 test("lo que ve el público no explica la marca por dentro", () => {
@@ -93,6 +97,7 @@ test("el guion puede nombrar algo para descartarlo, pero no para pedirlo", () =>
 
 test("numerar las láminas o escenas no cuenta como una cifra, pero una cifra suelta sí", () => {
   assert.deepEqual(cifrasNoPermitidas("Lámina 1: el gancho. Lámina 2: la frase. Story 3 y 4. Paso 5."), []);
+  assert.deepEqual(cifrasNoPermitidas("Cuadro 1: las manos. Cuadro 2: fondo hueso. Cuadros 3 y 4: cierre."), []);
   assert.deepEqual(cifrasNoPermitidas("Lámina 2: probamos 5 straps"), ["5"]);
   assert.deepEqual(cifrasNoPermitidas("Slide 1 a 3 con Drop 01"), []);
 });
