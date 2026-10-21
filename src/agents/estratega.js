@@ -18,6 +18,11 @@ export const PALABRAS_MAXIMAS_GANCHO = 12; // un gancho fuerte es corto
 export const ALTERNATIVAS_PEDIDAS = 4;
 const ALTERNATIVAS_MINIMAS = 3;
 export const PIEZAS_POR_DEFECTO = 2; // sin producto, mejor pocas y buenas que rellenar
+// Rango de horas de publicación: el mensaje de confirmación sale a las 8, así que nunca se publica antes de las 9
+export const HORA_MINIMA_PUBLICACION = "09:00";
+export const HORA_MAXIMA_PUBLICACION = "23:00";
+export const esHoraDePublicacion = (valor) =>
+  typeof valor === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(valor) && valor >= HORA_MINIMA_PUBLICACION && valor <= HORA_MAXIMA_PUBLICACION;
 // Ganchos que suenan a tutorial o a lista de consejos (descartado por Facundo)
 const TONO_TUTORIAL = /^\s*(c[oó]mo|tips?\b|consejos?\b|pasos?\b|gu[ií]a\b|\d+\s+(cosas|tips|pasos|razones|formas|ideas))/i;
 const RUTA_CEREBRO = new URL("../../docs/marca/cerebro-de-marca.md", import.meta.url);
@@ -43,9 +48,13 @@ export const HERRAMIENTA_PLAN = {
         maxItems: MAXIMO_PIEZAS,
         items: {
           type: "object",
-          required: ["fecha", "formato", "pilar", "gancho", "ganchos_alternativos", "guion", "texto_en_pantalla", "epigrafe", "palabras_clave", "cta", "recursos", "justificacion"],
+          required: ["fecha", "hora", "formato", "pilar", "gancho", "ganchos_alternativos", "guion", "texto_en_pantalla", "epigrafe", "palabras_clave", "cta", "recursos", "material_a_producir", "justificacion"],
           properties: {
             fecha: { type: "string", description: "AAAA-MM-DD, dentro de la semana pedida." },
+            hora: {
+              type: "string",
+              description: `HH:MM, hora de Argentina a la que se publica ese día, entre ${HORA_MINIMA_PUBLICACION} y ${HORA_MAXIMA_PUBLICACION}. Elegila con los datos de rendimiento si los hay; si no, una hora de buena actividad (por ejemplo 19:00).`,
+            },
             formato: { type: "string", enum: FORMATOS },
             pilar: { type: "string", enum: PILARES },
             gancho: { type: "string", description: "Lo que se dice o se lee en los primeros 3 segundos." },
@@ -60,6 +69,11 @@ export const HERRAMIENTA_PLAN = {
             palabras_clave: { type: "array", items: { type: "string" } },
             cta: { type: "string", description: "Una sola acción: anotarse en la lista de espera." },
             recursos: { type: "array", items: { type: "string" }, description: "Qué hace falta tener para hacerla." },
+            material_a_producir: {
+              type: "array",
+              items: { type: "string" },
+              description: "Lo que Facundo tiene que filmar o fotografiar él mismo para esta pieza, una toma concreta por ítem. Lista vacía si la pieza sale de material que ya existe o de código.",
+            },
             justificacion: { type: "string", description: "Por qué esta pieza, con apoyo en la marca o en las referencias." },
             referencias: { type: "array", items: { type: "string" }, description: "Cuentas de referencia que inspiran la pieza, si aplica." },
           },
@@ -170,6 +184,19 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
     if (pieza.formato === "story" && pieza.epigrafe !== undefined && typeof pieza.epigrafe !== "string") errores.push(`${etiqueta}: el epígrafe no es texto.`);
     for (const campo of ["texto_en_pantalla", "palabras_clave", "recursos"]) {
       if (!Array.isArray(pieza[campo])) falta(campo);
+    }
+    // Hora y material a producir son opcionales para los planes viejos, pero si vienen tienen que ser válidos
+    if (pieza.hora !== undefined && !esHoraDePublicacion(pieza.hora)) {
+      errores.push(`${etiqueta}: la hora ${JSON.stringify(pieza.hora)} no es HH:MM entre ${HORA_MINIMA_PUBLICACION} y ${HORA_MAXIMA_PUBLICACION}.`);
+    }
+    if (pieza.material_a_producir !== undefined) {
+      if (!Array.isArray(pieza.material_a_producir) || pieza.material_a_producir.some((m) => typeof m !== "string" || m.trim() === "")) {
+        errores.push(`${etiqueta}: material_a_producir tiene que ser una lista de textos.`);
+      } else {
+        for (const item of pieza.material_a_producir) {
+          for (const { regla, fragmento } of revisarReglas(item)) errores.push(`${etiqueta}: ${regla} en el material a producir ("${fragmento}").`);
+        }
+      }
     }
     if (typeof pieza.gancho === "string" && pieza.gancho.trim() !== "") errores.push(...revisarGancho(pieza.gancho, `${etiqueta}: el gancho`, { reglas: false }));
     // Ganchos alternativos: tienen que ser nuevos, distintos entre sí y cumplir las mismas reglas
@@ -282,6 +309,9 @@ Reglas:
 - Hablás en voseo rioplatense. Cada pieza termina con una sola acción: anotarse en la lista de espera.
 - Nunca inventes cifras, pruebas, stock, fechas ni opiniones. No uses números en los textos salvo "01" de "Drop 01" y "2027", el año del lanzamiento.
 - Solo podés proponer piezas que se puedan hacer con los recursos disponibles que te indican. Si no hay producto, no propongas mostrar producto.
+- Cada pieza lleva su hora de publicación (hora de Argentina, entre ${HORA_MINIMA_PUBLICACION} y ${HORA_MAXIMA_PUBLICACION}). Si hay un RENDIMIENTO de @vow_ar, elegí la hora con esos datos; si no, una hora de buena actividad como 19:00. Nunca inventes que una hora "rinde mejor" sin datos.
+- En material_a_producir listá, una toma por ítem, lo que Facundo tiene que filmar o fotografiar él mismo. Si la pieza sale de material que ya existe o se genera con código, dejá la lista vacía. Facundo recibe el plan el lunes y se le recuerda 3 días antes de publicar: ubicá las piezas que necesitan filmación de jueves en adelante.
+- Las piezas se publican solas por la API de Instagram, que no permite agregar música de la biblioteca de Instagram: no la pidas en los recursos. Si una pieza lleva sonido, tiene que venir en el propio archivo (por ejemplo, el sonido ambiente real).
 - Las referencias son inspiración, no datos para citar. No copies sus textos ni sus ideas al pie de la letra.
 - Los ganchos tienen que ser potentes y sobrios, como pide la sección 8 del cerebro de marca: afirmaciones cortas de 3 a 8 palabras, en imperativo, que comprometen. Nunca tono de tutorial, de consejo ni de lo que falta.
 - Los ganchos de la sección 8 son ejemplos de estilo. A lo sumo UNO de los ganchos principales del plan puede ser uno de los aprobados; todos los demás tienen que ser creados por vos. Los ganchos alternativos son siempre nuevos: ni copias ni paráfrasis de los ejemplos.

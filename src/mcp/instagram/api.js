@@ -76,7 +76,8 @@ export function crearClienteMeta({ token, idCuenta, fetchFn = fetch } = {}) {
 
     publicar: async (idContenedor) => {
       const { id } = await pedir("POST", `${idCuenta}/media_publish`, { creation_id: idContenedor });
-      const { permalink = null } = await pedir("GET", id, { fields: "permalink" });
+      // Ya se publicó: si falla la consulta del link, no puede contarse como un error de publicación
+      const { permalink = null } = (await pedir("GET", id, { fields: "permalink" }).catch(() => null)) ?? {};
       return { id, permalink };
     },
 

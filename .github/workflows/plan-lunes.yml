@@ -1,0 +1,102 @@
+name: Plan del lunes
+
+# Todos los lunes a las 8:00 (hora de Argentina) corre los agentes y manda el plan de la semana al Telegram de Facundo.
+# Ahí Facundo lo aprueba o responde con cambios. No publica nada: la publicación es solo de lo que Facundo confirma cada día.
+# Usa la API de Anthropic (gasta plata, unos centavos de dólar por plan). También se puede lanzar a mano.
+#
+# GitHub programa en UTC y no conoce el horario de verano: Argentina es UTC-3 todo el año, así que 8:00 son las 11:00 UTC.
+# Los horarios programados de GitHub pueden atrasarse unos minutos.
+
+on:
+  schedule:
+    - cron: "0 11 * * 1"
+  workflow_dispatch:
+    inputs:
+      semana:
+        description: "Lunes de la semana a planificar (AAAA-MM-DD). Vacío: el lunes de hoy o el próximo."
+        required: false
+        type: string
+        default: ""
+      piezas:
+        description: "Cantidad de piezas de la semana"
+        required: true
+        type: choice
+        default: "2"
+        options:
+          - "1"
+          - "2"
+          - "3"
+      producto:
+        description: "Ya hay producto físico para mostrar"
+        required: true
+        type: boolean
+        default: false
+      gente:
+        description: "Hay personas que entrenan confirmadas para aparecer"
+        required: true
+        type: boolean
+        default: false
+      notas:
+        description: "Notas para el Estratega (opcional)"
+        required: false
+        type: string
+        default: ""
+
+concurrency:
+  group: plan-lunes
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    # Las claves solo se usan desde main
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      INSTAGRAM_TOKEN: ${{ secrets.INSTAGRAM_TOKEN }}
+      INSTAGRAM_USER_ID: ${{ secrets.INSTAGRAM_USER_ID }}
+      URL_PUBLICA: ${{ secrets.URL_PUBLICA }}
+      PROGRAMACION_SECRETO: ${{ secrets.PROGRAMACION_SECRETO }}
+      # Lo que escribe una persona pasa por variables de entorno, no dentro del script
+      SEMANA: ${{ inputs.semana }}
+      PIEZAS: ${{ inputs.piezas || '2' }}
+      PRODUCTO: ${{ inputs.producto || 'false' }}
+      GENTE: ${{ inputs.gente || 'false' }}
+      NOTAS: ${{ inputs.notas }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Secretos configurados
+        run: |
+          for nombre in ANTHROPIC_API_KEY URL_PUBLICA PROGRAMACION_SECRETO; do
+            if [ -z "${!nombre}" ]; then
+              echo "::error title=Falta $nombre::Cargalo en Settings > Secrets and variables > Actions."
+              exit 1
+            fi
+          done
+
+      # Los datos de la cuenta propia mejoran el plan, pero si Instagram no responde el plan sale igual
+      - name: Medir el rendimiento de @vow_ar
+        if: env.INSTAGRAM_TOKEN != '' && env.INSTAGRAM_USER_ID != ''
+        continue-on-error: true
+        run: npm run rendimiento
+
+      - name: Planificar y enviar a Telegram
+        run: |
+          args=(--piezas "$PIEZAS")
+          if [ -n "$SEMANA" ]; then args+=(--semana "$SEMANA"); fi
+          if [ "$PRODUCTO" = "true" ]; then args+=(--producto); fi
+          if [ "$GENTE" = "true" ]; then args+=(--gente); fi
+          if [ -n "$NOTAS" ]; then args+=(--notas "$NOTAS"); fi
+          npm run plan:lunes -- "${args[@]}"

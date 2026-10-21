@@ -1,0 +1,55 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { HERRAMIENTA_PLAN, esHoraDePublicacion, validarPlan, construirSistema } from "./estratega.js";
+import { crearPieza, crearPlan } from "../programacion/ayuda-pruebas.js";
+
+const validar = (pieza) => validarPlan(crearPlan([pieza]), { semanaInicio: "2026-10-26", recursos: { gente: true }, piezas: 1 });
+
+test("una pieza con hora y material a producir válidos pasa", () => {
+  const { ok, errores } = validar(crearPieza());
+  assert.equal(ok, true, errores.join("; "));
+});
+
+test("los planes viejos, sin hora ni material a producir, siguen siendo válidos", () => {
+  const { hora, material_a_producir: material, ...vieja } = crearPieza();
+  void hora;
+  void material;
+  assert.equal(validar(vieja).ok, true);
+});
+
+test("rechaza horas con mal formato o fuera de 09:00–23:00", () => {
+  for (const hora of ["08:59", "23:01", "25:00", "7:30", "19h", 1900, null]) {
+    const { ok, errores } = validar(crearPieza({ hora }));
+    assert.equal(ok, false, `la hora ${JSON.stringify(hora)} no debería pasar`);
+    assert.match(errores.join(" "), /hora/);
+  }
+  for (const hora of ["09:00", "12:30", "23:00"]) assert.equal(validar(crearPieza({ hora })).ok, true);
+});
+
+test("el material a producir tiene que ser una lista de textos que cumpla las reglas de marca", () => {
+  assert.match(validar(crearPieza({ material_a_producir: "filmar pies" })).errores.join(" "), /material_a_producir/);
+  assert.match(validar(crearPieza({ material_a_producir: ["", "otro"] })).errores.join(" "), /material_a_producir/);
+  assert.equal(validar(crearPieza({ material_a_producir: [] })).ok, true);
+});
+
+test("la herramienta del plan le pide a la IA la hora y el material a producir", () => {
+  const item = HERRAMIENTA_PLAN.input_schema.properties.piezas.items;
+  assert.ok(item.required.includes("hora"));
+  assert.ok(item.required.includes("material_a_producir"));
+  assert.match(item.properties.hora.description, /09:00/);
+  assert.equal(item.properties.material_a_producir.type, "array");
+});
+
+test("esHoraDePublicacion", () => {
+  assert.ok(esHoraDePublicacion("19:00"));
+  assert.ok(!esHoraDePublicacion("08:00"));
+  assert.ok(!esHoraDePublicacion(undefined));
+});
+
+test("las instrucciones del Estratega piden hora, material a producir y filmar de jueves en adelante", async () => {
+  const { texto } = await construirSistema();
+  assert.match(texto, /hora de publicación/);
+  assert.match(texto, /material_a_producir/);
+  assert.match(texto, /de jueves en adelante/);
+  assert.match(texto, /música de la biblioteca de Instagram/);
+});
