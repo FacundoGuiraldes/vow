@@ -9,3 +9,4 @@ docs/investigacion/informe-*-simulado.*
 docs/ejecuciones/*-simulado.json
 evals/resultados/
 docs/gasto/
+docs/rendimiento/*-simulado.*

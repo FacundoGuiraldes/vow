@@ -23,6 +23,7 @@ const TONO_TUTORIAL = /^\s*(c[oó]mo|tips?\b|consejos?\b|pasos?\b|gu[ií]a\b|\d+
 const RUTA_CEREBRO = new URL("../../docs/marca/cerebro-de-marca.md", import.meta.url);
 const RUTA_REFERENCIAS = new URL("../../docs/marca/referencias.md", import.meta.url);
 const RUTA_INVESTIGACION = new URL("../../docs/investigacion/", import.meta.url);
+const RUTA_RENDIMIENTO = new URL("../../docs/rendimiento/", import.meta.url);
 
 // El formato de salida se le pide a la IA con una "herramienta" cuyo esquema es este.
 // Así la respuesta llega como datos y no como texto libre que haya que interpretar.
@@ -226,24 +227,31 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
   return { ok: errores.length === 0, errores };
 }
 
-// Último informe del Investigador (docs/investigacion/informe-AAAA-MM-DD.md), si hay uno.
-// Si no hay, o no se puede leer, el Estratega trabaja solo con la marca y las referencias.
-export async function leerUltimoInforme({ leer = (ruta) => readFile(ruta, "utf8"), listar = (carpeta) => readdir(carpeta) } = {}) {
+// Último archivo de una carpeta cuyo nombre cumple `patron` (los nombres llevan la fecha, así que el último ordenado es el más nuevo).
+// Si no hay, o no se puede leer, devuelve null y el Estratega trabaja sin eso.
+async function leerUltimo(carpeta, patron, { leer = (ruta) => readFile(ruta, "utf8"), listar = (c) => readdir(c) } = {}) {
   try {
-    const nombres = (await listar(RUTA_INVESTIGACION)).filter((n) => /^informe-\d{4}-\d{2}-\d{2}\.md$/.test(n)).sort();
+    const nombres = (await listar(carpeta)).filter((n) => patron.test(n)).sort();
     if (nombres.length === 0) return null;
     const nombre = nombres.at(-1);
-    return { nombre, texto: await leer(new URL(nombre, RUTA_INVESTIGACION)) };
+    return { nombre, texto: await leer(new URL(nombre, carpeta)) };
   } catch {
     return null;
   }
 }
 
+// Último informe del Investigador (docs/investigacion/informe-AAAA-MM-DD.md), si hay uno.
+export const leerUltimoInforme = (opciones) => leerUltimo(RUTA_INVESTIGACION, /^informe-\d{4}-\d{2}-\d{2}\.md$/, opciones);
+
+// Último informe de rendimiento de la cuenta propia (docs/rendimiento/rendimiento-AAAA-MM-DD.md), si hay uno.
+export const leerUltimoRendimiento = (opciones) => leerUltimo(RUTA_RENDIMIENTO, /^rendimiento-\d{4}-\d{2}-\d{2}\.md$/, opciones);
+
 export async function construirSistema(leer = (ruta) => readFile(ruta, "utf8"), { listar } = {}) {
-  const [cerebro, referencias, informe, piezas] = await Promise.all([
+  const [cerebro, referencias, informe, rendimiento, piezas] = await Promise.all([
     leer(RUTA_CEREBRO),
     leer(RUTA_REFERENCIAS),
     leerUltimoInforme({ leer, listar }),
+    leerUltimoRendimiento({ leer, listar }),
     leerPiezasDefinidas({ leer, listar }),
   ]);
   const bloqueInvestigacion = informe
@@ -251,6 +259,12 @@ export async function construirSistema(leer = (ruta) => readFile(ruta, "utf8"), 
 
 === INVESTIGACIÓN DE MERCADO (${informe.nombre}) ===
 ${informe.texto}`
+    : "";
+  const bloqueRendimiento = rendimiento
+    ? `
+
+=== RENDIMIENTO DE @vow_ar (${rendimiento.nombre}) ===
+${rendimiento.texto}`
     : "";
   const bloquePiezas = piezas.length
     ? `
@@ -275,12 +289,13 @@ Reglas:
 - En "justificacion" explicá por qué la pieza encaja con la marca o con una referencia.
 - Si abajo hay PIEZAS YA DEFINIDAS, son piezas ya decididas: no repitas su idea, no uses su formato y pilar en fechas cercanas (una semana) y no reutilices sus frases. Las piezas que se piden se suman a las definidas.
 - Si abajo hay una INVESTIGACIÓN DE MERCADO, apoyate en ella: elegí formatos y estilos que los datos respaldan y evitá los que contradicen. Cuando una pieza se apoye en un hallazgo, nombralo por su título en "justificacion". La investigación es una guía con muestra chica, no una verdad: nunca gana sobre el cerebro de marca, no copies piezas ni textos de las marcas estudiadas y no uses sus cifras en los textos de la pieza.
+- Si abajo hay un RENDIMIENTO DE @vow_ar, son los resultados reales de la cuenta propia. Cuando un tipo tiene muestra suficiente, pesa más que las referencias; con muestra chica es una señal, no una conclusión. Repetí lo que guardaron, compartieron o comentaron, y cambiá lo que no generó interacción. Cuando una pieza se apoye en una publicación propia, nombrala por su fecha y tipo en "justificacion". No uses sus cifras en los textos de la pieza.
 
 === CEREBRO DE MARCA ===
 ${cerebro}
 
 === MARCAS DE REFERENCIA ===
-${referencias}${bloqueInvestigacion}${bloquePiezas}` };
+${referencias}${bloqueInvestigacion}${bloqueRendimiento}${bloquePiezas}` };
 }
 
 // Pide el plan de una semana. `cliente` se inyecta para poder probar sin gastar plata.

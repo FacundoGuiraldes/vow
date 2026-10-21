@@ -29,6 +29,7 @@
     "investigar": "node src/investigar-datos.js",
     "analizar": "node src/investigar-analisis.js",
     "gasto": "node src/gasto.js",
+    "rendimiento": "node src/rendimiento.js",
     "mcp:instagram": "node src/mcp/instagram/servidor.js"
   },
   "repository": {
