@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { planificarSemana, validarPlan, MAX_TOKENS_ESTRATEGA, construirSistema, leerUltimoInforme, extraerGanchosConocidos, HERRAMIENTA_PLAN, PALABRAS_MAXIMAS_GANCHO } from "./estratega.js";
+import { planificarSemana, validarPlan, MAX_TOKENS_ESTRATEGA, construirSistema, leerUltimoInforme, leerUltimoRendimiento, extraerGanchosConocidos, HERRAMIENTA_PLAN, PALABRAS_MAXIMAS_GANCHO } from "./estratega.js";
 import { revisarReglas } from "./reglas-marca.js";
 
 const SEMANA = "2026-10-19";
@@ -360,6 +360,31 @@ test("sin informe (o si no se puede leer), el Estratega trabaja como antes", asy
   assert.ok(!roto.texto.includes("=== INVESTIGACIÓN DE MERCADO"));
   const sinCarpeta = await leerUltimoInforme({ listar: async () => { throw new Error("ENOENT"); } });
   assert.equal(sinCarpeta, null);
+});
+
+test("si hay un informe de rendimiento propio, el Estratega lee el último de su carpeta y lo usa con cuidado", async () => {
+  const listar = async (carpeta) =>
+    String(carpeta).includes("rendimiento") ? ["rendimiento-2026-10-14.md", "rendimiento-2026-10-21.md", "rendimiento-2026-10-22-simulado.md", "rendimiento-2026-10-21.json"] : [];
+  const leidos = [];
+  const leer = async (ruta) => {
+    leidos.push(String(ruta));
+    return String(ruta).includes("rendimiento-") ? "RESULTADOS-PROPIOS" : "CONTENIDO";
+  };
+  const { texto } = await construirSistema(leer, { listar });
+  assert.match(texto, /=== RENDIMIENTO DE @vow_ar \(rendimiento-2026-10-21\.md\) ===\nRESULTADOS-PROPIOS/);
+  assert.ok(leidos.some((r) => r.endsWith("docs/rendimiento/rendimiento-2026-10-21.md")), "lee el más reciente de docs/rendimiento");
+  assert.ok(!leidos.some((r) => r.includes("simulado") || r.includes("2026-10-14")), "ignora el simulado y los viejos");
+  assert.ok(!texto.includes("=== INVESTIGACIÓN DE MERCADO"), "un informe de rendimiento no se confunde con uno de investigación");
+  assert.match(texto, /con muestra chica es una señal, no una conclusión/);
+  assert.match(texto, /No uses sus cifras en los textos de la pieza/);
+});
+
+test("sin informe de rendimiento (o si no se puede leer), el Estratega no agrega el bloque", async () => {
+  const sinNada = await construirSistema(leerFalso, { listar: async () => [] });
+  assert.ok(!sinNada.texto.includes("=== RENDIMIENTO DE @vow_ar"));
+  const roto = await construirSistema(async (ruta) => { if (String(ruta).includes("rendimiento-")) throw new Error("no se puede leer"); return "CONTENIDO"; }, { listar: async () => ["rendimiento-2026-10-21.md"] });
+  assert.ok(!roto.texto.includes("=== RENDIMIENTO DE @vow_ar"));
+  assert.equal(await leerUltimoRendimiento({ listar: async () => { throw new Error("ENOENT"); } }), null);
 });
 
 test("el informe real del repo llega al Estratega", async () => {

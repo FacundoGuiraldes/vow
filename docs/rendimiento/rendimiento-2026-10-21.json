@@ -1,0 +1,168 @@
+{
+  "fecha": "2026-10-21",
+  "cuenta": {
+    "usuario": "vow_ar",
+    "seguidores": 307,
+    "seguidos": 2009
+  },
+  "referencias": [
+    "Fuark",
+    "Gymshark",
+    "YoungLA",
+    "Darcsport",
+    "Vanquish Fitness"
+  ],
+  "porTipo": {
+    "reel": {
+      "cantidad": 1,
+      "medianaReaccionesPorSeguidor": 0.08469055374592833,
+      "medianaVistasPorSeguidor": 3.6644951140065145,
+      "medianaAlcancePorSeguidor": 2.44299674267101,
+      "medianaInteraccionesPorAlcance": 0.034666666666666665,
+      "guardados": 0,
+      "compartidos": 0
+    },
+    "carrusel": {
+      "cantidad": 1,
+      "medianaReaccionesPorSeguidor": 0.15309446254071662,
+      "medianaVistasPorSeguidor": 3.768729641693811,
+      "medianaAlcancePorSeguidor": 2.6058631921824102,
+      "medianaInteraccionesPorAlcance": 0.06125,
+      "guardados": 0,
+      "compartidos": 0
+    }
+  },
+  "referenciasPorTipo": {
+    "reel": {
+      "cuentas": 5,
+      "medianaReaccionesPorSeguidor": 0.0004372487686936776,
+      "medianaVistasPorSeguidor": 0.04697910178483215
+    },
+    "carrusel": {
+      "cuentas": 5,
+      "medianaReaccionesPorSeguidor": 0.0036727592946583904,
+      "medianaVistasPorSeguidor": null
+    },
+    "imagen": {
+      "cuentas": 3,
+      "medianaReaccionesPorSeguidor": 0.002055882931780144,
+      "medianaVistasPorSeguidor": null
+    }
+  },
+  "comparacion": [
+    {
+      "tipo": "reel",
+      "medida": "reacciones por seguidor",
+      "cantidad": 1,
+      "vow": 0.08469055374592833,
+      "referencias": 0.0004372487686936776,
+      "veredicto": "muestra muy chica"
+    },
+    {
+      "tipo": "reel",
+      "medida": "vistas por seguidor",
+      "cantidad": 1,
+      "vow": 3.6644951140065145,
+      "referencias": 0.04697910178483215,
+      "veredicto": "muestra muy chica"
+    },
+    {
+      "tipo": "carrusel",
+      "medida": "reacciones por seguidor",
+      "cantidad": 1,
+      "vow": 0.15309446254071662,
+      "referencias": 0.0036727592946583904,
+      "veredicto": "muestra muy chica"
+    },
+    {
+      "tipo": "carrusel",
+      "medida": "vistas por seguidor",
+      "cantidad": 1,
+      "vow": 3.768729641693811,
+      "referencias": null,
+      "veredicto": "sin datos para comparar"
+    }
+  ],
+  "destacadas": {
+    "masInteraccionPorAlcance": {
+      "tipo": "carrusel",
+      "fecha": "2026-10-19T15:02:25+0000",
+      "enlace": "https://www.instagram.com/p/DeriKp-FdNV/",
+      "likes": 45,
+      "comentarios": 2,
+      "vistas": 1157,
+      "reaccionesPorSeguidor": 0.15309446254071662,
+      "vistasPorSeguidor": 3.768729641693811,
+      "palabras": 11,
+      "primeraLinea": "Una promesa con vos. ",
+      "palabrasPrimeraLinea": 5,
+      "hashtags": 0,
+      "emojis": 0,
+      "esPregunta": false,
+      "alcance": 800,
+      "guardados": 0,
+      "compartidos": 0,
+      "interacciones": 49,
+      "interaccionesPorAlcance": 0.06125,
+      "alcancePorSeguidor": 2.6058631921824102,
+      "reciente": true
+    },
+    "masGuardada": null,
+    "masCompartida": null
+  },
+  "avisos": [
+    "La cuenta sigue a 2009 y tiene 307 seguidores: parte de los seguidores pueden ser de seguir de vuelta, que no miran el contenido. Las medidas por seguidor van a cambiar a medida que se limpien.",
+    "Una cuenta chica suele tener más reacciones por seguidor que una enorme: la comparación con las referencias orienta, no es una competencia pareja.",
+    "Las vistas de las referencias pueden incluir anuncios pagos. VOW no tiene anuncios: sus vistas son orgánicas.",
+    "2 de 2 publicaciones tienen menos de 7 días y todavía suman alcance.",
+    "Muestra muy chica en: reel (1), carrusel (1). Con menos de 3 publicaciones de un tipo, tomalo como señal y no como conclusión."
+  ],
+  "publicaciones": [
+    {
+      "tipo": "reel",
+      "fecha": "2026-10-20T02:16:22+0000",
+      "enlace": "https://www.instagram.com/reel/DesvQr2zTTo/",
+      "likes": 24,
+      "comentarios": 2,
+      "vistas": 1125,
+      "reaccionesPorSeguidor": 0.08469055374592833,
+      "vistasPorSeguidor": 3.6644951140065145,
+      "palabras": 30,
+      "primeraLinea": "¿Y vos? ¿Qué te prometés? Cumplilo.",
+      "palabrasPrimeraLinea": 6,
+      "hashtags": 0,
+      "emojis": 0,
+      "esPregunta": true,
+      "alcance": 750,
+      "guardados": 0,
+      "compartidos": 0,
+      "interacciones": 26,
+      "interaccionesPorAlcance": 0.034666666666666665,
+      "alcancePorSeguidor": 2.44299674267101,
+      "reciente": true
+    },
+    {
+      "tipo": "carrusel",
+      "fecha": "2026-10-19T15:02:25+0000",
+      "enlace": "https://www.instagram.com/p/DeriKp-FdNV/",
+      "likes": 45,
+      "comentarios": 2,
+      "vistas": 1157,
+      "reaccionesPorSeguidor": 0.15309446254071662,
+      "vistasPorSeguidor": 3.768729641693811,
+      "palabras": 11,
+      "primeraLinea": "Una promesa con vos. ",
+      "palabrasPrimeraLinea": 5,
+      "hashtags": 0,
+      "emojis": 0,
+      "esPregunta": false,
+      "alcance": 800,
+      "guardados": 0,
+      "compartidos": 0,
+      "interacciones": 49,
+      "interaccionesPorAlcance": 0.06125,
+      "alcancePorSeguidor": 2.6058631921824102,
+      "reciente": true
+    }
+  ]
+}

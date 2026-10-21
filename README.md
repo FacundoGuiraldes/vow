@@ -32,6 +32,7 @@ La parte difícil de usar IA en serio no es llamarla, es **poder confiar en lo q
 - **Catálogo del Drop 01:** tabla `productos` con los 7 productos del Drop 01 en estado concepto, cargados con el script `db-seed`. `GET /api/productos` y `GET /api/productos/:slug` los exponen sin precios, stock ni datos internos.
 - **Sección Drop 01 en la landing:** muestra la imagen conceptual del drop y el listado que trae de la API, con avisos mientras el servidor despierta y si la carga falla.
 - **Conexión a PostgreSQL (Neon):** pool de conexiones, script de prueba y migración de las tablas `lista_espera` y `productos`.
+- **Rendimiento propio:** `npm run rendimiento` mide las publicaciones de @vow_ar (alcance, guardados, compartidos) y las compara con las cuentas de referencia, sin IA. El Estratega lee el último informe.
 - **Sistema de agentes:** Investigador, Estratega y Revisor, coordinados por un orquestador que frena donde hace falta una persona. Detalle en [El sistema de agentes](#el-sistema-de-agentes).
 - **Reglas de marca en código:** voseo, palabras y frases prohibidas, máximo de emojis, y toda cifra tiene que existir en los datos cargados.
 - **Evals offline y online:** 121 casos gratis en el CI y una corrida con la IA real contra una línea base. Detalle en [Cómo sé que funciona](#cómo-sé-que-funciona).
@@ -111,6 +112,9 @@ flowchart LR
     inv --> informe["Informe con enlaces reales<br/>y nivel de confianza"]
     cerebro["Manual de marca<br/>docs/marca"] --> est
     definidas["Piezas ya definidas<br/>docs/piezas"] --> est
+    propia[("@vow_ar<br/>métricas propias")] --> rend["Rendimiento<br/>compara con las referencias · sin IA"]
+    meta -.-> rend
+    rend --> est
     informe --> est["Estratega<br/>propone el plan de la semana"]
     est --> reglas{"Reglas de marca<br/>voseo · cifras · ganchos · emojis"}
     reglas -->|"no pasa"| descarte["Plan descartado<br/>con los motivos"]
@@ -124,6 +128,7 @@ flowchart LR
 | Pieza | Qué hace | Qué no hace |
 |---|---|---|
 | **Investigador** (`src/agents/investigador.js`) | Lee datos públicos de cuentas de referencia, calcula el rendimiento con la mediana y mide cada publicación contra el tamaño de su cuenta. Pone a prueba hipótesis de formato. | Afirmar algo que los datos no sostienen: cada conclusión cita publicaciones reales y dice qué tan segura es. No cambia al Estratega por su cuenta. |
+| **Rendimiento** (`src/agents/rendimiento.js`) | Mide las publicaciones de @vow_ar con sus métricas privadas (alcance, guardados, compartidos, interacciones sobre alcance) y las compara por tipo con la mediana de las cuentas de referencia. Avisa cuando la muestra es chica, cuando una publicación es reciente o cuando los seguidores pueden no ser reales. No usa IA ni gasta. | Sacar conclusiones con pocas publicaciones: con menos de 3 de un tipo, marca "muestra muy chica". |
 | **Estratega** (`src/agents/estratega.js`) | Propone las piezas de una semana (gancho, guion, epígrafe, llamado a la acción, justificación), sin repetir lo que ya está definido. | Publicar. Propone y nada más. |
 | **Revisor** (`src/agents/revisor.js`) | Vuelve a pasar un plan por las mismas reglas con el contexto de hoy: un plan editado a mano, uno viejo o una pieza definida después. No usa IA ni gasta. | Aprobar solo: la aprobación es de una persona. |
 | **Orquestador** (`src/orquestador`) | Ejecuta los pasos en orden, guarda lo que hizo cada uno (`docs/ejecuciones/`), cuenta el gasto y no repite un paso que ya terminó. Un paso que falla frena el flujo. | Saber nada de Instagram ni de Claude: solo ordena pasos. |
@@ -131,6 +136,7 @@ flowchart LR
 Cómo se usa:
 
 ```bash
+npm run rendimiento                                   # mide @vow_ar contra las referencias (sin IA, conviene antes de planificar)
 npm run semana -- --semana 2026-11-02 --simulado      # prueba todo el flujo sin gastar
 npm run semana -- --semana 2026-11-02                 # con la IA real: planifica y revisa, y se frena en la aprobación
 npm run semana -- --semana 2026-11-02 --aprobar aprobar-plan   # aprueba; al volver a correr se guarda el plan
