@@ -1,0 +1,81 @@
+{
+  "resumen": "Dos piezas, las dos con material que se puede filmar de verdad: Facundo filmándose pies y manos, sin cara y sin producto. El jueves va un reel corto de una persona entrenando de verdad (pilar gente que entrena), y el domingo una story que cierra lo que el reel del 19/10 dejó abierto: revisar la promesa de la semana (pilar proceso). Se evitan el pilar promesa y el formato carrusel para no pisar el carrusel del 27/10, y no se muestra ni se menciona ningún producto.",
+  "piezas": [
+    {
+      "fecha": "2026-10-22",
+      "formato": "reel",
+      "pilar": "gente que entrena",
+      "gancho": "Atate el compromiso. Salí.",
+      "ganchos_alternativos": [
+        "Cumplí sin avisarle a nadie",
+        "Llegá callado. Cumplí igual",
+        "Sostené lo que te prometiste",
+        "Hacelo hoy. Hacelo en silencio"
+      ],
+      "guion": "Un solo plano continuo, vertical, filmado por Facundo con el celular apoyado en el piso o en un banco, sin mostrar la cara. 1) Primer cuadro: sus pies, ya con las zapatillas puestas, y las manos empiezan a atar el cordón; el texto del gancho está desde el segundo cero. 2) Se ajusta el nudo del segundo pie, sin apuro, con el sonido ambiente real. 3) Las manos se apoyan un instante en las rodillas; pausa corta. 4) Se levanta y los pies se van del cuadro, caminando hacia la puerta o hacia la calle. 5) Corte a fondo hueso con el cierre de marca. Luz natural, sin poses, sin filtros fuertes, sin logos de otras marcas a la vista (tapar o elegir zapatillas sin logo marcado).",
+      "texto_en_pantalla": [
+        "Atate el compromiso.",
+        "Salí.",
+        "Una promesa con vos.",
+        "Lista de espera: link en la bio."
+      ],
+      "epigrafe": "Nadie ve este momento y es el que cuenta. Una promesa con vos. Anotate en la lista de espera: link en la bio.",
+      "palabras_clave": [
+        "promesa",
+        "constancia",
+        "entrenar",
+        "compromiso",
+        "lista de espera"
+      ],
+      "cta": "Anotarse en la lista de espera (link en la bio).",
+      "recursos": [
+        "Celular vertical y un lugar donde apoyarlo",
+        "Luz natural",
+        "Zapatillas propias de Facundo, sin logos de otras marcas a la vista",
+        "Facundo filmándose pies y manos, sin mostrar la cara",
+        "Cierre de marca sobre fondo hueso (logo ya existente)",
+        "Música desde la biblioteca de Instagram al publicar"
+      ],
+      "justificacion": "Muestra gente entrenando de verdad y un proceso real (sección 3 del cerebro de marca), sin físico y sin producto, con lo único que hay disponible. Se apoya en el hallazgo 'Primeras líneas de lo que mejor rinde: frases cortas y afirmativas, no anuncios con entusiasmo' y en el hallazgo 'Fuark: los reels sin oferta en la primera línea tienen más vistas que los de cuotas, envío o códigos' (confianza baja): no hay oferta ni urgencia, solo una frase corta. La investigación marca que el ritual de atarse los cordones, sin escribir nada, es compatible con la marca; por eso no hay papel ni escritura. El reel del 2026-10-20 ya cerró con 'Cumplilo' y esta pieza lo muestra en un gesto concreto en vez de repetirlo en texto. Es de pilar distinto al carrusel del 27/10, y no repite la idea del reel del logo del 19/10. Inspiración de sobriedad visual: Vanquish Fitness, sin copiar ninguna pieza.",
+      "referencias": [
+        "Vanquish Fitness"
+      ],
+      "referencias_nota": "Solo como inspiración de estilo sobrio"
+    },
+    {
+      "fecha": "2026-10-25",
+      "formato": "story",
+      "pilar": "proceso",
+      "gancho": "Domingo. Fijate si cumpliste.",
+      "ganchos_alternativos": [
+        "Cerrá la semana con la promesa cumplida",
+        "Revisá lo que te prometiste",
+        "Sumá otro día a tu constancia",
+        "Cumplida o no, seguí construyendo"
+      ],
+      "guion": "Story de tres cuadros cortos, filmada por Facundo el domingo con luz natural y sin mostrar la cara. Cuadro 1: sus manos cierran el bolso o dejan las zapatillas junto a la puerta, con el texto del gancho. Cuadro 2: fondo hueso liso con una sola línea de texto que le habla a quien mira. Cuadro 3: cierre de marca con la invitación a la lista de espera. Sin stickers de encuesta ni de preguntas: la única acción es la lista de espera. La revisión de la promesa es algo que cada uno hace consigo mismo y no se muestra ni se responde en público.",
+      "texto_en_pantalla": [
+        "Domingo. Fijate si cumpliste.",
+        "Lo que te prometiste esta semana se revisa con vos.",
+        "Una promesa con vos.",
+        "Lista de espera: link en la bio."
+      ],
+      "epigrafe": "",
+      "palabras_clave": [
+        "promesa",
+        "constancia",
+        "domingo",
+        "lista de espera"
+      ],
+      "cta": "Anotarse en la lista de espera (link en la bio).",
+      "recursos": [
+        "Celular vertical",
+        "Luz natural",
+        "Manos y objetos personales de Facundo (bolso, zapatillas sin logos visibles), sin mostrar la cara",
+        "Fondo hueso y cierre de marca (diseño existente)",
+        "Link a la lista de espera en la story o en la bio"
+      ],
+      "justificacion": "Retoma el reel del 2026-10-20, que pedía revisar la promesa de la semana el domingo: cumplir con lo que la cuenta anunció es parte de ser constante y honesto. La publicación propia con más interacción sobre alcance fue el carrusel del 2026-10-19 ('Una promesa con vos.'), y el reel del 2026-10-20 tuvo interacción con una pregunta directa; se mantiene la idea central repetida (la promesa), como recomienda 'Mantener una idea central repetida' de la investigación, pero en un formato liviano y sin repetir texto. Muestra de las dos publicaciones propias es muy chica: es una señal, no una conclusión. Se pone en pilar proceso (el seguimiento semanal como hábito) para no repetir el pilar promesa del carrusel del 27/10, y es una story porque es el formato más barato de hacer con material real sin forzar contenido. Sin producto ni mención de accesorios, y el gancho es una afirmación corta en imperativo, no un consejo."
+    }
+  ]
+}

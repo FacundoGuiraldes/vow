@@ -570,3 +570,16 @@ test("el guion puede nombrar medidas de producción, pero el gancho y el epígra
   const epi = planValido([piezaValida({ epigrafe: "Carrusel de 6 láminas." })]);
   assert.ok(validarPlan(epi, { semanaInicio: SEMANA, piezas: 1 }).errores.some((e) => e.includes("(epigrafe)") && e.includes('"6"')));
 });
+
+test("una story puede venir sin epígrafe; el resto de los formatos no", () => {
+  const story = (cambios) => validarPlan(planValido([piezaValida({ formato: "story", ...cambios })]), { semanaInicio: SEMANA, piezas: 1 });
+  assert.equal(story({ epigrafe: "" }).ok, true, story({ epigrafe: "" }).errores.join(" | "));
+  assert.equal(story({ epigrafe: undefined }).ok, true);
+  assert.ok(story({ epigrafe: 5 }).errores.includes("Pieza 1: el epígrafe no es texto."));
+  for (const formato of ["reel", "carrusel", "imagen"]) {
+    const r = validarPlan(planValido([piezaValida({ formato, epigrafe: "" })]), { semanaInicio: SEMANA, piezas: 1 });
+    assert.ok(r.errores.includes("Pieza 1: falta epigrafe."), formato);
+  }
+  // una story sin epígrafe igual tiene que tener gancho y acción
+  assert.ok(story({ epigrafe: "", cta: "" }).errores.includes("Pieza 1: falta cta."));
+});

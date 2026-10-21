@@ -8,6 +8,7 @@ Este archivo es la fuente única de cómo habla y cómo se ve VOW. Todo contenid
 - Idea central: **la promesa**. Algo que te prometés a vos mismo y cumplís. Es un compromiso con uno mismo, no un texto: no se muestra escrita en papel ni se propone un ritual de escribirla.
 - Sobre la palabra "voto": es el nombre interno de la idea (así se llamó al principio y aparece en el manifiesto de la landing), pero se evita en la comunicación porque suena a elecciones. Se dice "promesa".
 - Lanzamiento: el Drop 01 sale en **2027** (definido por Facundo). Se puede decir en las piezas y en el Instagram; es la única fecha pública y no se agregan meses ni días.
+- **Drop 00** (definido por Facundo): una tanda chica de accesorios hechos en Argentina (gorras, medias y shakers) que se vende por Instagram antes del Drop 01. El detalle está en `docs/productos/stock-inicial.md`. El nombre está decidido, pero **todavía no se anuncia**: hasta que Facundo defina cuándo y cómo se comunica, no aparece en las piezas y "2027" sigue siendo la única fecha pública.
 - Bio de Instagram (@vow_ar), definida por Facundo: **"Una promesa con vos. Indumentaria y accesorios fitness. Lista de espera"**. Se dice "con vos" y no "para vos": la promesa la hace uno consigo mismo, la marca no se la hace a nadie.
 - En una frase: **simplicidad estética para quienes disfrutan entrenar y verse bien haciéndolo, sin dejar de ser simples.**
 
@@ -56,7 +57,8 @@ Cómo se resuelve la tensión entre "verse bien" y "no presumir": lo estético e
 - Urgencia falsa: "últimas unidades" si no es verdad, "solo hoy", "no te lo pierdas".
 - Presumir: "mostrá tu físico", "modo bestia", "crack".
 - Inglés innecesario: "gains", "grind", "no pain no gain", "aesthetic". Se dice "estética".
-- "Drop" solo como parte del nombre del lanzamiento ("Drop 01"), porque así se llama en la landing y es parte de la marca. En el resto del texto, "lanzamiento".
+- "Drop" solo como parte del nombre del lanzamiento ("Drop 01", y "Drop 00" cuando se anuncie), porque así se llama en la landing y es parte de la marca. En el resto del texto, "lanzamiento".
+- Excepción al inglés, decidida por Facundo: los nombres de los packs del Drop 00 (**Pledge**, **Kept** y **Oath**) van en inglés. Son nombres propios de producto; el resto del texto sigue en castellano.
 - Voz que no sea de vos.
 - Elementos del gimnasio como barras, mancuernas, pesas o discos: nombrarlos suena forzado. Grips, straps y prendas (el producto) sí se nombran.
 
@@ -128,5 +130,6 @@ Cómo se resuelve la tensión entre "verse bien" y "no presumir": lo estético e
 
 ## 9. Por confirmar
 
+- ¿Cuándo y cómo se anuncia el Drop 00? Hasta definirlo, no aparece en las piezas.
 - ¿"Figurar" se usa en los textos o se busca otra palabra?
 - ¿Hay palabras propias que quieras sumar a "Sí" o a "No"?

@@ -56,7 +56,7 @@ export const HERRAMIENTA_PLAN = {
             },
             guion: { type: "string", description: "Qué pasa en la pieza, paso a paso." },
             texto_en_pantalla: { type: "array", items: { type: "string" } },
-            epigrafe: { type: "string" },
+            epigrafe: { type: "string", description: "Texto que acompaña la publicación. En una story va vacío: las stories no llevan epígrafe." },
             palabras_clave: { type: "array", items: { type: "string" } },
             cta: { type: "string", description: "Una sola acción: anotarse en la lista de espera." },
             recursos: { type: "array", items: { type: "string" }, description: "Qué hace falta tener para hacerla." },
@@ -162,9 +162,12 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
     else if (desde && (pieza.fecha < desde || pieza.fecha > hasta)) errores.push(`${etiqueta}: la fecha ${pieza.fecha} está fuera de la semana (${desde} a ${hasta}).`);
     if (!FORMATOS.includes(pieza.formato)) errores.push(`${etiqueta}: formato inválido (${pieza.formato}).`);
     if (!PILARES.includes(pieza.pilar)) errores.push(`${etiqueta}: pilar inválido (${pieza.pilar}).`);
-    for (const campo of ["gancho", "guion", "epigrafe", "cta", "justificacion"]) {
+    // Una story no tiene epígrafe: puede venir vacío, pero si viene tiene que ser texto
+    const obligatorios = pieza.formato === "story" ? ["gancho", "guion", "cta", "justificacion"] : ["gancho", "guion", "epigrafe", "cta", "justificacion"];
+    for (const campo of obligatorios) {
       if (typeof pieza[campo] !== "string" || pieza[campo].trim() === "") falta(campo);
     }
+    if (pieza.formato === "story" && pieza.epigrafe !== undefined && typeof pieza.epigrafe !== "string") errores.push(`${etiqueta}: el epígrafe no es texto.`);
     for (const campo of ["texto_en_pantalla", "palabras_clave", "recursos"]) {
       if (!Array.isArray(pieza[campo])) falta(campo);
     }

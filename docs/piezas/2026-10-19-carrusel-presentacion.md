@@ -1,6 +1,6 @@
 # Carrusel · 19/10/2026 · pilar lanzamiento
 
-**Estado:** carrusel de 7 láminas (la presentación más dos láminas de la promesa que Facundo eligió); textos definidos con Facundo; láminas generadas en `docs/piezas/2026-10-19-laminas/` (falta su aprobación final). Es la **primera** publicación de la cuenta, porque explica qué es VOW; las otras dos láminas de la promesa ("Cumplite a vos primero" y "El trabajo diario no busca aplausos") quedan para una pieza de la semana del 2/11. La fecha es tentativa: si se publica otro día, se actualiza acá.
+**Estado:** publicado el 19/10/2026 a las 12:02 (hora argentina): https://www.instagram.com/p/DeriKp-FdNV/. Carrusel de 7 láminas (la presentación más dos láminas de la promesa que Facundo eligió); láminas en `docs/piezas/2026-10-19-laminas/`. Es la **primera** publicación de la cuenta, porque explica qué es VOW; las otras dos láminas de la promesa ("Cumplite a vos primero" y "El trabajo diario no busca aplausos") quedan para el carrusel de la promesa.
 
 ## Láminas
 1. Esto es VOW.

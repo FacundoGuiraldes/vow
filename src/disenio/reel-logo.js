@@ -185,6 +185,6 @@ export async function generar(salida, { segundos = DURACION } = {}) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const salida = process.argv[2] ?? join(raiz, "docs", "piezas", "2026-11-02-reel-logo");
+  const salida = process.argv[2] ?? join(raiz, "docs", "piezas", "2026-10-19-reel-logo");
   console.log(`Reel generado: ${await generar(salida)}`);
 }
