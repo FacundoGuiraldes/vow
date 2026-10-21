@@ -168,14 +168,14 @@ contrato(
     pool = crearPool();
     await migrar(pool);
     // por si una corrida anterior quedó a medias
-    await pool.query("DELETE FROM piezas_programadas WHERE semana >= '2099-01-01'");
+    await pool.query("DELETE FROM piezas_programadas WHERE semana BETWEEN '2099-01-01' AND '2099-12-31'");
     return crearRepositorio(pool);
   },
   {
     saltear: SIN_BASE,
     alTerminar: async () => {
       if (!pool) return;
-      await pool.query("DELETE FROM piezas_programadas WHERE semana >= '2099-01-01'");
+      await pool.query("DELETE FROM piezas_programadas WHERE semana BETWEEN '2099-01-01' AND '2099-12-31'");
       await pool.query("DELETE FROM bot_estado WHERE clave LIKE $1", [`${prefijo}%`]);
       await pool.query("DELETE FROM novedades WHERE texto LIKE $1", [`${prefijo}%`]);
       await pool.end();

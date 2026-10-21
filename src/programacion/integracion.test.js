@@ -16,8 +16,8 @@ import { crearServicio } from "./servicio.js";
 const CLAVE = "clave-de-integracion-1234";
 const SECRETO = "secreto-de-integracion-1234";
 const PREFIJO = `integracion-${process.pid}-${Date.now()}:`; // las claves de estado de esta prueba no se mezclan con las reales
-const SEMANA = "2099-01-05"; // lunes
-const VIERNES = "2099-01-09";
+const SEMANA = "2098-01-06"; // lunes (año propio: el test del repositorio usa 2099 y corre en paralelo contra la misma base)
+const VIERNES = "2098-01-10";
 const levantar = (app) => new Promise((resolver) => { const i = app.listen(0, "127.0.0.1", () => resolver(i)); });
 const cerrar = (i) => new Promise((resolver) => { i.closeAllConnections(); i.close(resolver); });
 
@@ -78,7 +78,7 @@ function correr(nombre, crearRepo, { saltear = false, alTerminar = async () => {
       assert.equal((await repo.obtenerPieza(fila.id)).estado, "aprobada");
 
       // Miércoles 8:00: el recordatorio de filmación (3 días antes del viernes)
-      mover("08:00", "2099-01-07");
+      mover("08:00", "2098-01-08");
       await (await api("tick")).json();
       assert.match(telegram.buscar("Recordatorio").texto, /en 2 días|en 3 días/);
 
@@ -124,14 +124,14 @@ correr(
   async () => {
     pool = crearPool();
     await migrar(pool);
-    await pool.query("DELETE FROM piezas_programadas WHERE semana >= '2099-01-01'");
+    await pool.query("DELETE FROM piezas_programadas WHERE semana BETWEEN '2098-01-01' AND '2098-12-31'");
     return crearRepositorio(pool, { prefijoEstado: PREFIJO });
   },
   {
     saltear: SIN_BASE,
     alTerminar: async () => {
       if (!pool) return;
-      await pool.query("DELETE FROM piezas_programadas WHERE semana >= '2099-01-01'");
+      await pool.query("DELETE FROM piezas_programadas WHERE semana BETWEEN '2098-01-01' AND '2098-12-31'");
       await pool.query("DELETE FROM bot_estado WHERE clave LIKE $1", [`${PREFIJO}%`]);
       await pool.end();
     },
