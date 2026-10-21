@@ -25,16 +25,12 @@ export class ErrorImagenIA extends Error {
   }
 }
 
-// Todo pedido lleva el estilo de VOW delante: así las imágenes salen coherentes con la marca aunque la descripción sea corta
-export const ESTILO_VOW = [
-  "Imagen para Instagram de VOW, una marca argentina de ropa y accesorios técnicos para entrenar.",
-  "Estilo sobrio y minimalista, mucho espacio vacío, luz suave, aspecto de revista.",
-  "Paleta: negro #0A0A0A, hueso #ECE8E1, beige #CDBFA6 y, como acento mínimo, bordó #7A1F24.",
-  "Composición vertical. NO incluyas texto, letras, números, logos ni marcas de agua.",
-  "NO incluyas personas ni caras salvo que la descripción lo pida expresamente.",
-].join(" ");
+// Todo pedido lleva el estilo de VOW detrás de la descripción. Solo en positivo: FLUX no tiene prompt negativo y las prohibiciones
+// ("sin personas", "sin texto") hacen que dibuje justamente eso. Tampoco se nombra la ropa ni el entrenamiento: la IA los toma como
+// el tema de la imagen y dibuja una modelo con ropa deportiva aunque se le pida un fondo liso.
+export const ESTILO_VOW = "Estética minimalista y sobria de revista, composición limpia con mucho espacio vacío, luz suave y paleta de negro profundo, hueso y beige.";
 
-export const armarPedido = (descripcion) => `${ESTILO_VOW}\n\nLo que tiene que mostrar: ${String(descripcion).trim()}`;
+export const armarPedido = (descripcion) => `${String(descripcion).trim()}. ${ESTILO_VOW}`;
 
 // Isotipo en hueso (el del sitio usa currentColor)
 const isotipoHueso = (ancho) => Buffer.from(ISOTIPO.replace('fill="currentColor"', 'fill="#ECE8E1"').replace("<svg ", `<svg width="${ancho}" `));
