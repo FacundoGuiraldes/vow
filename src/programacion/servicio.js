@@ -2,6 +2,7 @@
 //   repo      → la base (repositorio.js, o repositorio-memoria.js en los tests)
 //   telegram  → el bot con el que Facundo recibe y responde
 //   meta      → la API de Instagram (src/mcp/instagram/api.js)
+//   llm       → (opcional) la IA con la que Facundo charla; sin ella, responder a una pieza usa el editor y lo demás son novedades
 //
 // Reglas que no se negocian (están probadas en servicio.test.js):
 //   1. Solo se publica una pieza que Facundo CONFIRMÓ el mismo día de la publicación. La aprobación de la semana no alcanza.
@@ -10,9 +11,10 @@
 //   4. Fuera de la hora (más de TOLERANCIA_MINUTOS tarde) no se publica sola: se pregunta.
 //   5. /pausar frena toda publicación.
 import { revisarTextoPublico, validarUrlPublica } from "../mcp/instagram/validaciones.js";
+import { CAMPOS_EDITABLES, HERRAMIENTAS_CHAT, MENSAJES_MAXIMOS_POR_DIA, construirSistemaChat, recortarRecuerdo } from "./conversacion.js";
 import { ahoraArgentina, esHoraValida, fechaLegible, horaDesdeMinutos, minutosDelDia, sumarDias, diasHasta } from "./fechas.js";
 import {
-  ESTADOS_LEGIBLES, botonesDia, botonesImagenIA, botonesPlan, botonesTarde, fechaDeAviso, textoPieza, textoPlanSemanal, textoRecordatorio, textoResumenDiario,
+  ESTADOS_LEGIBLES, botonesCancelar, botonesDia, botonesImagenIA, botonesPlan, botonesTarde, fechaDeAviso, textoPieza, textoPlanSemanal, textoRecordatorio, textoResumenDiario,
 } from "./mensajes.js";
 
 export const HORA_RESUMEN = "08:00";
@@ -61,7 +63,7 @@ function elegirArchivo(msg) {
   return null;
 }
 
-export function crearServicio({ repo, telegram, meta = null, editor = null, generadorImagen = null, ahora = () => ahoraArgentina(), urlPublica = "", permitirPublicar = false } = {}) {
+export function crearServicio({ repo, telegram, meta = null, editor = null, generadorImagen = null, llm = null, validarEdicion = null, ahora = () => ahoraArgentina(), urlPublica = "", permitirPublicar = false } = {}) {
   const decir = (texto, opciones) => telegram.enviarMensaje(texto, opciones);
   const decirDePieza = async (fila, texto, opciones) => {
     const id = await telegram.enviarMensaje(texto, opciones);
@@ -125,6 +127,10 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     if (accion === "ia" || accion === "ia_otra") return generarConIA(fila, { responder, mensajeId });
     if (accion === "ia_usar") return usarImagenIA(fila, responder, mensajeId);
     if (accion === "ia_cambiar") return responder("✏️ Respondé a la pieza (o a la imagen) con /ia y lo que querés ver. Por ejemplo: /ia fondo negro con una sombra suave y mucho espacio vacío.");
+    if (accion === "dejar") {
+      telegram.quitarBotones(mensajeId);
+      return responder("Listo, la dejo como está.");
+    }
     if (accion === "cancelar") return cancelar(fila, responder, mensajeId);
     if (accion === "publicar_ahora") return publicarAhora(fila, responder, mensajeId);
     return responder("No entendí ese botón.");
@@ -207,6 +213,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     if (texto.startsWith("/")) return comando(texto, msg);
     if (msg.photo || msg.video || msg.document) return recibirArchivo(msg);
     if (!texto) return { ignorada: true };
+    if (llm) return conversar(msg, texto);
     return msg.reply_to_message ? editar(msg, texto) : novedad(msg, texto);
   }
 
@@ -356,6 +363,23 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     return responder(`✅ Listo, usé esa imagen para la pieza del ${fechaLegible(fila.fecha)}. ${falta ?? "Ya tiene todo el material."}${guardado.nota}`);
   }
 
+  // Guarda una pieza editada (por el editor con Claude o por el chat). Cualquier edición borra la confirmación y el contenedor
+  // ya armado en Meta, y reprograma el recordatorio de filmación. Devuelve la pieza nueva y un aviso si quedan menos de 3 días.
+  async function guardarEdicion(fila, { pieza, hora: horaNueva, hoy }) {
+    const hora = esHoraValida(horaNueva) ? horaNueva : fila.hora;
+    const fecha = pieza.fecha ?? fila.fecha;
+    await repo.actualizarPieza(fila.id, { fecha, hora, pieza: { ...pieza, hora }, estado: "propuesta", confirmada_el: null, contenedor: null, error: null });
+    await repo.borrarRecordatoriosPendientes(fila.id);
+    const nueva = await repo.obtenerPieza(fila.id);
+    let aviso = "";
+    if (material(nueva).length) {
+      const diaAviso = fechaDeAviso(fecha);
+      if (diaAviso > hoy) await repo.crearRecordatorio({ piezaId: fila.id, fecha: diaAviso });
+      else if (diaAviso < hoy) aviso = "\n⚠️ Con esta fecha te quedan menos de 3 días para producir el material.";
+    }
+    return { nueva, aviso };
+  }
+
   async function editar(msg, instruccion) {
     const { fecha: hoy } = ahora();
     const responder = (texto, opciones) => decir(texto, { responderA: msg.message_id, ...opciones });
@@ -378,19 +402,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     }
     if (!resultado.ok) return responder(`No apliqué el cambio:\n${resultado.errores.map((e) => `• ${e}`).join("\n")}`);
 
-    const hora = esHoraValida(resultado.hora) ? resultado.hora : fila.hora;
-    const fecha = resultado.pieza.fecha ?? fila.fecha;
-    // Cualquier edición borra la confirmación y el contenedor ya armado en Meta
-    await repo.actualizarPieza(fila.id, { fecha, hora, pieza: { ...resultado.pieza, hora }, estado: "propuesta", confirmada_el: null, contenedor: null, error: null });
-    await repo.borrarRecordatoriosPendientes(fila.id);
-    const nueva = await repo.obtenerPieza(fila.id);
-
-    let aviso = "";
-    if (material(nueva).length) {
-      const diaAviso = fechaDeAviso(fecha);
-      if (diaAviso > hoy) await repo.crearRecordatorio({ piezaId: fila.id, fecha: diaAviso });
-      else if (diaAviso < hoy) aviso = "\n⚠️ Con esta fecha te quedan menos de 3 días para filmar.";
-    }
+    const { nueva, aviso } = await guardarEdicion(fila, { pieza: resultado.pieza, hora: resultado.hora, hoy });
     return decirDePieza(nueva, `${resultado.queCambio ? `✏️ ${resultado.queCambio}\n\n` : ""}${textoPieza(nueva)}${aviso}`, { botones: botonesPlan(fila.id, { conIA: conIA(nueva) }), responderA: msg.message_id });
   }
 
@@ -416,11 +428,139 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
 
   async function enviarResumenDiario(hoy) {
     const pendientes = (await repo.piezasDelDia(hoy)).filter((f) => ["propuesta", "aprobada"].includes(f.estado));
-    for (const fila of pendientes) {
-      const falta = faltaArchivo(fila, await repo.mediosDePieza(fila.id));
-      await decirDePieza(fila, textoResumenDiario(fila, { faltaArchivo: falta }), { botones: botonesDia(fila.id, fila.hora, { conIA: conIA(fila) }) });
-    }
+    for (const fila of pendientes) await enviarTarjetaDelDia(fila);
     return pendientes.length;
+  }
+
+  // La pieza de hoy con su hora y los botones para confirmarla, modificarla o cancelarla
+  async function enviarTarjetaDelDia(fila) {
+    const falta = faltaArchivo(fila, await repo.mediosDePieza(fila.id));
+    return decirDePieza(fila, textoResumenDiario(fila, { faltaArchivo: falta }), { botones: botonesDia(fila.id, fila.hora, { conIA: conIA(fila) }) });
+  }
+
+  // ───────────────────────── Chat con la IA ─────────────────────────
+  // Facundo escribe como en cualquier chat y la IA entiende, mira y cambia las piezas con las herramientas de conversacion.js.
+  // Ninguna herramienta publica, confirma ni cancela: eso siempre pasa por un botón que toca Facundo.
+  async function conversar(msg, texto) {
+    const { fecha: hoy, hora } = ahora();
+    const responder = (t, o) => decir(t, { responderA: msg.message_id, ...o });
+    const clave = `chat-dia:${hoy}`;
+    const hechos = Number(await repo.leerEstado(clave)) || 0;
+    if (hechos >= MENSAJES_MAXIMOS_POR_DIA) {
+      return responder(`Llegué al máximo de ${MENSAJES_MAXIMOS_POR_DIA} mensajes de charla por hoy (es un freno por el cupo gratis de la IA). Los botones y comandos siguen andando; mañana seguimos charlando.`);
+    }
+    await repo.guardarEstado(clave, hechos + 1);
+    telegram.escribiendo?.();
+
+    const fila = msg.reply_to_message ? await repo.piezaPorMensaje(msg.reply_to_message.message_id) : null;
+    const entrada = fila ? `[Facundo responde al mensaje de la pieza ${fila.id} del ${fechaLegible(fila.fecha)} (${fila.pieza.formato}: "${fila.pieza.gancho}"). Si no aclara otra cosa, se refiere a esa pieza.]\n${texto}` : texto;
+    const memoria = (await repo.leerEstado("chat")) ?? [];
+    const historial = [...memoria, { rol: "usuario", texto: entrada }];
+
+    let salida;
+    try {
+      salida = await llm.conversar({
+        sistema: construirSistemaChat({ fecha: hoy, hora, permitirPublicar }),
+        historial,
+        herramientas: HERRAMIENTAS_CHAT,
+        ejecutar: (nombre, argumentos) => ejecutarHerramienta(nombre, argumentos, { hoy, hora }),
+      });
+    } catch (error) {
+      // Lo que no se pudo entender no se pierde: si era una novedad suelta, queda anotada para el próximo plan
+      if (!fila) {
+        await repo.agregarNovedad(texto);
+        return responder(`No pude procesar tu mensaje: ${error.message}\nLo anoté como novedad de VOW para el próximo plan. Si era un pedido, repetímelo en un rato o usá los botones.`);
+      }
+      return responder(`No pude procesar tu mensaje: ${error.message}\nProbá de nuevo en un rato o usá los botones de la pieza.`);
+    }
+    const respuesta = salida || "Listo.";
+    await repo.guardarEstado("chat", recortarRecuerdo([...historial, { rol: "asistente", texto: respuesta }]));
+    return responder(respuesta);
+  }
+
+  async function ejecutarHerramienta(nombre, argumentos, { hoy, hora }) {
+    const piezaDe = async (valor) => {
+      const fila = Number.isInteger(Number(valor)) ? await repo.obtenerPieza(Number(valor)) : null;
+      return fila && fila.estado !== "cancelada" ? fila : null;
+    };
+    const noExiste = { error: "No existe una pieza con ese ID. Usá ver_semana para ver los IDs." };
+
+    if (nombre === "ver_semana") {
+      const filas = await repo.piezasEntre(sumarDias(hoy, -1), sumarDias(hoy, 14));
+      const piezas = [];
+      for (const f of filas) {
+        const medios = await repo.mediosDePieza(f.id);
+        piezas.push({
+          id: f.id, fecha: f.fecha, dia: fechaLegible(f.fecha), hora: f.hora, formato: f.pieza.formato, gancho: f.pieza.gancho,
+          produccion: f.pieza.produccion ?? "propio", estado: ESTADOS_LEGIBLES[f.estado], confirmada_hoy: f.confirmada_el === hoy,
+          archivos: medios.length, falta_archivo: faltaArchivo(f, medios),
+        });
+      }
+      return { piezas, nota: piezas.length ? undefined : "No hay piezas en estos días." };
+    }
+    if (nombre === "ver_pieza") {
+      const fila = await piezaDe(argumentos.id);
+      if (!fila) return noExiste;
+      return { id: fila.id, fecha: fila.fecha, hora: fila.hora, estado: ESTADOS_LEGIBLES[fila.estado], pieza: fila.pieza };
+    }
+    if (nombre === "modificar_pieza") {
+      const fila = await piezaDe(argumentos.id);
+      if (!fila) return noExiste;
+      if (!VIVAS.includes(fila.estado)) return { error: `La pieza está ${ESTADOS_LEGIBLES[fila.estado]}: ya no se puede modificar.` };
+      if (!validarEdicion) return { error: "La edición no está disponible en este momento." };
+      const cambios = argumentos.cambios && typeof argumentos.cambios === "object" ? argumentos.cambios : {};
+      const ajenos = Object.keys(cambios).filter((c) => !CAMPOS_EDITABLES.includes(c));
+      if (ajenos.length) return { error: `Esos campos no se pueden cambiar: ${ajenos.join(", ")}. Los editables son: ${CAMPOS_EDITABLES.join(", ")}.` };
+      if (!Object.keys(cambios).length) return { error: "No indicaste ningún cambio." };
+
+      const pieza = { ...fila.pieza, ...cambios, fecha: cambios.fecha ?? fila.fecha, hora: cambios.hora ?? fila.hora };
+      const errores = await validarEdicion({ fila, pieza, hoy });
+      if (errores.length) return { ok: false, errores };
+      const { nueva, aviso } = await guardarEdicion(fila, { pieza, hora: pieza.hora, hoy });
+      // Facundo ve la pieza actualizada con sus botones; la IA no tiene que repetirla entera
+      await decirDePieza(nueva, `${argumentos.que_cambio ? `✏️ ${String(argumentos.que_cambio).slice(0, 300)}\n\n` : ""}${textoPieza(nueva)}${aviso}`, { botones: botonesPlan(nueva.id, { conIA: conIA(nueva) }) });
+      return { ok: true, estado: ESTADOS_LEGIBLES[nueva.estado], fecha: nueva.fecha, hora: nueva.hora, nota: `Ya le mostré a Facundo la pieza actualizada con sus botones.${aviso ? ` Aviso: ${aviso.trim()}` : ""}` };
+    }
+    if (nombre === "aprobar_pieza") {
+      const fila = await piezaDe(argumentos.id);
+      if (!fila) return noExiste;
+      if (!(await repo.reclamar(fila.id, ["propuesta"], "aprobada"))) return { error: `La pieza está ${ESTADOS_LEGIBLES[fila.estado]}: no hace falta aprobarla.` };
+      return { ok: true, nota: `Aprobada. El ${fechaLegible(fila.fecha)} a las 8 se le pide la confirmación final.` };
+    }
+    if (nombre === "pedir_confirmacion") {
+      const fila = await piezaDe(argumentos.id);
+      if (!fila) return noExiste;
+      if (fila.fecha !== hoy) return { error: `La confirmación solo vale el mismo día de la publicación. Esta pieza es del ${fechaLegible(fila.fecha)}.` };
+      if (!["propuesta", "aprobada"].includes(fila.estado)) return { error: `La pieza está ${ESTADOS_LEGIBLES[fila.estado]}.` };
+      await enviarTarjetaDelDia(fila);
+      return { ok: true, nota: "Le mandé la pieza con el botón Confirmar. Falta que Facundo lo toque: vos no podés confirmar." };
+    }
+    if (nombre === "pedir_cancelacion") {
+      const fila = await piezaDe(argumentos.id);
+      if (!fila) return noExiste;
+      if (!VIVAS.includes(fila.estado) && fila.estado !== "fallida") return { error: `La pieza está ${ESTADOS_LEGIBLES[fila.estado]}: no se puede cancelar.` };
+      await decirDePieza(fila, `¿Cancelo la pieza del ${fechaLegible(fila.fecha)} a las ${fila.hora} ("${fila.pieza.gancho}")? No se publica y se borran sus archivos.`, { botones: botonesCancelar(fila.id) });
+      return { ok: true, nota: "Le mandé el botón para cancelar. Falta que Facundo lo toque: vos no podés cancelar." };
+    }
+    if (nombre === "anotar_novedad") {
+      const texto = String(argumentos.texto ?? "").trim();
+      if (!texto) return { error: "La novedad está vacía." };
+      await repo.agregarNovedad(texto.slice(0, 1000));
+      return { ok: true, nota: "Anotada para el plan del próximo lunes." };
+    }
+    if (nombre === "reenviar_hoy") return { ok: true, enviadas: await enviarResumenDiario(hoy) };
+    if (nombre === "pausar_publicaciones") {
+      await repo.guardarEstado("pausa", true);
+      return { ok: true, nota: "Pausado: no se publica nada hasta que se reanude." };
+    }
+    if (nombre === "reanudar_publicaciones") {
+      await repo.guardarEstado("pausa", false);
+      return { ok: true, nota: "Reanudado: lo confirmado para hoy se publica a su hora." };
+    }
+    if (nombre === "estado_del_sistema") {
+      return { pausado: (await repo.leerEstado("pausa")) === true, publica_de_verdad: permitirPublicar, fecha: hoy, hora };
+    }
+    return { error: `No existe la herramienta ${nombre}.` };
   }
 
   // ───────────────────────── Publicación ─────────────────────────

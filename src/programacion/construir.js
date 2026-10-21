@@ -1,8 +1,9 @@
 // Arma el servicio de publicación programada con la configuración del entorno (Render).
 // Si falta alguna variable obligatoria, no se monta nada: la API sigue funcionando igual y el log dice qué falta.
 import { crearClienteMeta } from "../mcp/instagram/api.js";
-import { crearEditor } from "./editor.js";
+import { crearEditor, crearValidadorEdicion } from "./editor.js";
 import { crearGeneradorImagen } from "./imagen-ia.js";
+import { crearLLMGemini } from "./llm-gemini.js";
 import { crearRepositorio } from "./repositorio.js";
 import { crearRutasProgramacion } from "./rutas.js";
 import { crearServicio } from "./servicio.js";
@@ -35,7 +36,10 @@ export async function construirProgramacion({ pool, env = process.env, fetchFn =
     generadorImagen = crearGeneradorImagen({ proveedor: "gemini", apiKey: env.GEMINI_API_KEY, modelo: env.GEMINI_MODELO || undefined, fetchFn });
   }
 
-  const servicio = crearServicio({ repo, telegram, meta, editor, generadorImagen, urlPublica: env.URL_PUBLICA, permitirPublicar });
+  // Chat con la IA (Gemini, plan gratis): opcional. Sin la clave, responder a una pieza usa el editor con Claude y lo demás son novedades.
+  const llm = env.GEMINI_API_KEY ? crearLLMGemini({ apiKey: env.GEMINI_API_KEY, modelo: env.GEMINI_MODELO_CHAT || undefined, fetchFn }) : null;
+
+  const servicio = crearServicio({ repo, telegram, meta, editor, generadorImagen, llm, validarEdicion: llm ? crearValidadorEdicion() : null, urlPublica: env.URL_PUBLICA, permitirPublicar });
   const router = crearRutasProgramacion({ servicio, repo, secretoApi: env.PROGRAMACION_SECRETO, secretoWebhook: env.TELEGRAM_WEBHOOK_SECRETO });
-  return { router, servicio, telegram, permitirPublicar, edicionConIA: editor !== null, imagenesConIA: generadorImagen !== null };
+  return { router, servicio, telegram, permitirPublicar, edicionConIA: editor !== null, imagenesConIA: generadorImagen !== null, chatConIA: llm !== null };
 }

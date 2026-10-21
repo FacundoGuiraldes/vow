@@ -17,3 +17,8 @@ test("las imágenes con IA se activan solo con credenciales completas; Cloudflar
   assert.equal((await construir({ CLOUDFLARE_ACCOUNT_ID: "cuenta", CLOUDFLARE_API_TOKEN: "token" })).imagenesConIA, true);
   assert.equal((await construir({ GEMINI_API_KEY: "clave" })).imagenesConIA, true);
 });
+
+test("el chat con la IA se activa solo con GEMINI_API_KEY", async () => {
+  assert.equal((await construir()).chatConIA, false);
+  assert.equal((await construir({ GEMINI_API_KEY: "clave" })).chatConIA, true);
+});
