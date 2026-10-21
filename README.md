@@ -144,6 +144,29 @@ Qué cuida el sistema para que la IA no se descontrole:
 - **Gasto acotado:** `--tope-usd` por corrida y un tope mensual que corta antes de llamar a la API (se configura con `TOPE_MENSUAL_USD`, por defecto US$ 5). Con `--simulado` ningún comando gasta.
 - **Todo a mano:** los workflows que usan la IA solo se lanzan manualmente desde Actions.
 
+### Conector de Instagram (MCP)
+
+Un servidor [MCP](https://modelcontextprotocol.io) en `src/mcp/instagram/` conecta Claude Code con la cuenta de @vow_ar por la API oficial de Meta. Está registrado en [`.mcp.json`](.mcp.json): al abrir Claude Code en el repo, aparece como `vow-instagram` (la primera vez pide aprobarlo).
+
+| Herramienta | Qué hace |
+|---|---|
+| `perfil`, `publicaciones` | Datos de la cuenta y últimas publicaciones con likes y comentarios. |
+| `metricas_publicacion` | Alcance, vistas, guardados, compartidos e interacciones de una publicación. |
+| `comentarios` | Comentarios de una publicación. |
+| `preparar_publicacion` | Valida el texto, chequea el cupo diario de Meta y crea el contenedor de una imagen, un reel o un carrusel. **No publica.** |
+| `publicar` | Publica un contenedor ya preparado. Exige `confirmar: true`. |
+| `responder_comentario` | Responde un comentario. Exige `confirmar: true`. |
+
+Qué cuida:
+
+- **Solo lectura por defecto:** publicar y responder están apagados salvo `INSTAGRAM_PERMITIR_PUBLICAR=1`. Además, Claude Code pide permiso antes de cada herramienta.
+- **Publicar lleva dos pasos:** preparar (se puede revisar) y publicar con confirmación, solo si Meta terminó de procesar el archivo.
+- **Las mismas reglas de marca que el Estratega:** un epígrafe o una respuesta con urgencia falsa, sin voseo o con una cifra inventada se rechaza antes de llamar a Meta.
+- **El token nunca aparece** en respuestas ni en errores, y en los pedidos de escritura viaja en el cuerpo, no en la dirección.
+- **Archivos por dirección pública:** Meta descarga las imágenes (solo JPEG) y los videos desde una dirección `https` pública; no acepta archivos locales.
+
+Para usarlo, la app de Meta necesita los permisos `instagram_basic`, `pages_show_list`, `pages_read_engagement` e `instagram_manage_insights` para leer, y además `instagram_content_publish` e `instagram_manage_comments` para publicar y responder. Se prueba con `node --test` y un Meta simulado: los tests no tocan la cuenta real.
+
 ## Cómo sé que funciona
 
 Un sistema con IA no se prueba mirando una vez la salida. Hay tres capas:
@@ -247,7 +270,8 @@ cp .env.example .env
 | `ANTHROPIC_API_KEY` | Clave de la API de Anthropic. La usan el motor de agentes y los scripts `hola` y `prueba`. |
 | `DATABASE_URL` | Cadena de conexión a PostgreSQL. La usan la API, la migración y los tests de la API. |
 | `TOPE_MENSUAL_USD` | Tope de gasto mensual en dólares para los comandos que usan la IA. Opcional; por defecto 5. |
-| `INSTAGRAM_TOKEN` y `INSTAGRAM_USER_ID` | Acceso de solo lectura a la API oficial de Meta, para que el Investigador baje datos públicos de las cuentas de referencia. |
+| `INSTAGRAM_TOKEN` y `INSTAGRAM_USER_ID` | Acceso a la API oficial de Meta: el Investigador baja datos públicos de las cuentas de referencia y el conector MCP gestiona @vow_ar. |
+| `INSTAGRAM_PERMITIR_PUBLICAR` | Con `1`, el conector MCP puede publicar y responder comentarios. Vacía, solo lee. |
 | `ALLOWED_ORIGINS` | Orígenes que pueden llamar a la API desde el navegador, separados por coma. Hace falta cuando la landing llama a la API en otro dominio o puerto (por ejemplo, si `VITE_API_URL` apunta a `http://localhost:3000`, tiene que incluir la dirección donde corre Vite). Si queda vacía, ningún otro sitio puede llamar a la API. |
 | `VITE_API_URL` | URL base de la API que usa la landing. Si queda vacía, la landing llama a `/api/...` en su mismo dominio; en desarrollo, Vite reenvía esas rutas a la API local en el puerto 3000. |
 | `TRUST_PROXY` | Se activa con `1` solo cuando la API corre detrás de un proxy. Así el límite de pedidos usa la IP real del visitante (`X-Forwarded-For`) y no la del proxy. En local se deja vacía. |
@@ -304,6 +328,7 @@ El `.env` no se crea solo: hay que copiarlo de `.env.example` y completarlo, com
 | `npm run plan -- --semana AAAA-MM-DD` | Pide solo el plan al Estratega (sin orquestador). |
 | `npm run investigar` y `npm run analizar` | Bajan datos de las cuentas de referencia y los analizan con la IA (`analizar` gasta). |
 | `npm run gasto` | Muestra cuánto se gastó este mes contra el tope. |
+| `npm run mcp:instagram` | Levanta el servidor MCP de Instagram a mano (normalmente lo levanta Claude Code desde `.mcp.json`). |
 | `npm run laminas`, `npm run reel`, `npm run reel:logo`, `npm run foto-perfil` | Generan las láminas de los carruseles, los reels y la foto de perfil de Instagram. |
 | `npm run hola` | Pide un eslogan a la API de Anthropic. Hace una llamada real y consume crédito. |
 | `npm run prueba` | Corre el agente de prueba sobre el motor de agentes. Hace una llamada real y consume crédito. |
