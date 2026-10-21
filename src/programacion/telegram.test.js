@@ -82,3 +82,27 @@ test("chatId queda como texto para compararlo con el de los mensajes", () => {
   assert.equal(crearClienteTelegram({ token: "t", chatId: 42 }).chatId, "42");
   assert.equal(crearClienteTelegram({ token: "t" }).chatId, null);
 });
+
+test("enviarFoto sube la imagen con texto y botones, y devuelve el ID del mensaje y el file_id de la foto más grande", async () => {
+  let pedido;
+  const fetchFn = async (url, opciones) => {
+    pedido = { url: String(url), formulario: opciones.body };
+    return respuestaJSON({ ok: true, result: { message_id: 90, photo: [{ file_id: "chica" }, { file_id: "grande" }] } });
+  };
+  const cliente = crearClienteTelegram({ token: "123:ABC", chatId: 42, fetchFn });
+  const resultado = await cliente.enviarFoto(Buffer.from([1, 2, 3]), { texto: "Mirá", botones: [[{ texto: "Usar", dato: "ia_usar:1" }]], responderA: 7 });
+  assert.deepEqual(resultado, { id: 90, fileId: "grande" });
+  assert.equal(pedido.url, "https://api.telegram.org/bot123:ABC/sendPhoto");
+  assert.equal(pedido.formulario.get("chat_id"), "42");
+  assert.equal(pedido.formulario.get("caption"), "Mirá");
+  assert.equal((await pedido.formulario.get("photo").arrayBuffer()).byteLength, 3);
+  assert.deepEqual(JSON.parse(pedido.formulario.get("reply_markup")), { inline_keyboard: [[{ text: "Usar", callback_data: "ia_usar:1" }]] });
+  assert.equal(JSON.parse(pedido.formulario.get("reply_parameters")).message_id, 7);
+});
+
+test("enviarFoto no filtra el token cuando falla", async () => {
+  const cliente = crearClienteTelegram({ token: "123:ABC", chatId: 42, fetchFn: async () => { throw new Error("falló https://api.telegram.org/bot123:ABC/sendPhoto"); } });
+  await assert.rejects(cliente.enviarFoto(Buffer.from([1])), (error) => error instanceof ErrorTelegram && !error.message.includes("123:ABC"));
+  const rechazado = crearClienteTelegram({ token: "123:ABC", chatId: 42, fetchFn: async () => respuestaJSON({ ok: false, description: "Bad Request" }, 400) });
+  await assert.rejects(rechazado.enviarFoto(Buffer.from([1])), /Telegram rechazó sendPhoto: Bad Request/);
+});

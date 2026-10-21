@@ -46,6 +46,27 @@ export function crearClienteTelegram({ token, chatId, fetchFn = fetch } = {}) {
       return (await llamar("sendMessage", cuerpo)).message_id;
     },
 
+    // Manda una foto (Buffer JPEG) con texto y botones. Devuelve el ID del mensaje y el file_id de la foto más grande,
+    // que sirve para volver a bajarla después sin tener que guardarla en ningún lado.
+    async enviarFoto(foto, { texto = "", botones, responderA } = {}) {
+      if (!token) throw new ErrorTelegram("Falta TELEGRAM_TOKEN en el entorno.");
+      const formulario = new FormData();
+      formulario.append("chat_id", String(chatId));
+      formulario.append("photo", new Blob([foto], { type: "image/jpeg" }), "imagen.jpg");
+      if (texto) formulario.append("caption", texto.slice(0, 1024));
+      if (botones?.length) formulario.append("reply_markup", JSON.stringify(tecladoDe(botones)));
+      if (responderA) formulario.append("reply_parameters", JSON.stringify({ message_id: responderA, allow_sending_without_reply: true }));
+      let respuesta;
+      try {
+        respuesta = await fetchFn(`${BASE}/bot${token}/sendPhoto`, { method: "POST", body: formulario });
+      } catch {
+        throw new ErrorTelegram("No se pudo conectar con Telegram.");
+      }
+      const datos = await respuesta.json().catch(() => null);
+      if (!respuesta.ok || !datos?.ok) throw new ErrorTelegram(`Telegram rechazó sendPhoto: ${datos?.description ?? respuesta.status}`, { codigo: datos?.error_code ?? respuesta.status });
+      return { id: datos.result.message_id, fileId: datos.result.photo?.at(-1)?.file_id ?? null };
+    },
+
     // Mensaje a otro chat (solo lo usa /start para decirle a quien escribe cuál es su chat id)
     enviarA: (destino, texto) => llamar("sendMessage", { chat_id: destino, text: texto.slice(0, LIMITE_MENSAJE) }),
 
