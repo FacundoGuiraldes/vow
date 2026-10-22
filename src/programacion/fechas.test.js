@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ahoraArgentina, diasHasta, esFechaISO, esHoraValida, fechaLegible, horaDesdeMinutos, lunesDe, minutosDelDia, sumarDias } from "./fechas.js";
+import { ahoraArgentina, diasHasta, esFechaISO, fechaEnTexto, esHoraValida, fechaLegible, horaDesdeMinutos, lunesDe, minutosDelDia, sumarDias } from "./fechas.js";
 
 test("ahoraArgentina convierte de UTC a hora argentina (UTC-3), también al cruzar de día", () => {
   assert.deepEqual(ahoraArgentina(new Date("2026-10-26T11:00:00Z")), { fecha: "2026-10-26", hora: "08:00" });
@@ -49,4 +49,19 @@ test("minutos y horas", () => {
   assert.equal(minutosDelDia("19:30"), 1170);
   assert.equal(horaDesdeMinutos(1170), "19:30");
   assert.equal(horaDesdeMinutos(5000), "23:59");
+});
+
+test("fechaEnTexto: encuentra la fecha de la que se habla", () => {
+  const hoy = "2026-10-22"; // jueves
+  assert.equal(fechaEnTexto("la publicación para el jueves 29/10 quedaría así", hoy), "2026-10-29");
+  assert.equal(fechaEnTexto("es para el 5/11", hoy), "2026-11-05");
+  assert.equal(fechaEnTexto("para el viernes", hoy), "2026-10-23");
+  assert.equal(fechaEnTexto("el jueves", hoy), "2026-10-22", "hoy cuenta como la próxima ocurrencia");
+  assert.equal(fechaEnTexto("mañana a la noche", hoy), "2026-10-23");
+  assert.equal(fechaEnTexto("miércoles", hoy), "2026-10-28", "con y sin tilde");
+  assert.equal(fechaEnTexto("miercoles", hoy), "2026-10-28");
+  assert.equal(fechaEnTexto("2/1", "2026-12-30"), "2027-01-02", "una fecha ya lejana en el pasado es del año que viene");
+  assert.equal(fechaEnTexto("31/2", hoy), null);
+  assert.equal(fechaEnTexto("Drop 01 en 2027 https://vow-17x.pages.dev/?origen=instagram", hoy), null);
+  assert.equal(fechaEnTexto("", hoy), null);
 });

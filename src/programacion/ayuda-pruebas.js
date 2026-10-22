@@ -109,8 +109,15 @@ export function crearEscenario({ fecha = "2026-10-30", hora = "08:00", permitirP
     texto: (texto, { respondeA = null, chat = CHAT } = {}) => ({
       message: { message_id: mensajeEntrante++, chat: { id: chat }, text: texto, ...(respondeA ? { reply_to_message: { message_id: respondeA } } : {}) },
     }),
-    video: (fileId, { respondeA = null } = {}) => ({
-      message: { message_id: mensajeEntrante++, chat: { id: CHAT }, video: { file_id: fileId, mime_type: "video/mp4", file_size: 1000 }, ...(respondeA ? { reply_to_message: { message_id: respondeA } } : {}) },
+    // respondeTexto: el texto del mensaje al que se responde (un mensaje del chat, que no es de ninguna pieza); pie: el texto que acompaña al archivo
+    video: (fileId, { respondeA = null, respondeTexto = null, pie = null } = {}) => ({
+      message: {
+        message_id: mensajeEntrante++,
+        chat: { id: CHAT },
+        video: { file_id: fileId, mime_type: "video/mp4", file_size: 1000 },
+        ...(pie ? { caption: pie } : {}),
+        ...(respondeA || respondeTexto ? { reply_to_message: { message_id: respondeA ?? 1, ...(respondeTexto ? { text: respondeTexto } : {}) } } : {}),
+      },
     }),
     foto: (fileId, { respondeA = null } = {}) => ({
       message: { message_id: mensajeEntrante++, chat: { id: CHAT }, photo: [{ file_id: `${fileId}-chica`, file_size: 10 }, { file_id: fileId, file_size: 100 }], ...(respondeA ? { reply_to_message: { message_id: respondeA } } : {}) },

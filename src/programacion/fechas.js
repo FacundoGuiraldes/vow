@@ -58,3 +58,33 @@ export function lunesDe(fechaISO, { siguiente = false } = {}) {
   if (desdeLunes === 0) return fechaISO;
   return siguiente ? sumarDias(fechaISO, 7 - desdeLunes) : sumarDias(fechaISO, -desdeLunes);
 }
+
+const sinTildes = (texto) => texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const DIAS_SIN_TILDES = DIAS.map(sinTildes);
+const esDiaReal = (fechaISO) => esFechaISO(fechaISO) && new Date(`${fechaISO}T00:00:00Z`).toISOString().slice(0, 10) === fechaISO;
+
+// Busca en un texto libre la fecha de la que se habla: "29/10", "jueves", "mañana" o "hoy" (en ese orden de prioridad).
+// Devuelve AAAA-MM-DD, o null si no hay ninguna. Un día de la semana es su próxima ocurrencia desde `hoy` (hoy incluido).
+export function fechaEnTexto(texto, hoy) {
+  if (typeof texto !== "string" || !texto.trim()) return null;
+  const t = sinTildes(texto);
+  const numerica = t.match(/(?<!\d)(\d{1,2})\s*[/-]\s*(\d{1,2})(?:\s*[/-]\s*(\d{2,4}))?(?!\d)/);
+  if (numerica) {
+    const dia = numerica[1].padStart(2, "0");
+    const mes = numerica[2].padStart(2, "0");
+    let anio = numerica[3] ? (numerica[3].length === 2 ? `20${numerica[3]}` : numerica[3]) : hoy.slice(0, 4);
+    let fecha = `${anio}-${mes}-${dia}`;
+    if (!numerica[3] && esDiaReal(fecha) && diasHasta(hoy, fecha) < -180) fecha = `${Number(anio) + 1}-${mes}-${dia}`; // "2/1" dicho en diciembre
+    if (esDiaReal(fecha)) return fecha;
+  }
+  const dia = DIAS_SIN_TILDES.findIndex((nombre) => new RegExp(`\\b${nombre}\\b`).test(t));
+  if (dia >= 0) {
+    for (let n = 0; n < 7; n++) {
+      const fecha = sumarDias(hoy, n);
+      if (new Date(`${fecha}T12:00:00Z`).getUTCDay() === dia) return fecha;
+    }
+  }
+  if (/\bmanana\b/.test(t)) return sumarDias(hoy, 1);
+  if (/\bhoy\b/.test(t)) return hoy;
+  return null;
+}

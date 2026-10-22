@@ -12,7 +12,7 @@
 //   5. /pausar frena toda publicación.
 import { revisarTextoPublico, validarUrlPublica } from "../mcp/instagram/validaciones.js";
 import { CAMPOS_EDITABLES, HERRAMIENTAS_CHAT, MENSAJES_MAXIMOS_POR_DIA, construirSistemaChat, recortarRecuerdo } from "./conversacion.js";
-import { ahoraArgentina, esHoraValida, fechaLegible, horaDesdeMinutos, minutosDelDia, sumarDias, diasHasta } from "./fechas.js";
+import { ahoraArgentina, esHoraValida, fechaEnTexto, fechaLegible, horaDesdeMinutos, minutosDelDia, sumarDias, diasHasta } from "./fechas.js";
 import {
   ESTADOS_LEGIBLES, botonesCancelar, botonesDia, botonesImagenIA, botonesPlan, botonesTarde, fechaDeAviso, textoPieza, textoPlanSemanal, textoRecordatorio, textoResumenDiario,
 } from "./mensajes.js";
@@ -275,16 +275,29 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     const responder = (texto) => decir(texto, { responderA: msg.message_id });
 
     let fila = msg.reply_to_message ? await repo.piezaPorMensaje(msg.reply_to_message.message_id) : null;
+    const proximas = fila ? [] : await repo.piezasEntre(hoy, sumarDias(hoy, 14));
+    const pendientes = [];
     if (!fila) {
-      // Sin respuesta: si hay una sola pieza próxima a la que le falta material, es esa
-      const candidatas = [];
-      for (const f of await repo.piezasEntre(hoy, sumarDias(hoy, 14))) {
+      // Sin pieza a la vista: si hay una sola próxima a la que le falta material, es esa
+      for (const f of proximas) {
         if (!MEDIOS_REQUERIDOS[f.pieza.formato] || !["propuesta", "aprobada", "confirmada"].includes(f.estado) || material(f).length === 0) continue;
-        if (faltaArchivo(f, await repo.mediosDePieza(f.id))) candidatas.push(f);
+        if (faltaArchivo(f, await repo.mediosDePieza(f.id))) pendientes.push(f);
       }
-      if (candidatas.length === 1) fila = candidatas[0];
+      if (pendientes.length === 1) fila = pendientes[0];
     }
-    if (!fila) return responder("No sé para qué pieza es. Mandame el archivo respondiendo al mensaje de la pieza o a su recordatorio.");
+    if (!fila) {
+      // Si respondió a un mensaje del chat (que no es de una pieza) o puso un pie al archivo, la fecha que nombra ahí dice cuál es
+      const pista = [msg.caption, msg.reply_to_message?.text, msg.reply_to_message?.caption].filter(Boolean).join(" ");
+      const fechaPista = fechaEnTexto(pista, hoy);
+      const coinciden = fechaPista ? proximas.filter((f) => f.fecha === fechaPista && MEDIOS_REQUERIDOS[f.pieza.formato] && VIVAS.includes(f.estado)) : [];
+      if (coinciden.length === 1) fila = coinciden[0];
+    }
+    if (!fila) {
+      const lista = pendientes.map((f) => `• ${fechaLegible(f.fecha)} ${f.hora} hs · ${f.pieza.formato}`).join("\n");
+      return responder(
+        `No sé para qué pieza es. Mandame el archivo respondiendo al mensaje de la pieza o a su recordatorio, o escribí la fecha en el texto del archivo (por ejemplo «29/10»).${lista ? `\nEstas esperan archivo:\n${lista}` : ""}`,
+      );
+    }
 
     const requerido = MEDIOS_REQUERIDOS[fila.pieza.formato];
     if (!requerido) return responder("Las stories todavía no se publican solas, así que no necesito el archivo.");
