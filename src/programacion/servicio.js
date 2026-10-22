@@ -514,7 +514,11 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     if (nombre === "ver_pieza") {
       const fila = await piezaDe(argumentos.id);
       if (!fila) return noExiste;
-      return { id: fila.id, fecha: fila.fecha, hora: fila.hora, estado: ESTADOS_LEGIBLES[fila.estado], pieza: fila.pieza };
+      const medios = await repo.mediosDePieza(fila.id);
+      return {
+        id: fila.id, fecha: fila.fecha, hora: fila.hora, estado: ESTADOS_LEGIBLES[fila.estado], pieza: fila.pieza,
+        archivos: medios.map((m) => m.tipo), falta_archivo: faltaArchivo(fila, medios), // lo que ya se subió (por ejemplo ["video"]) y lo que falta, si falta algo
+      };
     }
     if (nombre === "modificar_pieza") {
       const fila = await piezaDe(argumentos.id);
