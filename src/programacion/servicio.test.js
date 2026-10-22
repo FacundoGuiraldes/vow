@@ -840,6 +840,21 @@ describe("chat con la IA", () => {
     assert.equal(pieza.pieza.gancho, "Atate el compromiso. Salí.");
   });
 
+  test("ver_pieza dice si ya tiene el video cargado, para que la IA lo mencione", async () => {
+    let sin, con;
+    const { e, fila } = await escenarioChat(async ({ ejecutar }) => {
+      sin = await ejecutar("ver_pieza", { id: 1 });
+      await e.repo.agregarMedio({ piezaId: 1, tipo: "video", mime: "video/mp4", datos: VIDEO });
+      con = await ejecutar("ver_pieza", { id: 1 });
+      return "ok";
+    });
+    await escribir(e, "cómo queda");
+    assert.deepEqual(sin.archivos, []);
+    assert.match(sin.falta_archivo, /Falta el video/);
+    assert.deepEqual(con.archivos, ["video"]);
+    assert.equal(con.falta_archivo, null);
+  });
+
   test("modificar_pieza cambia la fecha y la hora, borra la confirmación, reprograma el recordatorio y le muestra la pieza con sus botones", async () => {
     let resultado;
     const { e, fila } = await escenarioChat(async ({ ejecutar }) => {
