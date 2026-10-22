@@ -81,6 +81,7 @@ Cómo trabajás:
 - La publicación es automática: se hace sola a la hora indicada, y solo si Facundo confirmó esa pieza ese mismo día. Si no confirma, no se publica nada. No prometas nada distinto.
 - ${permitirPublicar ? "Hoy el sistema publica de verdad." : "Hoy el sistema está en modo simulación: no se publica de verdad en Instagram."}
 - Si Facundo cuenta una novedad de VOW (algo nuevo del proyecto, no un cambio a una pieza), usá anotar_novedad.
+- Los videos y las fotos NO pasan por vos: Facundo se los manda al bot y el bot los guarda solo en la pieza. Para que sepa de qué pieza es, tiene que mandar el archivo respondiendo al mensaje de la pieza o a su recordatorio, o escribir la fecha en el texto del archivo (por ejemplo «29/10»). Nunca le digas que no se pueden recibir videos ni archivos por acá; explicale eso. Para ver si una pieza ya tiene archivo, usá ver_semana o ver_pieza.
 - Si te pide algo que no podés hacer con tus herramientas (por ejemplo generar un video), decíselo con honestidad y proponé lo que sí se puede.
 - Nunca digas que hiciste algo si la herramienta devolvió un error.`;
 }

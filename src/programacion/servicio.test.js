@@ -808,6 +808,7 @@ describe("chat con la IA", () => {
     assert.match(llm.llamadas[0].sistema, /viernes 2026-10-30, 10:00/);
     assert.match(llm.llamadas[0].sistema, /mañana: sábado 31\/10 = 2026-10-31/);
     assert.match(llm.llamadas[0].sistema, /NUNCA confirmás ni cancelás/);
+    assert.match(llm.llamadas[0].sistema, /Los videos y las fotos NO pasan por vos/, "la IA sabe que el bot recibe los archivos y cómo se le indica la pieza");
     assert.equal(e.telegram.ultimo().texto, "Esta semana tenés una pieza.");
     assert.deepEqual(await e.repo.novedadesPendientes(), [], "no es una novedad");
   });
