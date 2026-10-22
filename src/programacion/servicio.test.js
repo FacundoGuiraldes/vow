@@ -452,6 +452,39 @@ describe("archivos", () => {
     assert.match(e.telegram.ultimo().texto, /No sé para qué pieza es/);
   });
 
+  test("si respondió a un mensaje del chat, la fecha que nombra ahí dice de qué pieza es", async () => {
+    const e = crearEscenario({ fecha: "2026-10-27" });
+    await e.servicio.recibirPlan({ semana: "2026-10-26", plan: crearPlan([crearPieza({ fecha: "2026-10-29" }), crearPieza({ fecha: "2026-11-01", gancho: "Sostenelo hoy. Cumplilo." })]) });
+    e.telegram.archivos.set("vid1", VIDEO);
+    await e.mandar(e.actualizacion.video("vid1", { respondeTexto: "Entonces la publicación para el jueves 29/10 quedaría así, con el video adjunto." }));
+    const filas = await e.repo.piezasDeSemana("2026-10-26");
+    const jueves = filas.find((f) => f.fecha === "2026-10-29");
+    const domingo = filas.find((f) => f.fecha === "2026-11-01");
+    assert.equal((await e.repo.mediosDePieza(jueves.id)).length, 1);
+    assert.equal((await e.repo.mediosDePieza(domingo.id)).length, 0);
+    assert.match(e.telegram.ultimo().texto, /Recibido para la pieza del jueves 29\/10/);
+  });
+
+  test("la fecha en el texto del archivo también sirve", async () => {
+    const e = crearEscenario({ fecha: "2026-10-27" });
+    await e.servicio.recibirPlan({ semana: "2026-10-26", plan: crearPlan([crearPieza({ fecha: "2026-10-29" }), crearPieza({ fecha: "2026-11-01", gancho: "Sostenelo hoy. Cumplilo." })]) });
+    e.telegram.archivos.set("vid1", VIDEO);
+    await e.mandar(e.actualizacion.video("vid1", { pie: "para el domingo" }));
+    const domingo = (await e.repo.piezasDeSemana("2026-10-26")).find((f) => f.fecha === "2026-11-01");
+    assert.equal((await e.repo.mediosDePieza(domingo.id)).length, 1);
+  });
+
+  test("si no se sabe de qué pieza es, lista las que esperan archivo", async () => {
+    const e = crearEscenario({ fecha: "2026-10-27" });
+    await e.servicio.recibirPlan({ semana: "2026-10-26", plan: crearPlan([crearPieza({ fecha: "2026-10-29" }), crearPieza({ fecha: "2026-11-01", gancho: "Sostenelo hoy. Cumplilo." })]) });
+    e.telegram.archivos.set("vid1", VIDEO);
+    await e.mandar(e.actualizacion.video("vid1", { respondeTexto: "Drop 01 en 2027, sí… pero la paciencia no es nuestro fuerte." }));
+    const texto = e.telegram.ultimo().texto;
+    assert.match(texto, /No sé para qué pieza es/);
+    assert.match(texto, /jueves 29\/10/);
+    assert.match(texto, /domingo 01\/11/);
+  });
+
   test("rechaza un formato que no corresponde (foto para un reel)", async () => {
     const e = crearEscenario({ fecha: "2026-10-27" });
     const fila = await e.cargarPieza();
