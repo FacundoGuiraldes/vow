@@ -485,6 +485,15 @@ describe("archivos", () => {
     assert.match(texto, /domingo 01\/11/);
   });
 
+  test("si algo falla al guardar el archivo, lo avisa en vez de quedarse callado", async () => {
+    const e = crearEscenario({ fecha: "2026-10-27" });
+    const fila = await e.cargarPieza();
+    e.telegram.archivos.set("vid1", VIDEO);
+    e.repo.agregarMedio = async () => { throw new Error("la base no responde"); };
+    await e.mandar(e.actualizacion.video("vid1", { respondeA: (await e.repo.obtenerPieza(fila.id)).mensajes[0] }));
+    assert.match(e.telegram.ultimo().texto, /No pude terminar eso: la base no responde/);
+  });
+
   test("rechaza un formato que no corresponde (foto para un reel)", async () => {
     const e = crearEscenario({ fecha: "2026-10-27" });
     const fila = await e.cargarPieza();

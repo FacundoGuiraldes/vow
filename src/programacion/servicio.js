@@ -420,9 +420,21 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
   }
 
   async function manejarActualizacion(actualizacion) {
-    if (actualizacion.callback_query) return manejarBoton(actualizacion.callback_query);
-    if (actualizacion.message) return manejarMensaje(actualizacion.message);
-    return { ignorada: true };
+    try {
+      if (actualizacion.callback_query) return await manejarBoton(actualizacion.callback_query);
+      if (actualizacion.message) return await manejarMensaje(actualizacion.message);
+      return { ignorada: true };
+    } catch (error) {
+      // Un fallo no tiene que pasar en silencio: si Facundo no ve respuesta, no sabe si el bot cayó o si no entendió
+      console.error(`Error en el bot de Telegram: ${error.message}`);
+      const chatId = actualizacion.message?.chat?.id ?? actualizacion.callback_query?.message?.chat?.id;
+      if (autorizado(chatId)) {
+        const aviso = String(error.message).slice(0, 300);
+        const idMensaje = actualizacion.message?.message_id;
+        await decir(`⚠️ No pude terminar eso: ${aviso}\nProbá de nuevo. Si se repite, mirá los logs del servicio en Render.`, idMensaje ? { responderA: idMensaje } : undefined).catch(() => {});
+      }
+      return { error: true };
+    }
   }
 
   // ───────────────────────── Aviso de las 8 ─────────────────────────
