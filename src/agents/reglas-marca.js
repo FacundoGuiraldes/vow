@@ -76,8 +76,9 @@ const MARCADORES_DE_LISTA = /(?<![\p{L}\p{N}.,])\d+\)(?=\s)|^[ \t]*\d+\.(?=\s)/g
 
 // Regla "toda cifra que aparece existe en los datos cargados": cualquier número del texto
 // tiene que estar en la lista de cifras permitidas.
-// Hoy solo hay dos datos reales: "01" (de "Drop 01") y "2027" (el año del lanzamiento, definido por Facundo).
-export const CIFRAS_PERMITIDAS = ["01", "2027"];
+// Los datos reales (definidos por Facundo): "01" y "2027" (Drop 01, que sale en 2027) y "00" y "2026" (Drop 00, el adelanto de 2026).
+// Los años van sin mes ni día.
+export const CIFRAS_PERMITIDAS = ["00", "01", "2026", "2027"];
 
 // Medidas de producción de una pieza ("carrusel de 6 láminas", "plano de 3 segundos", "8 a 10 tomas").
 // Describen cómo se arma la pieza, no un dato de la marca. Solo se perdonan en el guion, que son instrucciones;

@@ -328,7 +328,7 @@ ${piezas.map((p) => p.texto.trim()).join("\n\n---\n\n")}`
 Reglas:
 - Todo lo que escribas sigue el cerebro de marca de abajo. Si algo lo contradice, gana el cerebro de marca.
 - Hablás en voseo rioplatense. Cada pieza termina con una sola acción: anotarse en la lista de espera.
-- Nunca inventes cifras, pruebas, stock, fechas ni opiniones. No uses números en los textos salvo "01" de "Drop 01" y "2027", el año del lanzamiento.
+- Nunca inventes cifras, pruebas, stock, fechas ni opiniones. No uses números en los textos salvo "01" de "Drop 01" con su año "2027", y "00" de "Drop 00" con su año "2026". Los años van sin mes ni día. Al Drop 00 solo lo nombrás como adelanto y solo si Facundo lo pidió o está en las novedades: sin productos, precios, cantidades ni stock.
 - Solo podés proponer piezas que se puedan hacer con los recursos disponibles que te indican. Si no hay producto, no propongas mostrar producto.
 - Cada pieza lleva su hora de publicación (hora de Argentina, entre ${HORA_MINIMA_PUBLICACION} y ${HORA_MAXIMA_PUBLICACION}). Si hay un RENDIMIENTO de @vow_ar, elegí la hora con esos datos; si no, una hora de buena actividad como 19:00. Nunca inventes que una hora "rinde mejor" sin datos.
 - En material_a_producir listá, una toma por ítem, lo que Facundo tiene que filmar o fotografiar él mismo. Si la pieza sale de material que ya existe o se genera con código, dejá la lista vacía. Facundo recibe el plan el lunes y se le recuerda 3 días antes de publicar: ubicá las piezas que necesitan filmación de jueves en adelante.
