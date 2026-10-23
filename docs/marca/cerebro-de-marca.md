@@ -7,8 +7,8 @@ Este archivo es la fuente única de cómo habla y cómo se ve VOW. Todo contenid
 - Marca argentina de indumentaria y accesorios para entrenar (prendas técnicas, grips, straps). Es una marca independiente, propia de Facundo.
 - Idea central: **la promesa**. Algo que te prometés a vos mismo y cumplís. Es un compromiso con uno mismo, no un texto: no se muestra escrita en papel ni se propone un ritual de escribirla.
 - Sobre la palabra "voto": es el nombre interno de la idea (así se llamó al principio y aparece en el manifiesto de la landing), pero se evita en la comunicación porque suena a elecciones. Se dice "promesa".
-- Lanzamiento: el Drop 01 sale en **2027** (definido por Facundo). Se puede decir en las piezas y en el Instagram; es la única fecha pública y no se agregan meses ni días.
-- **Drop 00** (definido por Facundo): una tanda chica de accesorios hechos en Argentina (gorras, medias y shakers) que se vende por Instagram antes del Drop 01. El detalle está en `docs/productos/stock-inicial.md`. El nombre está decidido, pero **todavía no se anuncia**: hasta que Facundo defina cuándo y cómo se comunica, no aparece en las piezas y "2027" sigue siendo la única fecha pública.
+- Lanzamiento: el Drop 01 sale en **2027** (definido por Facundo) y el Drop 00 en **2026** (también definido por Facundo, ver abajo). Son las únicas fechas públicas, se pueden decir en las piezas y en el Instagram, y no se agregan meses ni días.
+- **Drop 00** (definido por Facundo): una tanda chica de accesorios hechos en Argentina (gorras, medias y shakers) que se vende por Instagram antes del Drop 01. El detalle está en `docs/productos/stock-inicial.md`. Ya se anuncia como adelanto: se puede nombrar "Drop 00" con su año, **2026**, y nada más. No se publican productos, precios, cantidades ni stock del Drop 00, ni meses o días, hasta que Facundo defina cómo se comunica. El Estratega solo lo nombra si Facundo lo pide o está en las novedades.
 - Bio de Instagram (@vow_ar), definida por Facundo: **"Una promesa con vos. Indumentaria y accesorios fitness. Lista de espera"**. Se dice "con vos" y no "para vos": la promesa la hace uno consigo mismo, la marca no se la hace a nadie.
 - En una frase: **simplicidad estética para quienes disfrutan entrenar y verse bien haciéndolo, sin dejar de ser simples.**
 
@@ -130,6 +130,6 @@ Cómo se resuelve la tensión entre "verse bien" y "no presumir": lo estético e
 
 ## 9. Por confirmar
 
-- ¿Cuándo y cómo se anuncia el Drop 00? Hasta definirlo, no aparece en las piezas.
+- ¿Cuándo se abre la venta del Drop 00 y cuánto detalle (productos, precios) se muestra? Hasta definirlo, solo se dice "Drop 00 en 2026".
 - ¿"Figurar" se usa en los textos o se busca otra palabra?
 - ¿Hay palabras propias que quieras sumar a "Sí" o a "No"?

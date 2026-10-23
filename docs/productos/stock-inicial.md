@@ -91,7 +91,7 @@ El shaker es el más delicado: su costo ($6.270) es casi lo que cuesta un shaker
 
 ## Por confirmar
 
-- Fecha pública del Drop 00 y cómo se anuncia (hoy la única fecha pública es 2027, la del Drop 01).
+- Cuándo se abre la venta del Drop 00 y cuánto detalle se muestra. Hoy lo público es solo "Drop 00 en 2026" (y "Drop 01 en 2027"), sin meses ni días.
 - Reparto de talles y colores de las medias.
 - Shakers: capacidad, material, método del logo, entrega y estado del pago.
 - Entrega de las medias.

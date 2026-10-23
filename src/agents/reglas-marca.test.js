@@ -110,8 +110,10 @@ test("los marcadores de lista de un guion no cuentan como cifras, pero una cifra
   assert.deepEqual(cifrasNoPermitidas("Drop 01 abre pronto"), []);
 });
 
-test("las únicas cifras de la marca son 01 (Drop 01) y 2027 (el año del lanzamiento)", () => {
-  assert.deepEqual(CIFRAS_PERMITIDAS, ["01", "2027"]);
+test("las únicas cifras de la marca son 01 y 2027 (Drop 01) y 00 y 2026 (Drop 00)", () => {
+  assert.deepEqual(CIFRAS_PERMITIDAS, ["00", "01", "2026", "2027"]);
+  assert.deepEqual(cifrasNoPermitidas("Drop 00 en 2026."), []);
+  assert.deepEqual(cifrasNoPermitidas("Drop 00 en 2025."), ["2025"]);
   assert.deepEqual(cifrasNoPermitidas("Drop 01 en 2027."), []);
   assert.deepEqual(cifrasNoPermitidas("Drop 01 en 2028."), ["2028"]);
   assert.deepEqual(cifrasNoPermitidas("Sale en marzo de 2027."), []); // el año es dato real
