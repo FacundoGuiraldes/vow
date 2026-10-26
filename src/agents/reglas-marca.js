@@ -85,8 +85,13 @@ export const CIFRAS_PERMITIDAS = ["00", "01", "2026", "2027"];
 // "3 días" o "5 straps" siguen marcados, y el texto que ve el público (gancho, epígrafe) nunca usa esta excepción.
 const MEDIDAS_DE_PRODUCCION = /(?<![\p{L}\p{N}.,])\d+(?:[.,]\d+)?(?:\s*(?:y|a|-|–)\s*\d+(?:[.,]\d+)?)?\s+(?:l[aá]minas?|slides?|escenas?|planos?|tomas?|cortes?|cuadros?|frames?|pantallas?|p[aá]ginas?|segundos?|fotos?|im[aá]gen(?:es)?|clips?)(?![\p{L}\p{N}])/giu;
 
+// Un enlace o dominio ("https://vow-17x.pages.dev", "vow17.com.ar") no es una cifra de la marca:
+// los números de una dirección web no se cuentan.
+const ENLACES = /(?<![\p{L}\p{N}])(?:https?:\/\/|www\.)\S+|(?<![\p{L}\p{N}@])[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)*\.(?:com|net|org|app|dev|io|ar|co|me|link|site|store|shop|ly)(?:\.[a-z]{2})?(?:\/\S*)?(?![\p{L}\p{N}])/giu;
+
 export function cifrasNoPermitidas(texto, permitidas = CIFRAS_PERMITIDAS, { produccion = false } = {}) {
   if (typeof texto !== "string") return [];
+  texto = texto.replace(ENLACES, " ");
   // Numerar las partes de una pieza ("Lámina 2", "Story 3", "Paso 1") no es una cifra de la marca
   let sinNumeracion = texto.replace(NUMERACION_DE_PARTES, "").replace(MARCADORES_DE_LISTA, "");
   if (produccion) sinNumeracion = sinNumeracion.replace(MEDIDAS_DE_PRODUCCION, "");
