@@ -4,7 +4,7 @@
 //   POST /plan           lo llama el workflow del lunes con el plan ya armado por los agentes (clave)
 //   GET  /novedades      lo que Facundo le contó al bot y todavía no leyó el Estratega (clave)
 //   GET  /oficina       todo lo que muestra el juego de la oficina: piezas, medios, charla, novedades y rendimiento (clave)
-//   POST /oficina/accion lo que hace el juego: aprobar una pieza, marcar pendientes, anotar en el cuaderno (clave)
+//   POST /oficina/accion lo que hace el juego: aprobar una pieza, pedir otra sugerencia, marcar pendientes, anotar en el cuaderno (clave)
 //   GET  /medios/:token  el archivo de una pieza: Meta lo descarga desde acá (el token es imposible de adivinar)
 import { createHash, timingSafeEqual } from "node:crypto";
 import { Router, json } from "express";
@@ -124,7 +124,8 @@ export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOfic
 
   router.get("/oficina", conClaveOficina, async (req, res, siguiente) => {
     try {
-      res.set("Cache-Control", "no-store").json(await armarEstadoOficina({ repo, rendimiento, permitirPublicar }));
+      const estado = await armarEstadoOficina({ repo, rendimiento, permitirPublicar });
+      res.set("Cache-Control", "no-store").json(req.query.v === estado.version ? { version: estado.version, sin_cambios: true } : estado);
     } catch (error) {
       siguiente(error);
     }
@@ -132,7 +133,7 @@ export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOfic
 
   router.post("/oficina/accion", conClaveOficina, async (req, res, siguiente) => {
     try {
-      res.json(await aplicarAccion({ repo, servicio }, req.body));
+      res.json(await aplicarAccion({ repo, servicio, rendimiento }, req.body));
     } catch (error) {
       if (error instanceof ErrorAccion) return res.status(error.estado).json({ error: error.message });
       return siguiente(error);

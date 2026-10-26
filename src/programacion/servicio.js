@@ -428,6 +428,33 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     return decirDePieza(nueva, `${resultado.queCambio ? `✏️ ${resultado.queCambio}\n\n` : ""}${textoPieza(nueva)}${aviso}`, { botones: botonesPlan(fila.id, { conIA: conIA(nueva) }), responderA: msg.message_id });
   }
 
+  // Desde la oficina: la IA arma otra sugerencia para el día de una pieza, que Facundo tiene que aprobar de nuevo.
+  async function sugerirCambio(id, { indicacion = "", contexto = "" } = {}) {
+    const { fecha: hoy } = ahora();
+    const fila = await repo.obtenerPieza(id);
+    if (!fila) return { ok: false, motivo: "Esa pieza no existe." };
+    if (!VIVAS.includes(fila.estado)) return { ok: false, motivo: `Esa pieza está ${ESTADOS_LEGIBLES[fila.estado]}: ya no se puede cambiar.` };
+    if (fila.fecha < hoy) return { ok: false, motivo: "Esa fecha ya pasó." };
+    if (!editor) return { ok: false, motivo: "La IA no está configurada en el servicio (falta ANTHROPIC_API_KEY)." };
+    const clave = `ediciones:${hoy}`;
+    const hechas = Number(await repo.leerEstado(clave)) || 0;
+    if (hechas >= EDICIONES_MAXIMAS_POR_DIA) return { ok: false, motivo: `Llegaste al máximo de ${EDICIONES_MAXIMAS_POR_DIA} ediciones por día (es un freno de gasto).` };
+    await repo.guardarEstado(clave, hechas + 1);
+
+    const instruccion = `Armá otra sugerencia para esta pieza.${indicacion ? `\nPedido de Facundo: ${indicacion}` : ""}${contexto ? `\n\nContexto:\n${contexto}` : ""}`;
+    let resultado;
+    try {
+      resultado = await editor.editarPieza({ fila, instruccion, hoy, alternativa: true });
+    } catch (error) {
+      return { ok: false, motivo: `No pude armar la sugerencia: ${error.message}` };
+    }
+    if (!resultado.ok) return { ok: false, motivo: `La sugerencia no pasó las reglas de la marca: ${resultado.errores.join(" ")}` };
+
+    const { nueva, aviso } = await guardarEdicion(fila, { pieza: resultado.pieza, hora: resultado.hora, hoy });
+    await decirDePieza(nueva, `🔄 Nueva sugerencia pedida desde la oficina${resultado.queCambio ? `: ${resultado.queCambio}` : ""}\n\n${textoPieza(nueva)}${aviso}`, { botones: botonesPlan(fila.id, { conIA: conIA(nueva) }) }).catch((error) => console.error(`No se pudo avisar por Telegram: ${error.message}`));
+    return { ok: true, estado: nueva.estado };
+  }
+
   async function manejarActualizacion(actualizacion) {
     try {
       if (actualizacion.callback_query) return await manejarBoton(actualizacion.callback_query);
@@ -788,5 +815,5 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     return { fecha: hoy, hora, acciones };
   }
 
-  return { recibirPlan, avisarFalloDelPlan, manejarActualizacion, aprobarDesdeJuego, tick, enviarResumenDiario: () => enviarResumenDiario(ahora().fecha) };
+  return { recibirPlan, avisarFalloDelPlan, manejarActualizacion, aprobarDesdeJuego, sugerirCambio, tick, enviarResumenDiario: () => enviarResumenDiario(ahora().fecha) };
 }

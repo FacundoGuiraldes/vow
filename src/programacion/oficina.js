@@ -3,6 +3,7 @@
 //   aplicarAccion      → lo que el juego puede hacer: aprobar una pieza, marcar pendientes como cumplidos, anotar en el cuaderno
 // Lo que se marca en el juego queda también como novedad: el Estratega lo lee en el próximo plan.
 // NO se puede confirmar la publicación del día desde acá: esa confirmación sigue siendo solo por Telegram.
+import { createHash } from "node:crypto";
 const DIA_MS = 86_400_000;
 const LIMITE_ENTRADAS = 200;
 const LIMITE_TEXTO = 300;
@@ -54,7 +55,7 @@ export async function armarEstadoOficina({ repo, rendimiento = null, permitirPub
       rend = { error: String(error.message).slice(0, 200) };
     }
   }
-  return {
+  const cuerpo = {
     generado: new Date(ahora).toISOString(),
     pausa: pausa === true,
     publica_de_verdad: permitirPublicar,
@@ -65,15 +66,44 @@ export async function armarEstadoOficina({ repo, rendimiento = null, permitirPub
     juego,
     rendimiento: rend,
   };
+  // La versión cambia solo cuando cambia algo: el juego pregunta seguido y, si no cambió, el servidor contesta cortito
+  const { generado, ...sinHora } = cuerpo;
+  void generado;
+  return { ...cuerpo, version: createHash("sha1").update(JSON.stringify(sinHora)).digest("hex").slice(0, 16) };
 }
 
-export async function aplicarAccion({ repo, servicio }, accion, ahora = Date.now()) {
+// Lo que la IA tiene que saber para sugerir algo mejor: novedades, charla con el bot, resto de la semana y cómo les fue a las últimas publicaciones
+export async function armarContexto({ repo, rendimiento = null }, idPieza, ahora = Date.now()) {
+  const [piezas, novedades, chat] = await Promise.all([repo.piezasEntre(fechaISO(ahora - 14 * DIA_MS), fechaISO(ahora + 30 * DIA_MS)), repo.novedadesRecientes(10), repo.leerEstado("chat")]);
+  const partes = [];
+  const otras = piezas.filter((p) => p.id !== idPieza && p.estado !== "cancelada").map((p) => `- ${p.fecha} ${p.pieza?.formato ?? ""} (${p.estado}): ${p.pieza?.gancho ?? ""}`);
+  if (otras.length) partes.push(`Otras piezas cerca (no repetir):\n${otras.join("\n")}`);
+  if (novedades.length) partes.push(`Novedades de Facundo:\n${novedades.map((n) => `- ${recortar(n.texto, 200)}`).join("\n")}`);
+  const mensajes = (Array.isArray(chat) ? chat : []).slice(-8).map((m) => `${m.rol === "usuario" ? "Facundo" : "Bot"}: ${recortar(m.texto, 250)}`);
+  if (mensajes.length) partes.push(`Últimos mensajes con el bot:\n${mensajes.join("\n")}`);
+  try {
+    const r = rendimiento ? await rendimiento.obtener() : null;
+    if (r?.publicaciones?.length) partes.push(`Rendimiento de las últimas publicaciones:\n${r.publicaciones.map((p) => `- ${p.fecha} ${p.gancho}: alcance ${p.alcance ?? "?"}, me gusta ${p.me_gusta ?? "?"}, guardados ${p.guardados ?? "?"}`).join("\n")}`);
+  } catch {
+    // sin rendimiento igual se puede sugerir
+  }
+  return partes.join("\n\n");
+}
+
+export async function aplicarAccion({ repo, servicio, rendimiento = null }, accion, ahora = Date.now()) {
   const en = new Date(ahora).toISOString();
   const tipo = accion?.accion;
 
   if (tipo === "aprobar_pieza") {
     if (!Number.isInteger(accion.id)) throw new ErrorAccion("Falta el id de la pieza.");
     const resultado = await servicio.aprobarDesdeJuego(accion.id);
+    if (!resultado.ok) throw new ErrorAccion(resultado.motivo, 409);
+    return { ok: true, estado: resultado.estado };
+  }
+
+  if (tipo === "cambiar_pieza") {
+    if (!Number.isInteger(accion.id)) throw new ErrorAccion("Falta el id de la pieza.");
+    const resultado = await servicio.sugerirCambio(accion.id, { indicacion: recortar(accion.indicacion, 300), contexto: await armarContexto({ repo, rendimiento }, accion.id) });
     if (!resultado.ok) throw new ErrorAccion(resultado.motivo, 409);
     return { ok: true, estado: resultado.estado };
   }

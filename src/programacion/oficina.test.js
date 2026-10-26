@@ -106,3 +106,56 @@ describe("rendimiento de Instagram para el juego", () => {
     assert.equal(await crearRendimientoJuego({ meta: null }).obtener(), null);
   });
 });
+
+describe("cambiar una pieza desde la oficina", () => {
+  const editorQue = (resultado) => ({ pedidos: [], async editarPieza(p) { this.pedidos.push(p); return typeof resultado === "function" ? resultado(p) : resultado; } });
+
+  test("la IA arma otra sugerencia con el contexto, la deja para aprobar y avisa por Telegram", async () => {
+    const editor = editorQue(({ fila }) => ({ ok: true, pieza: { ...fila.pieza, gancho: "Otra idea. Mismo día." }, hora: fila.hora, queCambio: "Cambié el enfoque.", errores: [] }));
+    const e = crearEscenario({ fecha: "2026-10-26", editor });
+    const fila = await e.cargarPieza();
+    await e.repo.agregarNovedad("Llegaron las gorras");
+    await e.repo.guardarEstado("chat", [{ rol: "usuario", texto: "quiero algo más de proceso" }]);
+    await aplicarAccion({ ...e, rendimiento: { obtener: async () => ({ publicaciones: [{ fecha: "2026-10-19", gancho: "Presentación", alcance: 200 }] }) } }, { accion: "cambiar_pieza", id: fila.id, indicacion: "más corto" });
+    const nueva = await e.repo.obtenerPieza(fila.id);
+    assert.equal(nueva.pieza.gancho, "Otra idea. Mismo día.");
+    assert.equal(nueva.estado, "propuesta");
+    assert.ok(editor.pedidos[0].alternativa);
+    for (const dato of ["más corto", "Llegaron las gorras", "quiero algo más de proceso", "alcance 200"]) assert.ok(editor.pedidos[0].instruccion.includes(dato), dato);
+    assert.match(e.telegram.ultimo().texto, /Nueva sugerencia pedida desde la oficina/);
+  });
+
+  test("si estaba confirmada, vuelve a pedir aprobación; sin IA o con pieza ya publicada, avisa por qué no", async () => {
+    const editor = editorQue(({ fila }) => ({ ok: true, pieza: { ...fila.pieza, gancho: "Nuevo." }, hora: fila.hora, queCambio: "", errores: [] }));
+    const e = crearEscenario({ fecha: "2026-10-30", editor });
+    const fila = await e.cargarPieza();
+    await e.repo.actualizarPieza(fila.id, { estado: "confirmada", confirmada_el: "2026-10-30" });
+    await aplicarAccion(e, { accion: "cambiar_pieza", id: fila.id });
+    const nueva = await e.repo.obtenerPieza(fila.id);
+    assert.equal(nueva.estado, "propuesta");
+    assert.equal(nueva.confirmada_el, null);
+    await e.repo.actualizarPieza(fila.id, { estado: "publicada" });
+    await assert.rejects(aplicarAccion(e, { accion: "cambiar_pieza", id: fila.id }), (error) => error.estado === 409);
+
+    const sinIA = crearEscenario({ fecha: "2026-10-30" });
+    const f2 = await sinIA.cargarPieza();
+    await assert.rejects(aplicarAccion(sinIA, { accion: "cambiar_pieza", id: f2.id }), /ANTHROPIC_API_KEY/);
+  });
+
+  test("una sugerencia que rompe las reglas de la marca no se guarda", async () => {
+    const e = crearEscenario({ fecha: "2026-10-26", editor: editorQue({ ok: false, errores: ["urgencia falsa"] }) });
+    const fila = await e.cargarPieza();
+    const antes = fila.pieza.gancho;
+    await assert.rejects(aplicarAccion(e, { accion: "cambiar_pieza", id: fila.id }), /urgencia falsa/);
+    assert.equal((await e.repo.obtenerPieza(fila.id)).pieza.gancho, antes);
+  });
+
+  test("la versión del estado solo cambia cuando cambia algo", async () => {
+    const e = crearEscenario();
+    const a = await armarEstadoOficina({ repo: e.repo, ahora: 1000 });
+    const b = await armarEstadoOficina({ repo: e.repo, ahora: 9000 });
+    assert.equal(a.version, b.version);
+    await e.repo.agregarNovedad("algo nuevo");
+    assert.notEqual((await armarEstadoOficina({ repo: e.repo })).version, a.version);
+  });
+});
