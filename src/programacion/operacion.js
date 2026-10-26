@@ -92,3 +92,37 @@ export function resumenParaChat(op) {
     nota: "Lo que no aparece en 'campos' es lo que dicen los documentos del repo (punto de partida).",
   };
 }
+
+// Copia legible de lo que se cambió desde el juego y el bot, para que el repo también lo muestre.
+// Solo depende del estado (sin hora de generación), así que si nada cambió el archivo queda idéntico y no hay commit.
+export function markdownDeOperacion(op) {
+  const filas = Object.entries(CAMPOS).map(([clave, def]) => `| ${def.nombre} | ${op.campos[clave] ? op.campos[clave].replace(/\|/g, "/") : "_igual que los documentos_"} |`);
+  const propias = Object.values(op.agenda.propias).sort((a, b) => (a.f + a.h).localeCompare(b.f + b.h));
+  const agenda = propias.length ? propias.map((e) => `- ${e.f}${e.h ? ` ${e.h}` : ""} · ${e.sala} · ${e.t}`) : ["_Nada agregado._"];
+  const ocultas = op.agenda.ocultas.length ? op.agenda.ocultas.map((c) => `- ${c.replace("|", " · ")}`) : ["_Ninguno._"];
+  const historial = op.historial.length ? [...op.historial].reverse().map((h) => `- ${h.en.slice(0, 16).replace("T", " ")} UTC · ${h.origen === "juego" ? "juego" : "bot"} · ${h.texto}`) : ["_Sin cambios._"];
+  return [
+    "# Operación: datos editados desde el juego y el bot",
+    "",
+    "Copia automática de lo que se cambió en VOW HQ y en el chat del bot. La fuente de verdad es la base de datos del servicio: no se edita a mano acá (el próximo sincronizado lo pisa).",
+    "",
+    "## Datos",
+    "",
+    "| Dato | Valor |",
+    "| --- | --- |",
+    ...filas,
+    "",
+    "## Agenda agregada",
+    "",
+    ...agenda,
+    "",
+    "## Eventos de los documentos que se quitaron de la agenda",
+    "",
+    ...ocultas,
+    "",
+    "## Últimos cambios",
+    "",
+    ...historial,
+    "",
+  ].join("\n");
+}

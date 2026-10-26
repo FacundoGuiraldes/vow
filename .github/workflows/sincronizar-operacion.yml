@@ -1,0 +1,48 @@
+name: Sincronizar operación
+
+# Copia al repo (docs/operacion/) lo que se editó desde el juego VOW HQ y desde el chat del bot: depósito, recepción, estrategia y agenda.
+# La fuente de verdad es la base del servicio; el repo guarda la copia y el historial. Solo escribe si algo cambió.
+# Usa los secretos que ya tiene el proyecto (URL_PUBLICA y PROGRAMACION_SECRETO). No gasta la API de Anthropic.
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: sincronizar-operacion
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  sincronizar:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      URL_PUBLICA: ${{ secrets.URL_PUBLICA }}
+      PROGRAMACION_SECRETO: ${{ secrets.PROGRAMACION_SECRETO }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Traer la operación del servicio
+        run: node scripts/sincronizar-operacion.js
+
+      - name: Guardar en el repo si cambió
+        run: |
+          git add docs/operacion
+          if git diff --cached --quiet; then
+            echo "Nada para guardar."
+            exit 0
+          fi
+          git config user.name "vow-sincronizador"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "Operación: copia de lo editado en el juego y el bot"
+          git pull --rebase origin main
+          git push origin HEAD:main
