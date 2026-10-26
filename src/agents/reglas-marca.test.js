@@ -192,3 +192,12 @@ test("cifrasNoPermitidas con produccion: rango con decimal y espacio obligatorio
   // sin espacio ("7láminas") no es la forma de escribir una medida: se marca
   assert.deepEqual(cifrasNoPermitidas("Son 7láminas", CIFRAS_PERMITIDAS, p), ["7"]);
 });
+
+test("cifrasNoPermitidas: los números dentro de un enlace no cuentan", async () => {
+  const { cifrasNoPermitidas } = await import("./reglas-marca.js");
+  const assert = (await import("node:assert/strict")).default;
+  assert.deepEqual(cifrasNoPermitidas("Anotate: https://vow-17x.pages.dev/lista"), []);
+  assert.deepEqual(cifrasNoPermitidas("Entrá a vow17.com.ar hoy"), []);
+  assert.deepEqual(cifrasNoPermitidas("Drop 01 en 2027, www.vow-17x.pages.dev"), []);
+  assert.deepEqual(cifrasNoPermitidas("Quedan 17 unidades"), ["17"]);
+});
