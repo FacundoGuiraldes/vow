@@ -96,12 +96,12 @@ export function crearMetaFalso() {
 }
 
 // Escenario completo: servicio + repositorio en memoria + Telegram y Meta falsos + reloj manual
-export function crearEscenario({ fecha = "2026-10-30", hora = "08:00", permitirPublicar = true, editor = null, sinMeta = false, generadorImagen = null, llm = null } = {}) {
+export function crearEscenario({ fecha = "2026-10-30", hora = "08:00", permitirPublicar = true, editor = null, sinMeta = false, generadorImagen = null, llm = null, investigacion = undefined } = {}) {
   const reloj = { fecha, hora };
   const repo = crearRepositorioMemoria();
   const telegram = crearTelegramFalso();
   const meta = sinMeta ? null : crearMetaFalso();
-  const servicio = crearServicio({ repo, telegram, meta, editor, generadorImagen, llm, validarEdicion: llm ? crearValidadorEdicion() : null, ahora: () => ({ ...reloj }), urlPublica: URL_PUBLICA, permitirPublicar });
+  const servicio = crearServicio({ repo, telegram, meta, editor, generadorImagen, llm, validarEdicion: llm ? crearValidadorEdicion() : null, ahora: () => ({ ...reloj }), urlPublica: URL_PUBLICA, permitirPublicar, ...(investigacion ? { investigacion } : {}) });
   let mensajeEntrante = 5000;
 
   const actualizacion = {

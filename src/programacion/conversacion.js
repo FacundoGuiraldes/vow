@@ -58,19 +58,49 @@ export const HERRAMIENTAS_CHAT = [
       required: ["fecha", "indicacion"],
     },
   },
-  { name: "ver_operacion", description: "Muestra los datos de depósito, recepción, estrategia y agenda que se cambiaron desde el juego o el chat (y cuáles se pueden editar).", parameters: { type: "OBJECT", properties: {} } },
+  { name: "ver_operacion", description: "Muestra la estrategia de la semana (con los id de cada línea), la agenda y lo que se cambió desde el juego o el chat.", parameters: { type: "OBJECT", properties: {} } },
   {
     name: "editar_dato",
-    description: "Cambia un dato de la operación (entrega o estado de gorras, medias o shakers, venta, productos del Drop, foco o notas de estrategia). El juego lo ve al instante. Mandá valor vacío para volver a lo que dicen los documentos.",
+    description: "Cambia el foco de la semana o las notas de estrategia. El juego lo ve al instante. Mandá valor vacío para volver a lo que dicen los documentos.",
     parameters: {
       type: "OBJECT",
       properties: {
-        campo: { type: "STRING", description: "deposito.gorras, deposito.medias, deposito.shakers, deposito.venta, recepcion.productos, estrategia.foco o estrategia.notas." },
+        campo: { type: "STRING", description: "estrategia.foco o estrategia.notas." },
         valor: { type: "STRING", description: "El texto nuevo, corto y claro." },
       },
       required: ["campo", "valor"],
     },
   },
+  {
+    name: "editar_estrategia",
+    description: "Cambia la estrategia de ESTA semana (sale de la investigación y vale hasta el lunes). accion: agregar una línea nueva (texto), editar una existente (id y texto nuevo), quitar una (id) o restaurar todo a lo que dice la investigación. Los id salen de ver_operacion.",
+    parameters: { type: "OBJECT", properties: { accion: { type: "STRING", description: "agregar, editar, quitar o restaurar." }, id: { type: "STRING" }, texto: { type: "STRING", description: "El texto de la línea, corto y claro." } }, required: ["accion"] },
+  },
+  { name: "ver_stock", description: "Muestra el stock del Almacén (gorras negras y beige, shakers negros y claros, medias), las ventas recientes, los totales y qué se puede vender con su precio." },
+  {
+    name: "registrar_llegada",
+    description: "Suma al stock mercadería que llegó. El Almacén y la Caja del juego lo ven al instante. producto: gorra-negra, gorra-beige, shaker-negro, shaker-claro o medias (pares).",
+    parameters: { type: "OBJECT", properties: { producto: { type: "STRING" }, cantidad: { type: "INTEGER" }, nota: { type: "STRING", description: "Opcional." } }, required: ["producto", "cantidad"] },
+  },
+  {
+    name: "ajustar_stock",
+    description: "Corrige el stock de un producto a la cantidad exacta que hay (por conteo o error). No es para ventas: para eso, registrar_venta.",
+    parameters: { type: "OBJECT", properties: { producto: { type: "STRING" }, cantidad: { type: "INTEGER" }, nota: { type: "STRING" } }, required: ["producto", "cantidad"] },
+  },
+  {
+    name: "registrar_venta",
+    description: "Registra una venta y resta el stock sola. El precio lo define el sistema: NO se puede cambiar ni inventar. Cada item: producto (gorra, medias, shaker, pledge, kept, oath, medias2 o medias3), cantidad, y el color si lleva gorra (gorra: negra o beige) o shaker (shaker: negro o claro). Si falta un color, preguntáselo a Facundo antes. Si no alcanza el stock, no se registra.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        items: { type: "ARRAY", items: { type: "OBJECT", properties: { producto: { type: "STRING" }, cantidad: { type: "INTEGER" }, gorra: { type: "STRING", description: "negra o beige." }, shaker: { type: "STRING", description: "negro o claro." } }, required: ["producto", "cantidad"] } },
+        nota: { type: "STRING", description: "Opcional: quién compró o cómo pagó." },
+        fecha: { type: "STRING", description: "AAAA-MM-DD, solo si no fue hoy." },
+      },
+      required: ["items"],
+    },
+  },
+  { name: "anular_venta", description: "Anula una venta registrada y devuelve su stock al Almacén (usá el id_venta o el id que devuelve ver_stock).", parameters: { type: "OBJECT", properties: { id: { type: "STRING" } }, required: ["id"] } },
   {
     name: "agregar_agenda",
     description: "Agrega un evento a la agenda de la oficina (llegada de mercadería, una reunión, una fecha límite). No es una publicación: para publicar usá programar_pieza.",
@@ -122,7 +152,8 @@ Cómo trabajás:
 - Cuando escribas o propongas un texto de VOW (gancho, epígrafe, texto en pantalla): voseo, palabras de todos los días y algo concreto y verdadero. Nada de eslóganes, teasers («algo llega», «pronto»), frases de coaching ni «no es X, es Y»; si suena a póster, reescribilo más simple. El epígrafe va en dos a cuatro frases, en párrafos cortos separados por una línea en blanco.
 - Para aprobar una pieza de la semana, aprobar_pieza.
 - Si pide publicar algo un día que no tiene pieza (mirá ver_semana), usá programar_pieza con la fecha exacta, el formato y lo que pidió. Si el día ya tiene una pieza, no armes otra: ofrecé modificarla.
-- Los datos de depósito (gorras, medias, shakers, venta), recepción, el foco de estrategia y la agenda se cambian con editar_dato, agregar_agenda y quitar_agenda; el juego los muestra al instante. Antes de decir qué hay cargado, mirá con ver_operacion.
+- El foco de la semana y la agenda se cambian con editar_dato, agregar_agenda y quitar_agenda, y las líneas de la estrategia de la semana con editar_estrategia; el juego los muestra al instante. Antes de decir qué hay cargado, mirá con ver_operacion.
+- El stock y las ventas son del sistema: para saber cuánto hay usá ver_stock, cuando llega mercadería registrar_llegada, y cuando Facundo cuenta que vendió algo registrar_venta (resta el stock solo; los precios los define el sistema y no se cambian; si falta el color de una gorra o un shaker, preguntalo). Nunca digas «anotado» si la herramienta devolvió un error, por ejemplo por falta de stock.
 - Si pide varias cosas en un mismo mensaje, hacelas todas con las herramientas y contá al final qué quedó hecho y qué no. Si te falta un dato para hacerlo bien (qué día, qué texto), preguntá una sola cosa clara.
 - NUNCA confirmás ni cancelás una publicación por tu cuenta: para confirmar usá pedir_confirmacion y para cancelar pedir_cancelacion. Eso le manda un botón a Facundo y la decisión es suya. Decile claro que te falta que toque el botón.
 - La publicación es automática: se hace sola a la hora indicada, y solo si Facundo confirmó esa pieza ese mismo día. Si no confirma, no se publica nada. No prometas nada distinto.

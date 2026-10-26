@@ -3,6 +3,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { markdownDeOperacion } from "../src/programacion/operacion.js";
+import { markdownDeInventario } from "../src/programacion/inventario.js";
 
 const url = process.env.URL_PUBLICA?.replace(/\/$/, "");
 const clave = process.env.PROGRAMACION_SECRETO;
@@ -17,14 +18,14 @@ if (!respuesta.ok) {
   console.error(`El servicio respondió ${respuesta.status}. No se sincronizó.`);
   process.exit(1);
 }
-const { operacion } = await respuesta.json();
+const { operacion, inventario } = await respuesta.json();
 if (!operacion) {
   console.error("El servicio todavía no devuelve la operación (¿falta desplegar la última versión?).");
   process.exit(1);
 }
 
 mkdirSync(destino, { recursive: true });
-const archivos = { "estado.json": `${JSON.stringify(operacion, null, 2)}\n`, "estado.md": markdownDeOperacion(operacion) };
+const archivos = { "estado.json": `${JSON.stringify(operacion, null, 2)}\n`, "estado.md": markdownDeOperacion(operacion), ...(inventario ? { "inventario.md": markdownDeInventario(inventario) } : {}) };
 let cambiaron = 0;
 for (const [nombre, contenido] of Object.entries(archivos)) {
   const ruta = join(destino, nombre);

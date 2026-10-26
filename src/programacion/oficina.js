@@ -4,6 +4,9 @@
 // Lo que se marca en el juego queda también como novedad: el Estratega lo lee en el próximo plan.
 // La confirmación final del día también se puede dar desde acá (confirmar_pieza), con las mismas reglas que el botón de Telegram.
 import { ErrorOperacion, aplicarOperacion, leerOperacion } from "./operacion.js";
+import { ErrorInventario, aplicarInventario, leerInventario, vistaInventario } from "./inventario.js";
+import { lineasDeInvestigacion, vistaEstrategia } from "./estrategia-semana.js";
+import { ahoraArgentina, lunesDe } from "./fechas.js";
 import { createHash } from "node:crypto";
 const DIA_MS = 86_400_000;
 const LIMITE_ENTRADAS = 200;
@@ -92,8 +95,8 @@ async function lanzarCambio({ repo, segundoPlano }, clave, ahora, trabajo) {
   return { ok: true, estado: r.estado, id: r.id };
 }
 
-export async function armarEstadoOficina({ repo, rendimiento = null, permitirPublicar = false, ahora = Date.now() }) {
-  const [piezas, novedades, recordatorios, pausa, chat, juego, operacion, cambios] = await Promise.all([
+export async function armarEstadoOficina({ repo, rendimiento = null, permitirPublicar = false, ahora = Date.now(), investigacion = lineasDeInvestigacion }) {
+  const [piezas, novedades, recordatorios, pausa, chat, juego, operacion, cambios, inventario, lineas] = await Promise.all([
     repo.piezasEntre(fechaISO(ahora - 21 * DIA_MS), fechaISO(ahora + 45 * DIA_MS)),
     repo.novedadesRecientes(20),
     repo.recordatoriosPendientes(fechaISO(ahora + 45 * DIA_MS)),
@@ -102,7 +105,10 @@ export async function armarEstadoOficina({ repo, rendimiento = null, permitirPub
     leerJuego(repo),
     leerOperacion(repo),
     repo.leerEstado("cambios"),
+    leerInventario(repo),
+    investigacion(),
   ]);
+  const hoy = ahoraArgentina(new Date(ahora)).fecha;
   const filas = await Promise.all(
     piezas.map(async (p) => ({
       id: p.id, fecha: p.fecha, hora: p.hora, estado: p.estado, formato: p.pieza?.formato ?? null, pilar: p.pieza?.pilar ?? null,
@@ -129,6 +135,8 @@ export async function armarEstadoOficina({ repo, rendimiento = null, permitirPub
     chat: (Array.isArray(chat) ? chat : []).slice(-30).map((m) => ({ rol: m.rol, texto: recortar(m.visible ?? m.texto, 1500), canal: m.canal ?? "telegram", en: m.en ?? null })),
     juego,
     operacion,
+    estrategia_semana: vistaEstrategia(operacion.estrategia, lineas, lunesDe(hoy)),
+    inventario: vistaInventario(inventario, hoy),
     cambios: cambiosVisibles(cambios, ahora),
     rendimiento: rend,
   };
@@ -225,10 +233,22 @@ export async function aplicarAccion(deps, accion, ahora = Date.now()) {
   // Datos de depósito, recepción, estrategia y agenda: el juego los edita y el bot los ve (y los puede editar él también)
   if (tipo === "operacion") {
     try {
-      const { operacion, resumen } = await aplicarOperacion(repo, accion.cambio, { origen: "juego", ahora });
+      const { lineas } = await (deps.investigacion ?? lineasDeInvestigacion)();
+      const { operacion, resumen } = await aplicarOperacion(repo, accion.cambio, { origen: "juego", ahora, base: lineas });
       return { ok: true, operacion, resumen };
     } catch (error) {
       if (error instanceof ErrorOperacion) throw new ErrorAccion(error.message, 400);
+      throw error;
+    }
+  }
+
+  // Almacén y Caja: llegadas, correcciones y ventas. El stock se resta solo al vender; el precio lo define el sistema.
+  if (tipo === "inventario") {
+    try {
+      const { inventario, resumen, id } = await aplicarInventario(repo, accion.cambio, { origen: "juego", ahora });
+      return { ok: true, resumen, ...(id ? { id } : {}), inventario: vistaInventario(inventario, ahoraArgentina(new Date(ahora)).fecha) };
+    } catch (error) {
+      if (error instanceof ErrorInventario) throw new ErrorAccion(error.message, 400);
       throw error;
     }
   }

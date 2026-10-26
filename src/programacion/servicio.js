@@ -11,6 +11,8 @@
 //   4. Fuera de la hora (más de TOLERANCIA_MINUTOS tarde) no se publica sola: se pregunta.
 //   5. /pausar frena toda publicación.
 import { ErrorOperacion, aplicarOperacion, leerOperacion, resumenParaChat } from "./operacion.js";
+import { ErrorInventario, aplicarInventario, leerInventario, vistaInventario } from "./inventario.js";
+import { lineasDeInvestigacion, vistaEstrategia } from "./estrategia-semana.js";
 import { revisarTextoPublico, validarUrlPublica } from "../mcp/instagram/validaciones.js";
 import { CAMPOS_EDITABLES, HERRAMIENTAS_CHAT, afirmaCambio, MENSAJES_MAXIMOS_POR_DIA, construirSistemaChat, paraElModelo, recortarRecuerdo } from "./conversacion.js";
 import { ahoraArgentina, esFechaISO, esHoraValida, lunesDe, fechaEnTexto, fechaLegible, horaDesdeMinutos, minutosDelDia, sumarDias, diasHasta } from "./fechas.js";
@@ -64,7 +66,7 @@ function elegirArchivo(msg) {
   return null;
 }
 
-export function crearServicio({ repo, telegram, meta = null, editor = null, generadorImagen = null, llm = null, validarEdicion = null, ahora = () => ahoraArgentina(), urlPublica = "", permitirPublicar = false } = {}) {
+export function crearServicio({ repo, telegram, meta = null, editor = null, generadorImagen = null, llm = null, validarEdicion = null, ahora = () => ahoraArgentina(), urlPublica = "", permitirPublicar = false, investigacion = lineasDeInvestigacion } = {}) {
   const decir = (texto, opciones) => telegram.enviarMensaje(texto, opciones);
   const decirDePieza = async (fila, texto, opciones) => {
     const id = await telegram.enviarMensaje(texto, opciones);
@@ -785,16 +787,38 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
       return { ok: true, estado: ESTADOS_LEGIBLES[nueva.estado], fecha: nueva.fecha, hora: nueva.hora, nota: `Ya le mostré a Facundo la pieza actualizada con sus botones.${aviso ? ` Aviso: ${aviso.trim()}` : ""}` };
     }
     if (nombre === "programar_pieza") return programarPieza(argumentos, { hoy, canal });
-    if (nombre === "ver_operacion") return resumenParaChat(await leerOperacion(repo));
-    if (nombre === "editar_dato" || nombre === "agregar_agenda" || nombre === "quitar_agenda") {
+    if (nombre === "ver_operacion") {
+      const base = await investigacion();
+      const op = await leerOperacion(repo);
+      return resumenParaChat(op, vistaEstrategia(op.estrategia, base, lunesDe(hoy)));
+    }
+    if (nombre === "editar_dato" || nombre === "agregar_agenda" || nombre === "quitar_agenda" || nombre === "editar_estrategia") {
+      const accionEstrategia = { agregar: "estrategia_agregar", editar: "estrategia_editar", quitar: "estrategia_quitar", restaurar: "estrategia_restaurar" }[argumentos.accion];
+      if (nombre === "editar_estrategia" && !accionEstrategia) return { error: "La acción tiene que ser agregar, editar, quitar o restaurar." };
       const cambio = nombre === "editar_dato" ? { tipo: "campo", campo: argumentos.campo, valor: argumentos.valor }
         : nombre === "agregar_agenda" ? { tipo: "agenda_agregar", fecha: argumentos.fecha, hora: argumentos.hora, sala: argumentos.sala, texto: argumentos.texto }
-          : { tipo: "agenda_quitar", clave: argumentos.id };
+          : nombre === "editar_estrategia" ? { tipo: accionEstrategia, clave: argumentos.id, texto: argumentos.texto }
+            : { tipo: "agenda_quitar", clave: argumentos.id };
       try {
-        const { resumen } = await aplicarOperacion(repo, cambio, { origen: "bot" });
+        const { lineas } = await investigacion();
+        const { resumen } = await aplicarOperacion(repo, cambio, { origen: "bot", base: lineas });
         return { ok: true, nota: `Guardado y visible en el juego: ${resumen}` };
       } catch (error) {
         if (error instanceof ErrorOperacion) return { error: error.message };
+        throw error;
+      }
+    }
+    if (nombre === "ver_stock") return vistaInventario(await leerInventario(repo), hoy);
+    if (nombre === "registrar_llegada" || nombre === "ajustar_stock" || nombre === "registrar_venta" || nombre === "anular_venta") {
+      const cambio = nombre === "registrar_llegada" ? { tipo: "entrada", sku: argumentos.producto, cantidad: argumentos.cantidad, nota: argumentos.nota }
+        : nombre === "ajustar_stock" ? { tipo: "ajuste", sku: argumentos.producto, cantidad: argumentos.cantidad, nota: argumentos.nota }
+          : nombre === "registrar_venta" ? { tipo: "venta", items: argumentos.items, nota: argumentos.nota, fecha: argumentos.fecha }
+            : { tipo: "anular_venta", id: argumentos.id };
+      try {
+        const { resumen, id, inventario } = await aplicarInventario(repo, cambio, { origen: "bot" });
+        return { ok: true, nota: `Guardado y visible en el juego: ${resumen}`, ...(id ? { id_venta: id } : {}), stock: inventario.stock };
+      } catch (error) {
+        if (error instanceof ErrorInventario) return { error: error.message };
         throw error;
       }
     }

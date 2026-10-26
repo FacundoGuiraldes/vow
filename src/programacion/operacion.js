@@ -1,23 +1,19 @@
 // Los datos de la operación que se editan desde los dos lados: el juego (VOW HQ) y el bot (el chat de Telegram y del juego).
 // Los documentos del repo son el punto de partida; lo que se cambia acá se guarda en la base ("operacion") y manda sobre ellos.
 // Todo cambio deja una novedad para el Estratega y una línea en el historial, para saber quién cambió qué y cuándo.
-import { esFechaISO, esHoraValida } from "./fechas.js";
+import { ahoraArgentina, esFechaISO, esHoraValida, lunesDe } from "./fechas.js";
+import { estrategiaVacia } from "./estrategia-semana.js";
 
 export const CAMPOS = {
-  "deposito.gorras": { nombre: "Gorras (entrega y estado)", largo: 300 },
-  "deposito.medias": { nombre: "Medias (entrega y estado)", largo: 300 },
-  "deposito.shakers": { nombre: "Shakers (entrega y estado)", largo: 300 },
-  "deposito.venta": { nombre: "Venta (cuándo y cómo)", largo: 300 },
-  "recepcion.productos": { nombre: "Productos del Drop", largo: 300 },
-  "estrategia.foco": { nombre: "Foco de la estrategia", largo: 600 },
+  "estrategia.foco": { nombre: "Foco de la semana", largo: 600 },
   "estrategia.notas": { nombre: "Notas de estrategia", largo: 1200 },
 };
-export const SALAS = ["estrategia", "bot", "diseno", "deposito", "recepcion"];
+export const SALAS = ["estrategia", "bot", "diseno", "deposito", "recepcion", "caja"];
 const MAX_PROPIAS = 60;
 const MAX_OCULTAS = 120;
 const MAX_HISTORIAL = 20;
 
-export const operacionVacia = () => ({ campos: {}, agenda: { propias: {}, ocultas: [] }, historial: [] });
+export const operacionVacia = () => ({ campos: {}, agenda: { propias: {}, ocultas: [] }, estrategia: estrategiaVacia(), historial: [] });
 
 export async function leerOperacion(repo) {
   const guardada = await repo.leerEstado("operacion");
@@ -26,6 +22,7 @@ export async function leerOperacion(repo) {
   return {
     campos: guardada.campos && typeof guardada.campos === "object" ? guardada.campos : base.campos,
     agenda: { propias: guardada.agenda?.propias ?? {}, ocultas: Array.isArray(guardada.agenda?.ocultas) ? guardada.agenda.ocultas : [] },
+    estrategia: { ...estrategiaVacia(), ...(guardada.estrategia && typeof guardada.estrategia === "object" ? guardada.estrategia : {}) },
     historial: Array.isArray(guardada.historial) ? guardada.historial : [],
   };
 }
@@ -35,7 +32,7 @@ const limpiar = (valor, largo) => String(valor ?? "").replace(/\s+/g, " ").trim(
 export class ErrorOperacion extends Error {}
 
 // Aplica un cambio y devuelve { operacion, resumen }. origen: "juego" o "bot". Tira ErrorOperacion si el pedido no sirve.
-export async function aplicarOperacion(repo, cambio, { origen = "juego", ahora = Date.now() } = {}) {
+export async function aplicarOperacion(repo, cambio, { origen = "juego", ahora = Date.now(), base = [] } = {}) {
   const op = await leerOperacion(repo);
   const en = new Date(ahora).toISOString();
   let resumen;
@@ -72,6 +69,41 @@ export async function aplicarOperacion(repo, cambio, { origen = "juego", ahora =
       if (op.agenda.ocultas.length > MAX_OCULTAS) op.agenda.ocultas = op.agenda.ocultas.slice(-MAX_OCULTAS);
       resumen = `Agenda: quitó el evento ${clave.split("|").pop()}`;
     }
+  } else if (typeof cambio?.tipo === "string" && cambio.tipo.startsWith("estrategia_")) {
+    // La estrategia vale por semana: si cambió la semana, arranca de nuevo desde la investigación
+    const lunes = lunesDe(ahoraArgentina(new Date(ahora)).fecha);
+    if (op.estrategia.semana !== lunes) op.estrategia = { ...estrategiaVacia(), semana: lunes };
+    const e = op.estrategia;
+    const esBase = (k) => base.some((l) => l.k === k);
+    const clave = String(cambio.clave ?? "").slice(0, 60);
+    if (cambio.tipo === "estrategia_agregar") {
+      const texto = limpiar(cambio.texto, 600);
+      if (!texto) throw new ErrorOperacion("Falta el texto de la línea.");
+      if (Object.keys(e.propias).length >= 12) throw new ErrorOperacion("Ya hay 12 líneas propias esta semana: quitá alguna antes de agregar otra.");
+      e.propias[`p${ahora.toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`] = { t: texto, en };
+      resumen = `Estrategia de la semana: agregó «${texto}»`;
+    } else if (cambio.tipo === "estrategia_editar") {
+      const texto = limpiar(cambio.texto, 600);
+      if (!texto) throw new ErrorOperacion("Falta el texto nuevo.");
+      if (e.propias[clave]) e.propias[clave].t = texto;
+      else if (esBase(clave)) e.editadas[clave] = texto;
+      else throw new ErrorOperacion("No encuentro esa línea de la estrategia.");
+      resumen = `Estrategia de la semana: cambió una línea a «${texto}»`;
+    } else if (cambio.tipo === "estrategia_quitar") {
+      if (e.propias[clave]) {
+        resumen = `Estrategia de la semana: quitó «${e.propias[clave].t}»`;
+        delete e.propias[clave];
+      } else if (esBase(clave)) {
+        if (!e.quitadas.includes(clave)) e.quitadas.push(clave);
+        delete e.editadas[clave];
+        resumen = `Estrategia de la semana: quitó «${base.find((l) => l.k === clave).t.slice(0, 120)}»`;
+      } else throw new ErrorOperacion("No encuentro esa línea de la estrategia.");
+    } else if (cambio.tipo === "estrategia_restaurar") {
+      op.estrategia = { ...estrategiaVacia(), semana: lunes };
+      resumen = "Estrategia de la semana: vuelve a lo que dice la investigación";
+    } else {
+      throw new ErrorOperacion("Acción de estrategia desconocida.");
+    }
   } else {
     throw new ErrorOperacion("Acción desconocida.");
   }
@@ -83,8 +115,9 @@ export async function aplicarOperacion(repo, cambio, { origen = "juego", ahora =
 }
 
 // Lo que ve la IA: lo que se cambió sobre los documentos, en texto corto
-export function resumenParaChat(op) {
+export function resumenParaChat(op, estrategia = null) {
   return {
+    ...(estrategia ? { estrategia_de_la_semana: { semana: estrategia.semana, sale_del_informe: estrategia.fuente, lineas: estrategia.lineas.map((l) => ({ id: l.k, texto: l.t, origen: l.origen, editada: l.editada })) } } : {}),
     campos: Object.fromEntries(Object.entries(op.campos).map(([k, v]) => [k, v])),
     agenda_propia: Object.entries(op.agenda.propias).map(([id, e]) => ({ id, fecha: e.f, hora: e.h, sala: e.sala, texto: e.t })).sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora)),
     ultimos_cambios: op.historial.slice(-5),
@@ -111,6 +144,10 @@ export function markdownDeOperacion(op) {
     "| Dato | Valor |",
     "| --- | --- |",
     ...filas,
+    "",
+    "## Estrategia de la semana (cambios sobre la investigación)",
+    "",
+    ...(op.estrategia?.semana ? [`Semana del ${op.estrategia.semana}.`, ...Object.values(op.estrategia.editadas).map((t) => `- Editada: ${t}`), ...op.estrategia.quitadas.map((k) => `- Quitada: ${k}`), ...Object.values(op.estrategia.propias).map((p) => `- Agregada: ${p.t}`)] : ["_Igual que la investigación._"]),
     "",
     "## Agenda agregada",
     "",
