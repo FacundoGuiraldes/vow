@@ -442,7 +442,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
   }
 
   // Desde la oficina: la IA arma otra sugerencia para el día de una pieza, que Facundo tiene que aprobar de nuevo.
-  async function sugerirCambio(id, { indicacion = "", contexto = "" } = {}) {
+  async function sugerirCambio(id, { indicacion = "", contexto = "", alAvanzar = null } = {}) {
     const { fecha: hoy } = ahora();
     const fila = await repo.obtenerPieza(id);
     if (!fila) return { ok: false, motivo: "Esa pieza no existe." };
@@ -457,25 +457,26 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     const instruccion = `Armá otra sugerencia para esta pieza.${indicacion ? `\nPedido de Facundo: ${indicacion}` : ""}${contexto ? `\n\nContexto:\n${contexto}` : ""}`;
     let resultado;
     try {
-      resultado = await editor.editarPieza({ fila, instruccion, hoy, alternativa: true });
+      resultado = await editor.editarPieza({ fila, instruccion, hoy, alternativa: true, alAvanzar });
     } catch (error) {
       return { ok: false, motivo: `No pude armar la sugerencia: ${error.message}` };
     }
     if (!resultado.ok) return { ok: false, motivo: `La sugerencia no pasó las reglas de la marca: ${resultado.errores.join(" ")}` };
 
+    alAvanzar?.("Guardando la sugerencia y avisando por Telegram…");
     const { nueva, aviso } = await guardarEdicion(fila, { pieza: resultado.pieza, hora: resultado.hora, hoy });
     await decirDePieza(nueva, `🔄 Nueva sugerencia pedida desde la oficina${resultado.queCambio ? `: ${resultado.queCambio}` : ""}\n\n${textoPieza(nueva)}${aviso}`, { botones: botonesPlan(fila.id, { conIA: conIA(nueva) }) }).catch((error) => console.error(`No se pudo avisar por Telegram: ${error.message}`));
     return { ok: true, estado: nueva.estado };
   }
 
   // "Cambiar" en el juego sobre una pieza que todavía no está en la base (solo en los documentos): la IA arma la nueva en el momento
-  async function cambiarSinFila({ fecha, formato, indicacion = "", base = "" }) {
+  async function cambiarSinFila({ fecha, formato, indicacion = "", base = "", alAvanzar = null }) {
     const { fecha: hoy } = ahora();
     if (!esFechaISO(fecha)) return { ok: false, motivo: "Falta la fecha de la pieza." };
     const viva = (await repo.piezasDelDia(fecha)).find((f) => VIVAS.includes(f.estado));
-    if (viva) return { ...(await sugerirCambio(viva.id, { indicacion })), id: viva.id };
+    if (viva) return { ...(await sugerirCambio(viva.id, { indicacion, alAvanzar })), id: viva.id };
     const pedido = `${base ? `Esta pieza existe solo en los documentos y hay que rehacerla o mejorarla. Versión actual:\n${String(base).slice(0, 1500)}\n\n` : ""}Pedido de Facundo: ${indicacion || "armá otra sugerencia mejor para ese día"}`;
-    const r = await programarPieza({ fecha, formato: String(formato || "reel").toLowerCase(), indicacion: pedido }, { hoy, canal: "juego" });
+    const r = await programarPieza({ fecha, formato: String(formato || "reel").toLowerCase(), indicacion: pedido }, { hoy, canal: "juego", alAvanzar });
     if (r.ok) return { ok: true, estado: r.estado, id: r.id };
     return { ok: false, motivo: r.error ?? (r.errores ?? []).join(" ") };
   }
@@ -694,7 +695,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
   }
 
   // Arma con la IA una pieza nueva para un día libre (la usan el chat y el "Cambiar" del juego para piezas que solo existen en los documentos)
-  async function programarPieza(entrada, { hoy, canal }) {
+  async function programarPieza(entrada, { hoy, canal, alAvanzar = null }) {
     const fecha = String(entrada.fecha ?? "").trim();
     if (!esFechaISO(fecha)) return { error: "La fecha tiene que ser AAAA-MM-DD." };
     if (fecha < hoy) return { error: `El ${fechaLegible(fecha)} ya pasó.` };
@@ -717,7 +718,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     const instruccion = `Pieza nueva para el ${fecha} (${fechaLegible(fecha)}), formato ${formato}, a las ${horaPieza}.\n${indicacion}${contexto ? `\n\nPiezas de estos días (no las repitas):\n${contexto}` : ""}`;
     let resultado;
     try {
-      resultado = await editor.editarPieza({ fila: { pieza: { formato }, fecha, hora: horaPieza }, instruccion, hoy, nueva: true });
+      resultado = await editor.editarPieza({ fila: { pieza: { formato }, fecha, hora: horaPieza }, instruccion, hoy, nueva: true, alAvanzar });
     } catch (error) {
       return { error: `No pude armar la pieza: ${error.message}` };
     }

@@ -69,6 +69,12 @@ canvas#gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-a
 #cuerpo p{margin:0 0 8px}#cuerpo ul{margin:0 0 8px;padding-left:20px}
 #cuerpo .mono,.mono{font:400 12px/1.45 var(--f-mono);color:#5d584f;overflow-wrap:anywhere}
 .vacio{color:#7a7468;font-style:italic}
+.avance{display:flex;gap:12px;align-items:flex-start;background:#f1ece3;border:1px solid #e0d8c8;border-radius:12px;padding:12px 14px;margin:8px 0}
+.avance strong{display:block;font-size:14.5px;margin-bottom:2px}
+.progt .mono{font-size:12.5px}.progt .mono+.mono{margin-top:4px}
+.girar{flex:0 0 18px;width:18px;height:18px;margin-top:2px;border:3px solid #d9cfbd;border-top-color:#b3243f;border-radius:50%;animation:giro 0.9s linear infinite}
+@keyframes giro{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.girar{animation-duration:3s}}
 .fila{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #e3ddd0}
 .fila:last-child{border-bottom:0}
 .fila .fe{flex:0 0 66px;font:500 12.5px var(--f-mono);color:#5d584f}
@@ -641,6 +647,18 @@ function ponerCapa(){
 /* ================= tarjeta de una pieza: ver, aprobar o pedir otra ================= */
 var PEDIDOS={};
 function claveCambio(pz){return pz._id?String(pz._id):'f:'+pz.fecha}
+/* progreso de "Cambiar todo": paso actual que informa el servidor + reloj que corre solo, así se nota que no está trabado */
+function seg(n){n=Math.max(0,Math.floor(n));return Math.floor(n/60)+':'+String(n%60).padStart(2,'0')}
+function bloqueProgreso(e){
+  var c=VIVO&&VIVO.cambios&&VIVO.cambios[claveCambio(e)],d=el('div','avance');
+  var desde=c&&c.en?Date.parse(c.en):(PEDIDOS[e._id||kPieza(e)]||{}).t||Date.now();
+  var paso=(c&&c.paso)||'Mandando el pedido a la IA…';
+  d.appendChild(el('span','girar'));
+  var t=el('div','progt');t.appendChild(el('strong',null,'La IA está armando otra sugerencia'));t.appendChild(el('div','mono',paso));
+  var r=el('div','mono');r.appendChild(document.createTextNode('Lleva '));var x=el('b','reloj');x.setAttribute('data-desde',String(desde));x.textContent=seg((Date.now()-desde)/1000);r.appendChild(x);r.appendChild(document.createTextNode(' · suele tardar 1 o 2 minutos. Si pasa de 5, avisa que se cortó.'));
+  t.appendChild(r);d.appendChild(t);return d;
+}
+setInterval(function(){var n=document.querySelectorAll('.reloj[data-desde]');for(var i=0;i<n.length;i++)n[i].textContent=seg((Date.now()-Number(n[i].getAttribute('data-desde')))/1000)},1000);
 function cambiandoAhora(e){
   var c=VIVO&&VIVO.cambios&&VIVO.cambios[claveCambio(e)];
   return !!(CAMBIANDO[e._id||kPieza(e)]||(c&&c.estado==='trabajando'));
@@ -659,7 +677,7 @@ function pedirCambio(pz,indicacion){
   indicacion=(indicacion||'').trim();var kc=String(pz._id||kPieza(pz)),ck=pz._id||kc;
   if(conectado!=='vivo'){aviso('Sin conexión con el bot: el cambio no se guardaría. Revisá el aviso de arriba.',6000);return}
   if(cambiandoAhora(pz))return;CAMBIANDO[ck]=true;refrescar();
-  aviso('La IA está armando otra sugerencia… puede tardar un minuto');
+  aviso('Pedido enviado: abajo ves cómo va');
   /* una pieza que solo está en los documentos no tiene fila: el servidor la arma nueva en el momento para ese día */
   var cuerpo=pz._id?{accion:'cambiar_pieza',id:pz._id,indicacion:indicacion}:{accion:'cambiar_pieza',fecha:pz.fecha,formato:pz.formato,indicacion:indicacion,base:pz.texto||pz.titulo||''};
   api('/oficina/accion',{body:cuerpo}).then(function(r){
@@ -760,7 +778,7 @@ function tarjetaPieza(e){
   var d=pd(e.fecha),f=el('div','pieza'),m=(MED.piezas||{})[kMed(e)]||{},ap=!!HECHO[kPieza(e)];
   var h=el('div','ph');h.appendChild(el('strong',null,e.titulo||'Pieza'));h.appendChild(chipEstado(e.estado));f.appendChild(h);
   f.appendChild(el('div','mono',(d?dd(d)+' · ':'')+(e.formato||'')+(e.hora?' · '+e.hora:'')+(d?' · '+rel(dias(d)):'')));
-  if(cambiandoAhora(e))f.appendChild(el('p','vacio','La IA está armando otra sugerencia…'));
+  if(cambiandoAhora(e))f.appendChild(bloqueProgreso(e));
   if(m.imgs&&m.imgs.length)f.appendChild(galeria(m.imgs));
   if(m.vid){var v=document.createElement('video');v.src=m.vid;v.controls=true;v.playsInline=true;v.preload='metadata';v.className='vid';f.appendChild(v)}
   var ep=epigrafeDe(e,m);f.appendChild(ep?el('p','epi',ep):el('p','vacio','Todavía no tiene epígrafe.'));
