@@ -11,7 +11,7 @@
 //   4. Fuera de la hora (más de TOLERANCIA_MINUTOS tarde) no se publica sola: se pregunta.
 //   5. /pausar frena toda publicación.
 import { revisarTextoPublico, validarUrlPublica } from "../mcp/instagram/validaciones.js";
-import { CAMPOS_EDITABLES, HERRAMIENTAS_CHAT, MENSAJES_MAXIMOS_POR_DIA, construirSistemaChat, recortarRecuerdo } from "./conversacion.js";
+import { CAMPOS_EDITABLES, HERRAMIENTAS_CHAT, afirmaCambio, MENSAJES_MAXIMOS_POR_DIA, construirSistemaChat, recortarRecuerdo } from "./conversacion.js";
 import { ahoraArgentina, esHoraValida, fechaEnTexto, fechaLegible, horaDesdeMinutos, minutosDelDia, sumarDias, diasHasta } from "./fechas.js";
 import {
   ESTADOS_LEGIBLES, botonesCancelar, botonesDia, botonesImagenIA, botonesPlan, botonesTarde, fechaDeAviso, textoPieza, textoPlanSemanal, textoRecordatorio, textoResumenDiario,
@@ -518,13 +518,21 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     const memoria = (await repo.leerEstado("chat")) ?? [];
     const historial = [...memoria, { rol: "usuario", texto: entrada }];
 
+    const efectos = { guardados: 0, rechazos: [] };
     let salida;
     try {
       salida = await llm.conversar({
         sistema: construirSistemaChat({ fecha: hoy, hora, permitirPublicar }),
         historial,
         herramientas: HERRAMIENTAS_CHAT,
-        ejecutar: (nombre, argumentos) => ejecutarHerramienta(nombre, argumentos, { hoy, hora }),
+        ejecutar: async (nombre, argumentos) => {
+          const resultado = await ejecutarHerramienta(nombre, argumentos, { hoy, hora });
+          if (nombre === "modificar_pieza") {
+            if (resultado?.ok === true) efectos.guardados++;
+            else efectos.rechazos.push(resultado?.error ?? (resultado?.errores ?? []).join(" "));
+          }
+          return resultado;
+        },
       });
     } catch (error) {
       // Lo que no se pudo entender no se pierde: si era una novedad suelta, queda anotada para el próximo plan
@@ -534,7 +542,14 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
       }
       return responder(`No pude procesar tu mensaje: ${error.message}\nProbá de nuevo en un rato o usá los botones de la pieza.`);
     }
-    const respuesta = salida || "Listo.";
+    let respuesta = salida || "Listo.";
+    // La IA a veces "acuerda" un cambio en la charla y dice que lo guardó sin llamar a la herramienta: Facundo tiene que enterarse
+    if (efectos.guardados === 0 && afirmaCambio(respuesta)) {
+      const motivo = efectos.rechazos.filter(Boolean).join(" ").slice(0, 300);
+      respuesta += motivo
+        ? `\n\n⚠️ No quedó guardado: el sistema rechazó el cambio (${motivo}).`
+        : "\n\n⚠️ Ojo: NO se guardó ningún cambio en la pieza. Respondé al mensaje de la pieza con el texto exacto y lo guardo, o escribime «cambiá el epígrafe de la pieza del 29/10 a: …».";
+    }
     await repo.guardarEstado("chat", recortarRecuerdo([...historial, { rol: "asistente", texto: respuesta }]));
     return responder(respuesta);
   }

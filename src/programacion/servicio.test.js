@@ -822,6 +822,39 @@ describe("chat con la IA", () => {
     assert.deepEqual(await e.repo.novedadesPendientes(), [], "no es una novedad");
   });
 
+  test("si la IA dice que guardó un cambio sin haber llamado a modificar_pieza, se le avisa a Facundo que NO se guardó", async () => {
+    const { e, fila } = await escenarioChat(async () => "Listo, el epígrafe quedó guardado.");
+    await escribir(e, "el epígrafe tiene que ser: Se construye sin ruido");
+    assert.match(e.telegram.ultimo().texto, /NO se guardó ningún cambio en la pieza/);
+    assert.equal((await e.repo.obtenerPieza(fila.id)).pieza.epigrafe, crearPieza().epigrafe);
+  });
+
+  test("si la herramienta rechazó el cambio y la IA dice que quedó, Facundo ve el motivo", async () => {
+    const { e, fila } = await escenarioChat(async ({ ejecutar }) => {
+      await ejecutar("modificar_pieza", { id: 1, cambios: { epigrafe: "Solo hoy: comprá ya" } });
+      return "Ya lo cambié.";
+    }, { });
+    void fila;
+    await escribir(e, "poné ese epígrafe");
+    assert.match(e.telegram.ultimo().texto, /No quedó guardado: el sistema rechazó el cambio/);
+  });
+
+  test("si la IA llamó a modificar_pieza y funcionó, no hay ninguna advertencia", async () => {
+    const { e, fila } = await escenarioChat(async ({ ejecutar }) => {
+      const r = await ejecutar("modificar_pieza", { id: 1, cambios: { epigrafe: "Se construye sin ruido, un paso por día. Anotate en la lista de espera: link en la bio." } });
+      return r.ok ? "Listo, quedó guardado." : "No se pudo.";
+    }, { });
+    void fila;
+    await escribir(e, "poné ese epígrafe");
+    assert.doesNotMatch(e.telegram.ultimo().texto, /⚠️/);
+  });
+
+  test("una respuesta que solo informa no dispara la advertencia", async () => {
+    const { e } = await escenarioChat(async () => "El epígrafe actual dice: Nadie ve este momento.");
+    await escribir(e, "cómo queda?");
+    assert.doesNotMatch(e.telegram.ultimo().texto, /⚠️/);
+  });
+
   test("recuerda la charla: el segundo mensaje llega con el anterior y la respuesta anterior", async () => {
     const { e, llm } = await escenarioChat(async ({ historial }) => `Mensajes que veo: ${historial.length}`);
     await escribir(e, "hola");
