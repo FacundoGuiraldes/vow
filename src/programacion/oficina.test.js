@@ -144,7 +144,9 @@ describe("cambiar una pieza desde la oficina", () => {
   });
 
   test("en el servidor, Cambiar contesta enseguida y el avance se ve en el estado (listo o con el error)", async () => {
-    const editor = editorQue(({ fila }) => ({ ok: true, pieza: { ...fila.pieza, gancho: "Nuevo." }, hora: fila.hora, queCambio: "", errores: [] }));
+    let soltar;
+    const puerta = new Promise((r) => { soltar = r; }); // la IA "tarda" hasta que el test la suelta
+    const editor = editorQue(async ({ fila }) => { await puerta; return { ok: true, pieza: { ...fila.pieza, gancho: "Nuevo." }, hora: fila.hora, queCambio: "", errores: [] }; });
     const e = crearEscenario({ fecha: "2026-10-30", editor });
     const fila = await e.cargarPieza();
     const trabajos = [];
@@ -153,6 +155,7 @@ describe("cambiar una pieza desde la oficina", () => {
     assert.deepEqual(r, { ok: true, trabajando: true });
     assert.equal((await armarEstadoOficina({ repo: e.repo })).cambios[fila.id].estado, "trabajando");
     await assert.rejects(aplicarAccion(deps, { accion: "cambiar_pieza", id: fila.id }), (error) => error.estado === 409 && /ya está armando/.test(error.message));
+    soltar();
     await Promise.all(trabajos);
     assert.equal((await armarEstadoOficina({ repo: e.repo })).cambios[fila.id].estado, "listo");
     assert.equal((await e.repo.obtenerPieza(fila.id)).pieza.gancho, "Nuevo.");
@@ -309,16 +312,16 @@ describe("editar una publicación a mano desde el juego", () => {
 describe("datos de la operación: ida y vuelta entre el juego y el bot", () => {
   test("lo que se edita en el juego queda en la base, llega al estado y al Estratega como novedad", async () => {
     const e = crearEscenario();
-    await aplicarAccion(e, { accion: "operacion", cambio: { tipo: "campo", campo: "deposito.gorras", valor: "Llegan el 5/11, 100 unidades" } });
+    await aplicarAccion(e, { accion: "operacion", cambio: { tipo: "campo", campo: "estrategia.foco", valor: "Llegan el 5/11, 100 unidades" } });
     await aplicarAccion(e, { accion: "operacion", cambio: { tipo: "agenda_agregar", fecha: "2026-11-05", hora: "10:00", sala: "deposito", texto: "Retirar las gorras" } });
     const estado = await armarEstadoOficina({ repo: e.repo });
-    assert.equal(estado.operacion.campos["deposito.gorras"], "Llegan el 5/11, 100 unidades");
+    assert.equal(estado.operacion.campos["estrategia.foco"], "Llegan el 5/11, 100 unidades");
     const [id, ev] = Object.entries(estado.operacion.agenda.propias)[0];
     assert.deepEqual([ev.f, ev.h, ev.sala, ev.t], ["2026-11-05", "10:00", "deposito", "Retirar las gorras"]);
-    assert.ok((await e.repo.novedadesPendientes()).some((n) => /Dato actualizado desde la oficina: Gorras/.test(n.texto)));
+    assert.ok((await e.repo.novedadesPendientes()).some((n) => /Dato actualizado desde la oficina: Foco de la semana/.test(n.texto)));
     await aplicarAccion(e, { accion: "operacion", cambio: { tipo: "agenda_quitar", clave: id } });
     await aplicarAccion(e, { accion: "operacion", cambio: { tipo: "agenda_quitar", clave: "2026-11-02|Llegan las medias" } });
-    await aplicarAccion(e, { accion: "operacion", cambio: { tipo: "campo", campo: "deposito.gorras", valor: "" } });
+    await aplicarAccion(e, { accion: "operacion", cambio: { tipo: "campo", campo: "estrategia.foco", valor: "" } });
     const tras = await armarEstadoOficina({ repo: e.repo });
     assert.deepEqual([tras.operacion.campos, tras.operacion.agenda.propias, tras.operacion.agenda.ocultas], [{}, {}, ["2026-11-02|Llegan las medias"]]);
     assert.equal(tras.operacion.historial.length, 5);
@@ -335,18 +338,18 @@ describe("datos de la operación: ida y vuelta entre el juego y el bot", () => {
     const llm = {
       async conversar({ ejecutar }) {
         const antes = await ejecutar("ver_operacion", {});
-        await ejecutar("editar_dato", { campo: "deposito.medias", valor: "Llegaron, faltan etiquetas" });
+        await ejecutar("editar_dato", { campo: "estrategia.notas", valor: "Llegaron, faltan etiquetas" });
         await ejecutar("agregar_agenda", { fecha: "2026-11-06", texto: "Reunión con el proveedor", sala: "deposito" });
-        return `Antes: ${antes.campos["deposito.gorras"]}. Listo, quedó guardado.`;
+        return `Antes: ${antes.campos["estrategia.foco"]}. Listo, quedó guardado.`;
       },
     };
     const e = crearEscenario({ llm });
-    await aplicarAccion(e, { accion: "operacion", cambio: { tipo: "campo", campo: "deposito.gorras", valor: "Llegan el 5/11" } });
+    await aplicarAccion(e, { accion: "operacion", cambio: { tipo: "campo", campo: "estrategia.foco", valor: "Llegan el 5/11" } });
     const r = await aplicarAccion(e, { accion: "chat", texto: "actualizá medias y agendá la reunión" });
     assert.match(r.respuesta, /Antes: Llegan el 5\/11/);
     assert.doesNotMatch(r.respuesta, /⚠️/);
     const estado = await armarEstadoOficina({ repo: e.repo });
-    assert.equal(estado.operacion.campos["deposito.medias"], "Llegaron, faltan etiquetas");
+    assert.equal(estado.operacion.campos["estrategia.notas"], "Llegaron, faltan etiquetas");
     assert.equal(Object.values(estado.operacion.agenda.propias)[0].t, "Reunión con el proveedor");
     assert.equal(estado.operacion.historial.at(-1).origen, "bot");
   });
@@ -389,5 +392,136 @@ describe("editar y adjuntar: casos de borde", () => {
     assert.equal((await e.servicio.adjuntarDesdeJuego(fila.id, { mime: "image/jpeg", datos: Buffer.from("a") })).ok, true);
     assert.equal((await e.servicio.adjuntarDesdeJuego(fila.id, { mime: "video/mp4", datos: Buffer.from("b") })).ok, true);
     assert.equal((await e.repo.mediosDePieza(fila.id)).length, 1);
+  });
+});
+
+const LINEAS = { fuente: "2026-10-19", lineas: [{ k: "iaaaa1111", t: "Probar carruseles de frase corta." }, { k: "ibbbb2222", t: "No poner ofertas en la primera línea." }] };
+const investigacion = async () => LINEAS;
+
+describe("Almacén y Caja: stock y ventas conectados entre el juego y el bot", () => {
+  const llegada = (e, sku, cantidad) => aplicarAccion(e, { accion: "inventario", cambio: { tipo: "entrada", sku, cantidad } });
+
+  test("el stock arranca en 0; una llegada lo suma y una venta lo resta sola, con el precio del sistema", async () => {
+    const e = crearEscenario({ investigacion });
+    const vacio = await armarEstadoOficina({ repo: e.repo, investigacion });
+    assert.deepEqual(Object.values(vacio.inventario.stock), [0, 0, 0, 0, 0]);
+    await llegada(e, "gorra-negra", 10);
+    await llegada(e, "medias", 132);
+    const r = await aplicarAccion(e, { accion: "inventario", cambio: { tipo: "venta", items: [{ producto: "pledge", cantidad: 2, gorra: "negra" }, { producto: "medias2", cantidad: 1 }], nota: "Ana" } });
+    assert.equal(r.inventario.stock["gorra-negra"], 8);
+    assert.equal(r.inventario.stock.medias, 132 - 2 - 2);
+    assert.equal(r.inventario.totales.ventas, 1);
+    assert.equal(r.inventario.totales.importe, 2 * 34900 + 17900);
+    const estado = await armarEstadoOficina({ repo: e.repo, investigacion });
+    assert.equal(estado.inventario.stock["gorra-negra"], 8);
+    assert.ok((await e.repo.novedadesPendientes()).some((n) => /Caja \(oficina\): Venta: 2 × Pack Pledge/.test(n.texto)));
+  });
+
+  test("no deja vender lo que no hay, ni cambiar el precio, y no toca nada si falla", async () => {
+    const e = crearEscenario({ investigacion });
+    await llegada(e, "shaker-negro", 1);
+    const mala = (cambio) => assert.rejects(aplicarAccion(e, { accion: "inventario", cambio }), (error) => error instanceof ErrorAccion && error.estado === 400);
+    await mala({ tipo: "venta", items: [{ producto: "shaker", cantidad: 2, shaker: "negro" }] });
+    await mala({ tipo: "venta", items: [{ producto: "shaker", cantidad: 1, shaker: "negro", precio: 1 }] });
+    await mala({ tipo: "venta", items: [{ producto: "shaker", cantidad: 1 }] });
+    await mala({ tipo: "venta", items: [{ producto: "oath", cantidad: 1, gorra: "beige", shaker: "negro" }] });
+    await mala({ tipo: "entrada", sku: "remera", cantidad: 3 });
+    await mala({ tipo: "entrada", sku: "medias", cantidad: -4 });
+    const estado = await armarEstadoOficina({ repo: e.repo, investigacion });
+    assert.equal(estado.inventario.stock["shaker-negro"], 1);
+    assert.equal(estado.inventario.ventas.length, 0);
+  });
+
+  test("anular una venta devuelve el stock, y dos ventas juntas no se pisan", async () => {
+    const e = crearEscenario({ investigacion });
+    await llegada(e, "medias", 10);
+    const [a, b] = await Promise.all([1, 2].map(() => aplicarAccion(e, { accion: "inventario", cambio: { tipo: "venta", items: [{ producto: "medias", cantidad: 3 }] } })));
+    assert.equal((await armarEstadoOficina({ repo: e.repo, investigacion })).inventario.stock.medias, 4);
+    const t = await aplicarAccion(e, { accion: "inventario", cambio: { tipo: "anular_venta", id: a.id } });
+    assert.equal(t.inventario.stock.medias, 7);
+    await assert.rejects(aplicarAccion(e, { accion: "inventario", cambio: { tipo: "anular_venta", id: a.id } }), (error) => error.estado === 400);
+    assert.equal(t.inventario.totales.ventas, 1);
+    void b;
+  });
+
+  test("el bot ve el stock del juego y lo que registra el bot (llegada, venta, anulación) aparece en el juego", async () => {
+    const llm = {
+      async conversar({ ejecutar }) {
+        const antes = await ejecutar("ver_stock", {});
+        const sinColor = await ejecutar("registrar_venta", { items: [{ producto: "gorra", cantidad: 1 }] });
+        await ejecutar("registrar_llegada", { producto: "gorra-beige", cantidad: 5 });
+        const v = await ejecutar("registrar_venta", { items: [{ producto: "gorra", cantidad: 2, gorra: "beige" }, { producto: "shaker", cantidad: 1, shaker: "claro" }] });
+        const cambiaPrecio = await ejecutar("registrar_venta", { items: [{ producto: "medias", cantidad: 1, precio: 1 }] });
+        return `Antes ${antes.stock["shaker-claro"]}. ${sinColor.error ? "Faltaba el color." : ""} ${v.error ?? "Vendido."} ${cambiaPrecio.error ? "Precio fijo." : ""}`;
+      },
+    };
+    const e = crearEscenario({ llm, investigacion });
+    await llegada(e, "shaker-claro", 4);
+    await llegada(e, "medias", 1);
+    const r = await aplicarAccion(e, { accion: "chat", texto: "vendí 2 gorras beige y un shaker claro" });
+    assert.match(r.respuesta, /Antes 4\. Faltaba el color\. Vendido\. Precio fijo\./);
+    const estado = await armarEstadoOficina({ repo: e.repo, investigacion });
+    assert.equal(estado.inventario.stock["gorra-beige"], 3);
+    assert.equal(estado.inventario.stock["shaker-claro"], 3);
+    assert.equal(estado.inventario.ventas[0].origen, "bot");
+    assert.equal(estado.inventario.totales.importe, 2 * 29900 + 12900);
+  });
+});
+
+describe("estrategia de la semana: sale de la investigación y se modifica desde el juego y el bot", () => {
+  const hoy = Date.parse("2026-10-28T15:00:00Z"); // miércoles; la semana arranca el lunes 26/10
+  const cambiar = (e, cambio, ahora = hoy) => aplicarAccion(e, { accion: "operacion", cambio }, ahora);
+
+  test("muestra las líneas de la investigación y permite editar, quitar y agregar (y volver atrás)", async () => {
+    const e = crearEscenario({ investigacion });
+    const e1 = { ...e, investigacion };
+    let estado = await armarEstadoOficina({ repo: e.repo, investigacion, ahora: hoy });
+    assert.deepEqual(estado.estrategia_semana.lineas.map((l) => l.t), LINEAS.lineas.map((l) => l.t));
+    assert.equal(estado.estrategia_semana.semana, "2026-10-26");
+    await cambiar(e1, { tipo: "estrategia_editar", clave: "iaaaa1111", texto: "Carruseles de frase, uno por semana." });
+    await cambiar(e1, { tipo: "estrategia_quitar", clave: "ibbbb2222" });
+    await cambiar(e1, { tipo: "estrategia_agregar", texto: "Mostrar el proceso con las manos." });
+    estado = await armarEstadoOficina({ repo: e.repo, investigacion, ahora: hoy });
+    assert.deepEqual(estado.estrategia_semana.lineas.map((l) => [l.t, l.origen, l.editada]), [["Carruseles de frase, uno por semana.", "investigacion", true], ["Mostrar el proceso con las manos.", "propia", false]]);
+    assert.ok((await e.repo.novedadesPendientes()).some((n) => /Estrategia de la semana: agregó/.test(n.texto)), "el Estratega se entera");
+    await assert.rejects(cambiar(e1, { tipo: "estrategia_editar", clave: "inexistente", texto: "x" }), (error) => error.estado === 400);
+    await cambiar(e1, { tipo: "estrategia_restaurar" });
+    estado = await armarEstadoOficina({ repo: e.repo, investigacion, ahora: hoy });
+    assert.equal(estado.estrategia_semana.lineas.length, 2);
+    assert.equal(estado.estrategia_semana.cambiada, false);
+  });
+
+  test("el lunes siguiente vuelve a arrancar desde la investigación", async () => {
+    const e = crearEscenario({ investigacion });
+    await cambiar({ ...e, investigacion }, { tipo: "estrategia_quitar", clave: "iaaaa1111" });
+    const lunesQueViene = Date.parse("2026-11-02T12:00:00Z");
+    const estado = await armarEstadoOficina({ repo: e.repo, investigacion, ahora: lunesQueViene });
+    assert.equal(estado.estrategia_semana.lineas.length, 2);
+    assert.equal(estado.estrategia_semana.semana, "2026-11-02");
+  });
+
+  test("el bot ve las líneas (con id) y las cambia; el juego lo ve", async () => {
+    const llm = {
+      async conversar({ ejecutar }) {
+        const v = await ejecutar("ver_operacion", {});
+        const id = v.estrategia_de_la_semana.lineas[0].id;
+        await ejecutar("editar_estrategia", { accion: "editar", id, texto: "Más carruseles." });
+        const mal = await ejecutar("editar_estrategia", { accion: "borrar" });
+        return `${v.estrategia_de_la_semana.lineas.length} líneas. ${mal.error ? "Acción inválida." : ""}`;
+      },
+    };
+    const e = crearEscenario({ llm, investigacion });
+    const r = await aplicarAccion(e, { accion: "chat", texto: "cambiá la primera línea de la estrategia" });
+    assert.match(r.respuesta, /2 líneas\. Acción inválida\./);
+    const estado = await armarEstadoOficina({ repo: e.repo, investigacion });
+    assert.equal(estado.estrategia_semana.lineas[0].t, "Más carruseles.");
+    assert.equal(estado.operacion.historial.at(-1).origen, "bot");
+  });
+});
+
+describe("Instagram ya no tiene Productos del Drop", () => {
+  test("ese dato ya no se puede editar", async () => {
+    const e = crearEscenario({ investigacion });
+    await assert.rejects(aplicarAccion(e, { accion: "operacion", cambio: { tipo: "campo", campo: "recepcion.productos", valor: "x" } }), (error) => error.estado === 400);
   });
 });
