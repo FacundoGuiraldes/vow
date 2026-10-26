@@ -700,6 +700,49 @@ function formNota(){
   fo.addEventListener('submit',function(e){e.preventDefault();agregarNota(ta.value,se.value,ti.value);ta.value=''});
   return fo;
 }
+
+/* ================= datos editables: el juego y el bot los cambian y los dos lo ven ================= */
+var EDITANDO={},EDTXT={};
+function enviarOp(cambio,okMsg){
+  if(conectado!=='vivo'){aviso('Sin conexión con el bot: no se guardó.',6000);return Promise.resolve(false)}
+  return api('/oficina/accion',{body:{accion:'operacion',cambio:cambio}}).then(function(r){if(r&&r.operacion&&VIVO)VIVO.operacion=r.operacion;aviso(okMsg||'Guardado: el bot ya lo sabe');return leerVivo(true).then(function(){return true})}).catch(function(e){aviso(e.estado===401?'Clave inválida: no se guardó':'No se guardó: '+(e.message||'error'),6000);if(e.estado===401)pedirClave('La clave no es válida.');return false});
+}
+function filaEditable(clave,etiqueta,valor){
+  var op=(D._op&&D._op.campos)||{},propio=op[clave]!=null;
+  var f=el('div','fila'),t=el('div','tx');t.appendChild(el('strong',null,etiqueta+': '));t.appendChild(document.createTextNode(valor||'sin dato'));
+  if(propio)t.appendChild(el('div','mono','cambiado desde el juego o el bot'));
+  var a=el('div','acc');
+  a.appendChild(boton('Editar','ck sec',function(){EDITANDO[clave]=!EDITANDO[clave];abrirEdif(panelAbierto,true);if(EDITANDO[clave])setTimeout(function(){var i=document.querySelector('#cuerpo form.nota input');if(i)i.focus()},30)}));
+  f.appendChild(t);f.appendChild(a);
+  if(EDITANDO[clave]){
+    var fo=el('form','nota'),inp=el('input');inp.type='text';inp.maxLength=1200;inp.value=EDTXT[clave]!=null?EDTXT[clave]:(valor||'');
+    inp.addEventListener('input',function(){EDTXT[clave]=inp.value});
+    var rw=el('div','fil2'),sb=el('button','ck si','Guardar');sb.type='submit';rw.appendChild(sb);
+    if(propio)rw.appendChild(boton('Volver al documento','ck sec',function(){enviarOp({tipo:'campo',campo:clave,valor:''},'Vuelve a lo que dicen los documentos').then(function(ok){if(ok){delete EDITANDO[clave];delete EDTXT[clave];abrirEdif(panelAbierto,true)}})}));
+    fo.appendChild(inp);fo.appendChild(rw);
+    fo.addEventListener('submit',function(ev){ev.preventDefault();enviarOp({tipo:'campo',campo:clave,valor:inp.value}).then(function(ok){if(ok){delete EDITANDO[clave];delete EDTXT[clave];abrirEdif(panelAbierto,true)}})});
+    t.appendChild(fo);
+  }
+  return f;
+}
+function seccionAgenda(r){
+  var ev=lista('agenda').filter(function(x){var d=pd(x.f);return d&&dias(d)>=0}).sort(function(a,b){return (a.f+(a.h||'')).localeCompare(b.f+(b.h||''))}).slice(0,10);
+  r.appendChild(el('h4',null,'Agenda'));
+  if(!ev.length)r.appendChild(el('p','vacio','No hay nada agendado.'));
+  ev.forEach(function(x){
+    var f=el('div','fila'),d=pd(x.f);f.appendChild(el('div','fe',d?dd(d)+(x.h?' '+x.h:''):x.f));
+    var t=el('div','tx');if(SALA[x.sala])t.appendChild(el('span','chip ok',SALA[x.sala].n));t.appendChild(document.createTextNode(x.t));f.appendChild(t);
+    var a=el('div','acc');a.appendChild(boton('Quitar','ck sec',function(){enviarOp({tipo:'agenda_quitar',clave:x._id||(x.f+'|'+x.t)},'Quitado de la agenda').then(function(ok){if(ok)abrirEdif(panelAbierto,true)})}));f.appendChild(a);r.appendChild(f);
+  });
+  var de=el('details');de.appendChild(el('summary',null,'Agregar a la agenda'));
+  var fo=el('form','nota'),fe=el('input'),ho=el('input'),tx=el('input'),se=el('select'),sb=el('button','ck si','Agregar');
+  fe.type='date';ho.type='time';tx.type='text';tx.maxLength=140;tx.placeholder='Ej.: Retirar las gorras';sb.type='submit';
+  ['bot','deposito','estrategia','diseno','recepcion'].forEach(function(k){var o=el('option',null,SALA[k].n);o.value=k;se.appendChild(o)});
+  var r1=el('div','fil2');r1.appendChild(fe);r1.appendChild(ho);var r2=el('div','fil2');r2.appendChild(se);r2.appendChild(sb);
+  fo.appendChild(r1);fo.appendChild(tx);fo.appendChild(r2);
+  fo.addEventListener('submit',function(ev2){ev2.preventDefault();if(!fe.value||!tx.value.trim()){aviso('Falta la fecha o qué pasa ese día');return}enviarOp({tipo:'agenda_agregar',fecha:fe.value,hora:ho.value,sala:se.value,texto:tx.value},'Agendado: el bot ya lo sabe').then(function(ok){if(ok)abrirEdif(panelAbierto,true)})});
+  de.appendChild(fo);r.appendChild(de);
+}
 var PANEL={};
 PANEL.hq=function(){
   var r=document.createElement('div'),T=TAREAS,pz=T.diseno.filter(function(x){return x.pieza}),otros=[];
@@ -710,6 +753,7 @@ PANEL.hq=function(){
   if(!pz.length&&!otros.length)r.appendChild(el('p','vacio','Todo al día: no hay nada pendiente.'));
   var ks=notasDe();
   if(ks.length){r.appendChild(el('h4',null,'Anotado para el bot'));ks.slice(0,4).forEach(function(k){var n=NOTAS[k],f=el('div','fila'),t=el('div','tx');if(n.tipo==='confirmado')t.appendChild(el('strong',null,'Confirmado: '));t.appendChild(document.createTextNode(n.t));f.appendChild(t);var a=el('div','acc');a.appendChild(boton('Quitar','ck sec',function(){quitarNota(k)}));f.appendChild(a);r.appendChild(f)})}
+  seccionAgenda(r);
   r.appendChild(el('h4',null,'Anotar al bot'));r.appendChild(formNota());
   var hs=Object.keys(HECHO).filter(function(k){return HECHO[k]&&HECHO[k].t}).sort(function(a,b){return (HECHO[b].cuando||'').localeCompare(HECHO[a].cuando||'')}).slice(0,5);
   if(hs.length){var de=el('details');de.appendChild(el('summary',null,'Hecho hace poco'));hs.forEach(function(k){var f=el('div','fila'),t=el('div','tx');t.appendChild(document.createTextNode('✓ '+HECHO[k].t));t.appendChild(el('div','mono',fechaHora(HECHO[k].cuando)));f.appendChild(t);var a=el('div','acc');a.appendChild(boton('Deshacer','ck sec',function(){deshacerHecho(k)}));f.appendChild(a);de.appendChild(f)});r.appendChild(de)}
@@ -737,6 +781,7 @@ PANEL.estrategia=function(){
   var r=document.createElement('div'),e=D.estrategia||{},pl=pd(e.plan),inf=pd(e.informe);
   r.appendChild(dato('Plan',pl?ddy(pl)+' · '+rel(dias(pl)):'sin plan',pl&&dias(pl)<-7?'mal':''));
   r.appendChild(dato('Informe de investigación',inf?ddy(inf)+' · '+rel(dias(inf)):'sin informe',inf&&dias(inf)<-10?'mal':''));
+  r.appendChild(filaEditable('estrategia.foco','Foco',e.foco));r.appendChild(filaEditable('estrategia.notas','Notas',e.notas));
   listaTareas(r,TAREAS.estrategia);
   if(D.planTexto){var d1=el('details');d1.appendChild(el('summary',null,'Leer el plan'));d1.appendChild(md(D.planTexto));r.appendChild(d1)}
   if(D.informeTexto){var d2=el('details');d2.appendChild(el('summary',null,'Leer el informe'));d2.appendChild(md(D.informeTexto));r.appendChild(d2)}
@@ -744,6 +789,7 @@ PANEL.estrategia=function(){
 };
 PANEL.recepcion=function(){
   var r=document.createElement('div'),x=D.rendimiento;
+  r.appendChild(filaEditable('recepcion.productos','Productos del Drop',(D.recepcion||{}).productos));
   if(!x){r.appendChild(el('p','vacio',conectado==='vivo'?'Instagram todavía no está conectado al servicio.':'Conectá el juego al bot para ver Instagram.'));return {t:'Instagram',s:'',b:r}}
   if(x.error){r.appendChild(el('p','mono','No se pudo leer Instagram: '+x.error));return {t:'Instagram',s:'',b:r}}
   var c=x.cuenta||{},t=x.totales||{};
@@ -760,8 +806,9 @@ PANEL.recepcion=function(){
 PANEL.deposito=function(){
   var r=document.createElement('div'),d=D.deposito||{};
   [['gorras','Gorras'],['medias','Medias'],['shakers','Shakers']].forEach(function(k){
-    var e=estadoLlegada(d[k[0]]);r.appendChild(dato(k[1],e.llego?'llegó (verificar)':e.txt,e.llego?'bien':''));
+    var e=estadoLlegada(d[k[0]]);r.appendChild(filaEditable('deposito.'+k[0],k[1],(e.llego?'pasó la fecha estimada, verificar · ':'')+(d[k[0]]||'')));
   });
+  r.appendChild(filaEditable('deposito.venta','Venta',d.venta));
   listaTareas(r,TAREAS.deposito);
   return {t:'Almacén',s:'las cajas aparecen cuando pasa la fecha estimada',b:r};
 };
@@ -924,6 +971,15 @@ function armarD(){
   piezas.forEach(function(p){if(p.estado==='por aprobar'&&!p._id){var t='Aprobar «'+p.titulo+'» del '+ddf(p.fecha);if(!pend.some(function(x){return x.t===t}))pend.push({sala:'diseno',t:t})}});
   /* lunes 8:00: el plan semanal se arma solo */
   var h=new Date(),i;for(i=0;i<8;i++){var x=new Date(h.getFullYear(),h.getMonth(),h.getDate()+i);if(x.getDay()===1&&(i>0||h.getHours()<8)){agenda.push({f:x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'),h:'08:00',sala:'bot',t:'Plan semanal automático'});break}}
+  var op=(v&&v.operacion)||null;d._op=op;
+  if(op){
+    var cs=op.campos||{};
+    ['gorras','medias','shakers','venta'].forEach(function(k){if(cs['deposito.'+k]){d.deposito=d.deposito||{};d.deposito[k]=cs['deposito.'+k]}});
+    d.recepcion=d.recepcion||{};if(cs['recepcion.productos'])d.recepcion.productos=cs['recepcion.productos'];
+    d.estrategia=d.estrategia||{};if(cs['estrategia.foco'])d.estrategia.foco=cs['estrategia.foco'];if(cs['estrategia.notas'])d.estrategia.notas=cs['estrategia.notas'];
+    var oc=(op.agenda&&op.agenda.ocultas)||[];agenda=agenda.filter(function(x){return oc.indexOf(x.f+'|'+x.t)<0});
+    Object.keys((op.agenda&&op.agenda.propias)||{}).forEach(function(id){var e=op.agenda.propias[id];agenda.push({f:e.f,h:e.h||'',sala:e.sala||'bot',t:e.t,_id:id})});
+  }
   d.piezas=piezas;d.agenda=agenda;d.pendientes=pend;
   d.sistema={tests:CI.tests||'sin datos todavía',evals:CI.evals||'sin datos todavía'};
   return d;

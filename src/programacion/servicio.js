@@ -10,6 +10,7 @@
 //   3. Una publicación que ya se intentó nunca se reintenta sola: si algo falla, se avisa y se espera una orden.
 //   4. Fuera de la hora (más de TOLERANCIA_MINUTOS tarde) no se publica sola: se pregunta.
 //   5. /pausar frena toda publicación.
+import { ErrorOperacion, aplicarOperacion, leerOperacion, resumenParaChat } from "./operacion.js";
 import { revisarTextoPublico, validarUrlPublica } from "../mcp/instagram/validaciones.js";
 import { CAMPOS_EDITABLES, HERRAMIENTAS_CHAT, afirmaCambio, MENSAJES_MAXIMOS_POR_DIA, construirSistemaChat, paraElModelo, recortarRecuerdo } from "./conversacion.js";
 import { ahoraArgentina, esFechaISO, esHoraValida, lunesDe, fechaEnTexto, fechaLegible, horaDesdeMinutos, minutosDelDia, sumarDias, diasHasta } from "./fechas.js";
@@ -546,7 +547,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
         herramientas: HERRAMIENTAS_CHAT,
         ejecutar: async (nombre, argumentos) => {
           const resultado = await ejecutarHerramienta(nombre, argumentos, { hoy, hora, canal });
-          if (nombre === "modificar_pieza" || nombre === "programar_pieza") {
+          if (["modificar_pieza", "programar_pieza", "editar_dato", "agregar_agenda", "quitar_agenda"].includes(nombre)) {
             if (resultado?.ok === true) efectos.guardados++;
             else efectos.rechazos.push(resultado?.error ?? (resultado?.errores ?? []).join(" "));
           }
@@ -684,6 +685,19 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
       await decirDePieza(fila, `🆕 Pieza nueva para el ${fechaLegible(fecha)}, armada desde ${canal === "juego" ? "el juego" : "el chat"}${resultado.queCambio ? `: ${resultado.queCambio}` : ""}\n\n${textoPieza(fila)}${aviso}`, { botones: botonesPlan(fila.id, { conIA: conIA(fila) }) })
         .catch((error) => console.error(`No se pudo avisar por Telegram: ${error.message}`));
       return { ok: true, id: fila.id, estado: "propuesta", fecha, hora: horaPieza, formato: pieza.formato, nota: `Quedó propuesta (ID ${fila.id}) y ya se la mostré a Facundo en Telegram con sus botones. Falta que la apruebe.${aviso}` };
+    }
+    if (nombre === "ver_operacion") return resumenParaChat(await leerOperacion(repo));
+    if (nombre === "editar_dato" || nombre === "agregar_agenda" || nombre === "quitar_agenda") {
+      const cambio = nombre === "editar_dato" ? { tipo: "campo", campo: argumentos.campo, valor: argumentos.valor }
+        : nombre === "agregar_agenda" ? { tipo: "agenda_agregar", fecha: argumentos.fecha, hora: argumentos.hora, sala: argumentos.sala, texto: argumentos.texto }
+          : { tipo: "agenda_quitar", clave: argumentos.id };
+      try {
+        const { resumen } = await aplicarOperacion(repo, cambio, { origen: "bot" });
+        return { ok: true, nota: `Guardado y visible en el juego: ${resumen}` };
+      } catch (error) {
+        if (error instanceof ErrorOperacion) return { error: error.message };
+        throw error;
+      }
     }
     if (nombre === "aprobar_pieza") {
       const fila = await piezaDe(argumentos.id);

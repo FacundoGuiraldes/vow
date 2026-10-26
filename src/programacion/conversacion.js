@@ -58,6 +58,34 @@ export const HERRAMIENTAS_CHAT = [
       required: ["fecha", "indicacion"],
     },
   },
+  { name: "ver_operacion", description: "Muestra los datos de depósito, recepción, estrategia y agenda que se cambiaron desde el juego o el chat (y cuáles se pueden editar).", parameters: { type: "OBJECT", properties: {} } },
+  {
+    name: "editar_dato",
+    description: "Cambia un dato de la operación (entrega o estado de gorras, medias o shakers, venta, productos del Drop, foco o notas de estrategia). El juego lo ve al instante. Mandá valor vacío para volver a lo que dicen los documentos.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        campo: { type: "STRING", description: "deposito.gorras, deposito.medias, deposito.shakers, deposito.venta, recepcion.productos, estrategia.foco o estrategia.notas." },
+        valor: { type: "STRING", description: "El texto nuevo, corto y claro." },
+      },
+      required: ["campo", "valor"],
+    },
+  },
+  {
+    name: "agregar_agenda",
+    description: "Agrega un evento a la agenda de la oficina (llegada de mercadería, una reunión, una fecha límite). No es una publicación: para publicar usá programar_pieza.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        fecha: { type: "STRING", description: "AAAA-MM-DD." },
+        hora: { type: "STRING", description: "HH:MM, opcional." },
+        sala: { type: "STRING", description: "estrategia, bot, diseno, deposito o recepcion." },
+        texto: { type: "STRING", description: "Qué pasa ese día." },
+      },
+      required: ["fecha", "texto"],
+    },
+  },
+  { name: "quitar_agenda", description: "Quita un evento de la agenda que se agregó antes (usá el id que devuelve ver_operacion).", parameters: { type: "OBJECT", properties: { id: { type: "STRING" } }, required: ["id"] } },
   { name: "aprobar_pieza", description: "Aprueba una pieza propuesta para la semana. No la publica ni la confirma.", parameters: { type: "OBJECT", properties: { id }, required: ["id"] } },
   {
     name: "pedir_confirmacion",
@@ -93,6 +121,7 @@ Cómo trabajás:
 - Para cambiar una pieza usá modificar_pieza con solo lo que cambia. Las fechas, calculalas con el calendario de arriba. Si el sistema rechaza el cambio por las reglas de marca, explicale a Facundo qué regla fue y proponé una alternativa que la cumpla.
 - Para aprobar una pieza de la semana, aprobar_pieza.
 - Si pide publicar algo un día que no tiene pieza (mirá ver_semana), usá programar_pieza con la fecha exacta, el formato y lo que pidió. Si el día ya tiene una pieza, no armes otra: ofrecé modificarla.
+- Los datos de depósito (gorras, medias, shakers, venta), recepción, el foco de estrategia y la agenda se cambian con editar_dato, agregar_agenda y quitar_agenda; el juego los muestra al instante. Antes de decir qué hay cargado, mirá con ver_operacion.
 - Si pide varias cosas en un mismo mensaje, hacelas todas con las herramientas y contá al final qué quedó hecho y qué no. Si te falta un dato para hacerlo bien (qué día, qué texto), preguntá una sola cosa clara.
 - NUNCA confirmás ni cancelás una publicación por tu cuenta: para confirmar usá pedir_confirmacion y para cancelar pedir_cancelacion. Eso le manda un botón a Facundo y la decisión es suya. Decile claro que te falta que toque el botón.
 - La publicación es automática: se hace sola a la hora indicada, y solo si Facundo confirmó esa pieza ese mismo día. Si no confirma, no se publica nada. No prometas nada distinto.
