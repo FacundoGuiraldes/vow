@@ -31,8 +31,51 @@ async function guardarJuego(repo, juego) {
   await repo.guardarEstado("juego", { hechos: ultimas(juego.hechos), notas: ultimas(juego.notas) });
 }
 
+// "Cambiar todo" tarda (la IA arma la pieza y la corrige si rompe una regla): corre en segundo plano y el juego ve el avance acá.
+const MINUTOS_CAMBIO_MAXIMO = 5;
+function cambiosVisibles(cambios, ahora) {
+  const salida = {};
+  for (const [clave, c] of Object.entries(cambios && typeof cambios === "object" ? cambios : {})) {
+    const edad = ahora - Date.parse(c.en);
+    if (!(edad < 60 * 60_000)) continue; // lo viejo no le sirve al juego
+    salida[clave] = c.estado === "trabajando" && edad > MINUTOS_CAMBIO_MAXIMO * 60_000 ? { ...c, estado: "error", motivo: "Se interrumpió: probá de nuevo." } : c;
+  }
+  return salida;
+}
+
+async function guardarCambio(repo, clave, dato) {
+  const actuales = (await repo.leerEstado("cambios")) ?? {};
+  const recientes = Object.fromEntries(Object.entries(actuales).slice(-9));
+  await repo.guardarEstado("cambios", { ...recientes, [clave]: dato });
+}
+
+// Lanza el cambio y contesta enseguida. Con `segundoPlano` (el servidor) sigue solo; sin él (pruebas) se espera el resultado.
+async function lanzarCambio({ repo, segundoPlano }, clave, ahora, trabajo) {
+  const previo = ((await repo.leerEstado("cambios")) ?? {})[clave];
+  if (previo?.estado === "trabajando" && ahora - Date.parse(previo.en) < MINUTOS_CAMBIO_MAXIMO * 60_000) throw new ErrorAccion("La IA ya está armando esa pieza: esperá un momento.", 409);
+  const en = new Date(ahora).toISOString();
+  await guardarCambio(repo, clave, { estado: "trabajando", en });
+  const correr = (async () => {
+    let r;
+    try {
+      r = await trabajo();
+    } catch (error) {
+      r = { ok: false, motivo: String(error.message ?? error) };
+    }
+    await guardarCambio(repo, clave, r.ok ? { estado: "listo", en: new Date().toISOString(), id: r.id ?? null } : { estado: "error", en: new Date().toISOString(), motivo: String(r.motivo ?? "No se pudo armar la sugerencia.").slice(0, 400) });
+    return r;
+  })();
+  if (segundoPlano) {
+    segundoPlano(correr.catch((error) => console.error(`Cambio en segundo plano: ${error.message}`)));
+    return { ok: true, trabajando: true };
+  }
+  const r = await correr;
+  if (!r.ok) throw new ErrorAccion(r.motivo, 409);
+  return { ok: true, estado: r.estado, id: r.id };
+}
+
 export async function armarEstadoOficina({ repo, rendimiento = null, permitirPublicar = false, ahora = Date.now() }) {
-  const [piezas, novedades, recordatorios, pausa, chat, juego, operacion] = await Promise.all([
+  const [piezas, novedades, recordatorios, pausa, chat, juego, operacion, cambios] = await Promise.all([
     repo.piezasEntre(fechaISO(ahora - 21 * DIA_MS), fechaISO(ahora + 45 * DIA_MS)),
     repo.novedadesRecientes(20),
     repo.recordatoriosPendientes(fechaISO(ahora + 45 * DIA_MS)),
@@ -40,6 +83,7 @@ export async function armarEstadoOficina({ repo, rendimiento = null, permitirPub
     repo.leerEstado("chat"),
     leerJuego(repo),
     leerOperacion(repo),
+    repo.leerEstado("cambios"),
   ]);
   const filas = await Promise.all(
     piezas.map(async (p) => ({
@@ -67,6 +111,7 @@ export async function armarEstadoOficina({ repo, rendimiento = null, permitirPub
     chat: (Array.isArray(chat) ? chat : []).slice(-30).map((m) => ({ rol: m.rol, texto: recortar(m.visible ?? m.texto, 1500), canal: m.canal ?? "telegram", en: m.en ?? null })),
     juego,
     operacion,
+    cambios: cambiosVisibles(cambios, ahora),
     rendimiento: rend,
   };
   // La versión cambia solo cuando cambia algo: el juego pregunta seguido y, si no cambió, el servidor contesta cortito
@@ -93,7 +138,8 @@ export async function armarContexto({ repo, rendimiento = null }, idPieza, ahora
   return partes.join("\n\n");
 }
 
-export async function aplicarAccion({ repo, servicio, rendimiento = null }, accion, ahora = Date.now()) {
+export async function aplicarAccion(deps, accion, ahora = Date.now()) {
+  const { repo, servicio, rendimiento = null } = deps;
   const en = new Date(ahora).toISOString();
   const tipo = accion?.accion;
 
@@ -113,16 +159,18 @@ export async function aplicarAccion({ repo, servicio, rendimiento = null }, acci
 
   if (tipo === "cambiar_pieza" && !Number.isInteger(accion.id) && typeof accion.fecha === "string") {
     // La pieza solo está en los documentos: la IA arma la nueva en el momento y queda propuesta para aprobar
-    const resultado = await servicio.cambiarSinFila({ fecha: accion.fecha, formato: accion.formato, indicacion: recortar(accion.indicacion, 300), base: recortar(accion.base, 1500) });
-    if (!resultado.ok) throw new ErrorAccion(resultado.motivo, 409);
-    return { ok: true, estado: resultado.estado, id: resultado.id };
+    return lanzarCambio(deps, `f:${accion.fecha}`, ahora, async () => {
+      const r = await servicio.cambiarSinFila({ fecha: accion.fecha, formato: accion.formato, indicacion: recortar(accion.indicacion, 300), base: recortar(accion.base, 1500) });
+      return r.ok ? { ok: true, estado: r.estado, id: r.id } : r;
+    });
   }
 
   if (tipo === "cambiar_pieza") {
     if (!Number.isInteger(accion.id)) throw new ErrorAccion("Falta el id de la pieza.");
-    const resultado = await servicio.sugerirCambio(accion.id, { indicacion: recortar(accion.indicacion, 300), contexto: await armarContexto({ repo, rendimiento }, accion.id) });
-    if (!resultado.ok) throw new ErrorAccion(resultado.motivo, 409);
-    return { ok: true, estado: resultado.estado };
+    return lanzarCambio(deps, String(accion.id), ahora, async () => {
+      const r = await servicio.sugerirCambio(accion.id, { indicacion: recortar(accion.indicacion, 300), contexto: await armarContexto({ repo, rendimiento }, accion.id) });
+      return r.ok ? { ok: true, estado: r.estado, id: accion.id } : r;
+    });
   }
 
   // "Editar": cambia la publicación existente a mano (tipo, epígrafe con párrafos, gancho, hora), sin IA

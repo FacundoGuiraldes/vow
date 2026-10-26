@@ -143,6 +143,39 @@ describe("cambiar una pieza desde la oficina", () => {
     await assert.rejects(aplicarAccion(sinIA, { accion: "cambiar_pieza", id: f2.id }), /ANTHROPIC_API_KEY/);
   });
 
+  test("en el servidor, Cambiar contesta enseguida y el avance se ve en el estado (listo o con el error)", async () => {
+    const editor = editorQue(({ fila }) => ({ ok: true, pieza: { ...fila.pieza, gancho: "Nuevo." }, hora: fila.hora, queCambio: "", errores: [] }));
+    const e = crearEscenario({ fecha: "2026-10-30", editor });
+    const fila = await e.cargarPieza();
+    const trabajos = [];
+    const deps = { ...e, segundoPlano: (p) => trabajos.push(p) };
+    const r = await aplicarAccion(deps, { accion: "cambiar_pieza", id: fila.id });
+    assert.deepEqual(r, { ok: true, trabajando: true });
+    assert.equal((await armarEstadoOficina({ repo: e.repo })).cambios[fila.id].estado, "trabajando");
+    await assert.rejects(aplicarAccion(deps, { accion: "cambiar_pieza", id: fila.id }), (error) => error.estado === 409 && /ya está armando/.test(error.message));
+    await Promise.all(trabajos);
+    assert.equal((await armarEstadoOficina({ repo: e.repo })).cambios[fila.id].estado, "listo");
+    assert.equal((await e.repo.obtenerPieza(fila.id)).pieza.gancho, "Nuevo.");
+
+    const malo = crearEscenario({ fecha: "2026-10-30", editor: editorQue({ ok: false, errores: ["urgencia falsa"] }) });
+    const f2 = await malo.cargarPieza();
+    const t2 = [];
+    await aplicarAccion({ ...malo, segundoPlano: (p) => t2.push(p) }, { accion: "cambiar_pieza", id: f2.id });
+    await Promise.all(t2);
+    const c = (await armarEstadoOficina({ repo: malo.repo })).cambios[f2.id];
+    assert.equal(c.estado, "error");
+    assert.match(c.motivo, /urgencia falsa/);
+  });
+
+  test("un cambio que quedó 'trabajando' más de 5 minutos se muestra como interrumpido", async () => {
+    const e = crearEscenario();
+    const ahora = Date.parse("2026-10-26T12:00:00Z");
+    await e.repo.guardarEstado("cambios", { 5: { estado: "trabajando", en: "2026-10-26T11:50:00Z" } });
+    const c = (await armarEstadoOficina({ repo: e.repo, ahora })).cambios[5];
+    assert.equal(c.estado, "error");
+    assert.match(c.motivo, /interrumpió/);
+  });
+
   test("una sugerencia que rompe las reglas de la marca no se guarda", async () => {
     const e = crearEscenario({ fecha: "2026-10-26", editor: editorQue({ ok: false, errores: ["urgencia falsa"] }) });
     const fila = await e.cargarPieza();

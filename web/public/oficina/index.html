@@ -639,14 +639,31 @@ function ponerCapa(){
 }
 
 /* ================= tarjeta de una pieza: ver, aprobar o pedir otra ================= */
+var PEDIDOS={};
+function claveCambio(pz){return pz._id?String(pz._id):'f:'+pz.fecha}
+function cambiandoAhora(e){
+  var c=VIVO&&VIVO.cambios&&VIVO.cambios[claveCambio(e)];
+  return !!(CAMBIANDO[e._id||kPieza(e)]||(c&&c.estado==='trabajando'));
+}
+/* "Cambiar todo" corre en el servidor: acá se mira cómo va, así no depende de que la conexión aguante */
+function revisarCambios(){
+  Object.keys(PEDIDOS).forEach(function(ck){
+    var p=PEDIDOS[ck],c=VIVO&&VIVO.cambios&&VIVO.cambios[p.clave];
+    function fin(){delete PEDIDOS[ck];delete CAMBIANDO[ck];delete CFABRE[p.kc];delete CFTXT[p.kc]}
+    if(c&&c.estado==='listo'){fin();aviso('Nueva sugerencia lista: revisala y aprobala',5000)}
+    else if(c&&c.estado==='error'){fin();aviso('No se cambió nada: '+(c.motivo||'no se pudo armar la sugerencia'),9000)}
+    else if(Date.now()-p.t>6*60000){fin();aviso('No se supo cómo terminó: recargá y revisá la pieza.',8000)}
+  });
+}
 function pedirCambio(pz,indicacion){
   indicacion=(indicacion||'').trim();var kc=String(pz._id||kPieza(pz)),ck=pz._id||kc;
   if(conectado!=='vivo'){aviso('Sin conexión con el bot: el cambio no se guardaría. Revisá el aviso de arriba.',6000);return}
-  if(CAMBIANDO[ck])return;CAMBIANDO[ck]=true;refrescar();
+  if(cambiandoAhora(pz))return;CAMBIANDO[ck]=true;refrescar();
   aviso('La IA está armando otra sugerencia… puede tardar un minuto');
   /* una pieza que solo está en los documentos no tiene fila: el servidor la arma nueva en el momento para ese día */
   var cuerpo=pz._id?{accion:'cambiar_pieza',id:pz._id,indicacion:indicacion}:{accion:'cambiar_pieza',fecha:pz.fecha,formato:pz.formato,indicacion:indicacion,base:pz.texto||pz.titulo||''};
-  api('/oficina/accion',{body:cuerpo}).then(function(){
+  api('/oficina/accion',{body:cuerpo}).then(function(r){
+    if(r&&r.trabajando){PEDIDOS[ck]={clave:claveCambio(pz),kc:kc,t:Date.now()};return leerVivo(true)}
     delete CAMBIANDO[ck];delete CFABRE[kc];delete CFTXT[kc];aviso('Nueva sugerencia lista: revisala y aprobala',5000);return leerVivo(true);
   }).catch(function(e){delete CAMBIANDO[ck];refrescar();aviso(e.estado===401?'La clave no es válida':('No se cambió nada: '+(e.message||'no se pudo armar la sugerencia')),8000);if(e.estado===401)pedirClave('La clave no es válida.')});
 }
@@ -740,14 +757,14 @@ function tarjetaPieza(e){
   var d=pd(e.fecha),f=el('div','pieza'),m=(MED.piezas||{})[kMed(e)]||{},ap=!!HECHO[kPieza(e)];
   var h=el('div','ph');h.appendChild(el('strong',null,e.titulo||'Pieza'));h.appendChild(chipEstado(e.estado));f.appendChild(h);
   f.appendChild(el('div','mono',(d?dd(d)+' · ':'')+(e.formato||'')+(e.hora?' · '+e.hora:'')+(d?' · '+rel(dias(d)):'')));
-  if(CAMBIANDO[e._id||kPieza(e)])f.appendChild(el('p','vacio','La IA está armando otra sugerencia…'));
+  if(cambiandoAhora(e))f.appendChild(el('p','vacio','La IA está armando otra sugerencia…'));
   if(m.imgs&&m.imgs.length)f.appendChild(galeria(m.imgs));
   if(m.vid){var v=document.createElement('video');v.src=m.vid;v.controls=true;v.playsInline=true;v.preload='metadata';v.className='vid';f.appendChild(v)}
   var ep=epigrafeDe(e,m);f.appendChild(ep?el('p','epi',ep):el('p','vacio','Todavía no tiene epígrafe.'));
   var a=el('div','acc');
   if(e.estado==='por aprobar'&&!ap&&!esConfirmable(e))a.appendChild(boton('Aprobar','ck si',function(){if(conectado!=='vivo'){aviso('Sin conexión con el bot: no se puede aprobar ahora.',6000);return}aprobarPieza(e)}));
   if(esConfirmable(e)&&!CAMBIANDO['c'+e._id])a.appendChild(boton('Confirmar publicación','ck si',function(){confirmarPieza(e)}));
-  if(e.estado!=='publicado'&&!CAMBIANDO[e._id||kPieza(e)]){
+  if(e.estado!=='publicado'&&!cambiandoAhora(e)){
     var kc=String(e._id||kPieza(e)),cf=null,fe=null;
     function abrirForm(foco){cf=formCambio(e);var inp=cf.querySelector('input');inp.value=CFTXT[kc]||'';inp.addEventListener('input',function(){CFTXT[kc]=inp.value});f.appendChild(cf);if(foco)inp.focus()}
     function abrirEditar(foco){fe=formEditar(e,kc,m);f.appendChild(fe);if(foco){var ta=fe.querySelector('textarea');ta.focus()}}
@@ -1103,7 +1120,7 @@ function leerVivo(forzar){
   if(!leerClave()){conectado='no';refrescar();pedirClave('Ingresá la clave de la oficina para ver el estado del bot en vivo. Mientras tanto ves lo que dicen los documentos.');return Promise.resolve()}
   return api('/oficina'+(VIVO&&!forzar?'?v='+VIVO.version:'')).then(function(j){
     if(j.sin_cambios&&VIVO){if(conectado!=='vivo'){conectado='vivo';refrescar()}return}
-    VIVO=j;conectado='vivo';ERR_TXT='';$('clave').classList.remove('on');refrescar()}).catch(function(e){
+    VIVO=j;conectado='vivo';ERR_TXT='';$('clave').classList.remove('on');revisarCambios();refrescar()}).catch(function(e){
     if(e.estado===401){conectado='clave';VIVO=null;refrescar();pedirClave('La clave no es válida.')}
     else{console.error('oficina:',e);conectado='error';ERR_TXT=e.estado?'el servidor respondió '+e.estado:'no llega a la API: revisá ALLOWED_ORIGINS en Render';refrescar()}
   });
