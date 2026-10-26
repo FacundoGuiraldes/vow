@@ -25,6 +25,28 @@ export const leerOrigenes = (valor = "") =>
     .map((origen) => origen.trim())
     .filter(Boolean);
 
+// Un sitio de Cloudflare Pages (algo.pages.dev) tiene vistas previas en <rama>.algo.pages.dev y <hash>.algo.pages.dev:
+// si el sitio principal está permitido, sus vistas previas también (solo las de ese proyecto).
+export function origenPermitido(origen, permitidos = []) {
+  if (!origen) return true;
+  if (permitidos.includes(origen)) return true;
+  let url;
+  try {
+    url = new URL(origen);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:") return false;
+  return permitidos.some((p) => {
+    try {
+      const base = new URL(p);
+      return base.protocol === "https:" && base.hostname.endsWith(".pages.dev") && url.hostname.endsWith(`.${base.hostname}`);
+    } catch {
+      return false;
+    }
+  });
+}
+
 function validarEmail(email) {
   if (email === undefined || email === null || (typeof email === "string" && email.trim() === "")) {
     return { error: "Ingresá tu email." };
@@ -119,7 +141,7 @@ export function crearApp({
   app.use(helmet());
   app.use(
     cors({
-      origin: (origen, responder) => responder(null, !origen || origenesPermitidos.includes(origen)),
+      origin: (origen, responder) => responder(null, origenPermitido(origen, origenesPermitidos)),
       methods: ["GET", "POST"],
     })
   );
