@@ -19,18 +19,34 @@ const textoDe = (contenido) =>
     .join("")
     .trim();
 
-export function crearLLMGemini({ apiKey, modelo = MODELO_CHAT_POR_DEFECTO, fetchFn = fetch, pasosMaximos = PASOS_MAXIMOS } = {}) {
+// Fallas que se arreglan solas en segundos (red caída un instante, servidor de Google ocupado): se reintenta antes de molestar a Facundo
+const ESPERAS_ENTRE_REINTENTOS = [800, 2500];
+const SE_REINTENTA = new Set([500, 502, 503, 504]);
+const dormir = (ms) => new Promise((resolver) => setTimeout(resolver, ms));
+
+export function crearLLMGemini({ apiKey, modelo = MODELO_CHAT_POR_DEFECTO, fetchFn = fetch, pasosMaximos = PASOS_MAXIMOS, esperar = dormir } = {}) {
   async function pedir(cuerpo) {
     if (!apiKey) throw new ErrorLLM("Falta GEMINI_API_KEY en el servicio.");
     let respuesta;
-    try {
-      respuesta = await fetchFn(`${BASE}/${modelo}:generateContent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-        body: JSON.stringify(cuerpo),
-      });
-    } catch {
-      throw new ErrorLLM("No se pudo conectar con la IA.");
+    for (let intento = 0; ; intento++) {
+      let cayo = false;
+      try {
+        respuesta = await fetchFn(`${BASE}/${modelo}:generateContent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          body: JSON.stringify(cuerpo),
+        });
+        cayo = SE_REINTENTA.has(respuesta.status);
+      } catch {
+        cayo = true;
+        respuesta = null;
+      }
+      if (!cayo) break;
+      if (intento >= ESPERAS_ENTRE_REINTENTOS.length) {
+        if (!respuesta) throw new ErrorLLM("No se pudo conectar con la IA.");
+        break;
+      }
+      await esperar(ESPERAS_ENTRE_REINTENTOS[intento]);
     }
     const datos = await respuesta.json().catch(() => null);
     if (respuesta.status === 429) throw new ErrorLLM("Se agotó el cupo gratis de la IA por ahora. Probá en un rato.");

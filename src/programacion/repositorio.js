@@ -35,6 +35,11 @@ export function crearRepositorio(pool, { prefijoEstado = "" } = {}) {
       return creadas;
     },
 
+    // Una pieza suelta (la que arma el chat para un día): no toca las otras piezas de la semana
+    async crearPiezaSuelta({ semana, fecha, hora, pieza }) {
+      return una(`INSERT INTO piezas_programadas (semana, fecha, hora, pieza) VALUES ($1, $2, $3, $4::jsonb) RETURNING ${COLUMNAS}`, [semana, fecha, hora, JSON.stringify(pieza)]);
+    },
+
     obtenerPieza: (id) => una(`SELECT ${COLUMNAS} FROM piezas_programadas WHERE id = $1`, [id]),
 
     piezasDelDia: (fecha) => filas(`SELECT ${COLUMNAS} FROM piezas_programadas WHERE fecha = $1 AND estado <> 'cancelada' ORDER BY hora, id`, [fecha]),

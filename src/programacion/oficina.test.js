@@ -62,7 +62,8 @@ describe("la oficina", () => {
     assert.equal(estado.piezas[0].medios[0].tipo, "video");
     assert.match(estado.piezas[0].medios[0].token, /^[a-f0-9]{48}$/);
     assert.equal(estado.piezas[0].pieza.gancho, fila.pieza.gancho);
-    assert.equal(estado.chat.length, 12);
+    assert.equal(estado.chat.length, 20);
+    assert.equal(estado.chat[0].canal, "telegram");
     assert.equal(estado.rendimiento.totales.alcance, 5);
     const roto = await armarEstadoOficina({ repo: e.repo, rendimiento: { obtener: async () => { throw new Error("token vencido"); } } });
     assert.equal(roto.rendimiento.error, "token vencido");
@@ -157,5 +158,19 @@ describe("cambiar una pieza desde la oficina", () => {
     assert.equal(a.version, b.version);
     await e.repo.agregarNovedad("algo nuevo");
     assert.notEqual((await armarEstadoOficina({ repo: e.repo })).version, a.version);
+  });
+
+  test("el chat del juego usa el mismo bot: lo escrito queda en la charla compartida y los errores se muestran", async () => {
+    const llm = { async conversar({ historial }) { return `Veo ${historial.length}`; } };
+    const e = crearEscenario({ llm });
+    const r = await aplicarAccion(e, { accion: "chat", texto: "  hola bot  " });
+    assert.deepEqual([r.ok, r.respuesta], [true, "Veo 1"]);
+    const estado = await armarEstadoOficina({ repo: e.repo });
+    assert.deepEqual(estado.chat.map((m) => [m.rol, m.texto, m.canal]), [["usuario", "hola bot", "juego"], ["asistente", "Veo 1", "juego"]]);
+    await assert.rejects(aplicarAccion(e, { accion: "chat", texto: "   " }), (error) => error instanceof ErrorAccion && error.estado === 400);
+    const roto = crearEscenario({ llm: { async conversar() { throw new Error("saturada"); } } });
+    await assert.rejects(aplicarAccion(roto, { accion: "chat", texto: "hola" }), (error) => error instanceof ErrorAccion && error.estado === 502 && /saturada/.test(error.message));
+    const sinIA = crearEscenario();
+    await assert.rejects(aplicarAccion(sinIA, { accion: "chat", texto: "hola" }), (error) => error instanceof ErrorAccion && /no está configurado/.test(error.message));
   });
 });

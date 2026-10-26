@@ -11,8 +11,8 @@
 //   4. Fuera de la hora (más de TOLERANCIA_MINUTOS tarde) no se publica sola: se pregunta.
 //   5. /pausar frena toda publicación.
 import { revisarTextoPublico, validarUrlPublica } from "../mcp/instagram/validaciones.js";
-import { CAMPOS_EDITABLES, HERRAMIENTAS_CHAT, afirmaCambio, MENSAJES_MAXIMOS_POR_DIA, construirSistemaChat, recortarRecuerdo } from "./conversacion.js";
-import { ahoraArgentina, esHoraValida, fechaEnTexto, fechaLegible, horaDesdeMinutos, minutosDelDia, sumarDias, diasHasta } from "./fechas.js";
+import { CAMPOS_EDITABLES, HERRAMIENTAS_CHAT, afirmaCambio, MENSAJES_MAXIMOS_POR_DIA, construirSistemaChat, paraElModelo, recortarRecuerdo } from "./conversacion.js";
+import { ahoraArgentina, esFechaISO, esHoraValida, lunesDe, fechaEnTexto, fechaLegible, horaDesdeMinutos, minutosDelDia, sumarDias, diasHasta } from "./fechas.js";
 import {
   ESTADOS_LEGIBLES, botonesCancelar, botonesDia, botonesImagenIA, botonesPlan, botonesTarde, fechaDeAviso, textoPieza, textoPlanSemanal, textoRecordatorio, textoResumenDiario,
 } from "./mensajes.js";
@@ -502,32 +502,39 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
   // ───────────────────────── Chat con la IA ─────────────────────────
   // Facundo escribe como en cualquier chat y la IA entiende, mira y cambia las piezas con las herramientas de conversacion.js.
   // Ninguna herramienta publica, confirma ni cancela: eso siempre pasa por un botón que toca Facundo.
-  async function conversar(msg, texto) {
+  // Un mensaje a la vez: si Facundo escribe en Telegram y en el juego casi juntos, el segundo espera al primero y ve su resultado
+  let cola = Promise.resolve();
+  const enCola = (tarea) => {
+    const corrida = cola.then(tarea, tarea);
+    cola = corrida.catch(() => {});
+    return corrida;
+  };
+
+  // El núcleo de la charla, igual para Telegram y para el juego: misma memoria ("chat"), mismas herramientas, mismas reglas.
+  // Devuelve { ok, respuesta, limite } o { ok: false, error }.
+  async function pensar({ texto, canal, fila = null }) {
     const { fecha: hoy, hora } = ahora();
-    const responder = (t, o) => decir(t, { responderA: msg.message_id, ...o });
     const clave = `chat-dia:${hoy}`;
     const hechos = Number(await repo.leerEstado(clave)) || 0;
     if (hechos >= MENSAJES_MAXIMOS_POR_DIA) {
-      return responder(`Llegué al máximo de ${MENSAJES_MAXIMOS_POR_DIA} mensajes de charla por hoy (es un freno por el cupo gratis de la IA). Los botones y comandos siguen andando; mañana seguimos charlando.`);
+      return { ok: false, limite: true, respuesta: `Llegué al máximo de ${MENSAJES_MAXIMOS_POR_DIA} mensajes de charla por hoy (es un freno por el cupo gratis de la IA). Los botones y comandos siguen andando; mañana seguimos charlando.` };
     }
     await repo.guardarEstado(clave, hechos + 1);
-    telegram.escribiendo?.();
 
-    const fila = msg.reply_to_message ? await repo.piezaPorMensaje(msg.reply_to_message.message_id) : null;
     const entrada = fila ? `[Facundo responde al mensaje de la pieza ${fila.id} del ${fechaLegible(fila.fecha)} (${fila.pieza.formato}: "${fila.pieza.gancho}"). Si no aclara otra cosa, se refiere a esa pieza.]\n${texto}` : texto;
     const memoria = (await repo.leerEstado("chat")) ?? [];
-    const historial = [...memoria, { rol: "usuario", texto: entrada }];
+    const historial = [...memoria, { rol: "usuario", texto: entrada, visible: texto, canal, en: new Date().toISOString() }];
 
     const efectos = { guardados: 0, rechazos: [] };
     let salida;
     try {
       salida = await llm.conversar({
         sistema: construirSistemaChat({ fecha: hoy, hora, permitirPublicar }),
-        historial,
+        historial: paraElModelo(historial),
         herramientas: HERRAMIENTAS_CHAT,
         ejecutar: async (nombre, argumentos) => {
-          const resultado = await ejecutarHerramienta(nombre, argumentos, { hoy, hora });
-          if (nombre === "modificar_pieza") {
+          const resultado = await ejecutarHerramienta(nombre, argumentos, { hoy, hora, canal });
+          if (nombre === "modificar_pieza" || nombre === "programar_pieza") {
             if (resultado?.ok === true) efectos.guardados++;
             else efectos.rechazos.push(resultado?.error ?? (resultado?.errores ?? []).join(" "));
           }
@@ -535,12 +542,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
         },
       });
     } catch (error) {
-      // Lo que no se pudo entender no se pierde: si era una novedad suelta, queda anotada para el próximo plan
-      if (!fila) {
-        await repo.agregarNovedad(texto);
-        return responder(`No pude procesar tu mensaje: ${error.message}\nLo anoté como novedad de VOW para el próximo plan. Si era un pedido, repetímelo en un rato o usá los botones.`);
-      }
-      return responder(`No pude procesar tu mensaje: ${error.message}\nProbá de nuevo en un rato o usá los botones de la pieza.`);
+      return { ok: false, error: error.message };
     }
     let respuesta = salida || "Listo.";
     // La IA a veces "acuerda" un cambio en la charla y dice que lo guardó sin llamar a la herramienta: Facundo tiene que enterarse
@@ -550,11 +552,40 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
         ? `\n\n⚠️ No quedó guardado: el sistema rechazó el cambio (${motivo}).`
         : "\n\n⚠️ Ojo: NO se guardó ningún cambio en la pieza. Respondé al mensaje de la pieza con el texto exacto y lo guardo, o escribime «cambiá el epígrafe de la pieza del 29/10 a: …».";
     }
-    await repo.guardarEstado("chat", recortarRecuerdo([...historial, { rol: "asistente", texto: respuesta }]));
-    return responder(respuesta);
+    await repo.guardarEstado("chat", recortarRecuerdo([...historial, { rol: "asistente", texto: respuesta, canal, en: new Date().toISOString() }]));
+    return { ok: true, respuesta };
   }
 
-  async function ejecutarHerramienta(nombre, argumentos, { hoy, hora }) {
+  // Telegram
+  async function conversar(msg, texto) {
+    const responder = (t, o) => decir(t, { responderA: msg.message_id, ...o });
+    const fila = msg.reply_to_message ? await repo.piezaPorMensaje(msg.reply_to_message.message_id) : null;
+    telegram.escribiendo?.();
+    const resultado = await enCola(() => pensar({ texto, canal: "telegram", fila }));
+    if (resultado.ok || resultado.limite) return responder(resultado.respuesta);
+    // Lo que no se pudo entender no se pierde: si era una novedad suelta, queda anotada para el próximo plan
+    if (!fila) {
+      await repo.agregarNovedad(texto);
+      return responder(`No pude procesar tu mensaje: ${resultado.error}\nLo anoté como novedad de VOW para el próximo plan. Si era un pedido, repetímelo en un rato o usá los botones.`);
+    }
+    return responder(`No pude procesar tu mensaje: ${resultado.error}\nProbá de nuevo en un rato o usá los botones de la pieza.`);
+  }
+
+  // El juego: el mismo bot y la misma memoria. Un error acá no se anota como novedad: el juego lo muestra y Facundo reintenta.
+  async function conversarDesdeJuego(texto) {
+    const limpio = String(texto ?? "").trim().slice(0, 2000);
+    if (!limpio) return { ok: false, error: "El mensaje está vacío." };
+    if (!llm) return { ok: false, error: "El chat con la IA no está configurado en el servicio (falta GEMINI_API_KEY)." };
+    return enCola(() => pensar({ texto: limpio, canal: "juego" }));
+  }
+
+  // La charla guardada, lista para mostrar (lo que se ve es lo que Facundo escribió, sin los avisos internos)
+  async function charla(limite = 30) {
+    const memoria = (await repo.leerEstado("chat")) ?? [];
+    return memoria.slice(-limite).map((m) => ({ rol: m.rol, texto: m.visible ?? m.texto, canal: m.canal ?? "telegram", en: m.en ?? null }));
+  }
+
+  async function ejecutarHerramienta(nombre, argumentos, { hoy, hora, canal = "telegram" }) {
     const piezaDe = async (valor) => {
       const fila = Number.isInteger(Number(valor)) ? await repo.obtenerPieza(Number(valor)) : null;
       return fila && fila.estado !== "cancelada" ? fila : null;
@@ -600,6 +631,47 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
       // Facundo ve la pieza actualizada con sus botones; la IA no tiene que repetirla entera
       await decirDePieza(nueva, `${argumentos.que_cambio ? `✏️ ${String(argumentos.que_cambio).slice(0, 300)}\n\n` : ""}${textoPieza(nueva)}${aviso}`, { botones: botonesPlan(nueva.id, { conIA: conIA(nueva) }) });
       return { ok: true, estado: ESTADOS_LEGIBLES[nueva.estado], fecha: nueva.fecha, hora: nueva.hora, nota: `Ya le mostré a Facundo la pieza actualizada con sus botones.${aviso ? ` Aviso: ${aviso.trim()}` : ""}` };
+    }
+    if (nombre === "programar_pieza") {
+      const fecha = String(argumentos.fecha ?? "").trim();
+      if (!esFechaISO(fecha)) return { error: "La fecha tiene que ser AAAA-MM-DD." };
+      if (fecha < hoy) return { error: `El ${fechaLegible(fecha)} ya pasó.` };
+      if (diasHasta(hoy, fecha) > 60) return { error: "Solo se programa hasta 60 días hacia adelante." };
+      const formato = String(argumentos.formato || "reel").toLowerCase();
+      if (!["reel", "carrusel", "imagen", "story"].includes(formato)) return { error: "El formato tiene que ser reel, carrusel, imagen o story." };
+      const horaPieza = esHoraValida(argumentos.hora) ? argumentos.hora : HORA_POR_DEFECTO;
+      const indicacion = String(argumentos.indicacion ?? "").trim();
+      if (!indicacion) return { error: "Falta la indicación: qué quiere Facundo que diga o muestre la pieza." };
+      if (!editor) return { error: "Armar piezas con IA no está configurado en el servicio (falta ANTHROPIC_API_KEY)." };
+      const viva = (await repo.piezasDelDia(fecha)).find((f) => VIVAS.includes(f.estado));
+      if (viva) return { error: `El ${fechaLegible(fecha)} ya tiene la pieza ${viva.id} ("${viva.pieza.gancho}"). Usá modificar_pieza para cambiarla.` };
+      const claveEdiciones = `ediciones:${hoy}`;
+      const hechas = Number(await repo.leerEstado(claveEdiciones)) || 0;
+      if (hechas >= EDICIONES_MAXIMAS_POR_DIA) return { error: `Se llegó al máximo de ${EDICIONES_MAXIMAS_POR_DIA} ediciones por día (es un freno de gasto).` };
+      await repo.guardarEstado(claveEdiciones, hechas + 1);
+
+      const cercanas = await repo.piezasEntre(sumarDias(hoy, -14), sumarDias(hoy, 14));
+      const contexto = cercanas.map((f) => `- ${fechaLegible(f.fecha)} (${f.pieza.formato}): ${f.pieza.gancho}`).join("\n");
+      const instruccion = `Pieza nueva para el ${fecha} (${fechaLegible(fecha)}), formato ${formato}, a las ${horaPieza}.\n${indicacion}${contexto ? `\n\nPiezas de estos días (no las repitas):\n${contexto}` : ""}`;
+      let resultado;
+      try {
+        resultado = await editor.editarPieza({ fila: { pieza: { formato }, fecha, hora: horaPieza }, instruccion, hoy, nueva: true });
+      } catch (error) {
+        return { error: `No pude armar la pieza: ${error.message}` };
+      }
+      if (!resultado.ok) return { ok: false, errores: resultado.errores };
+
+      const pieza = { ...resultado.pieza, fecha, hora: horaPieza };
+      const fila = await repo.crearPiezaSuelta({ semana: lunesDe(fecha), fecha, hora: horaPieza, pieza });
+      let aviso = "";
+      if (material(fila).length) {
+        const diaAviso = fechaDeAviso(fecha);
+        if (diaAviso > hoy) await repo.crearRecordatorio({ piezaId: fila.id, fecha: diaAviso });
+        else if (diaAviso < hoy) aviso = "\n⚠️ Con esta fecha te quedan menos de 3 días para producir el material.";
+      }
+      await decirDePieza(fila, `🆕 Pieza nueva para el ${fechaLegible(fecha)}, armada desde ${canal === "juego" ? "el juego" : "el chat"}${resultado.queCambio ? `: ${resultado.queCambio}` : ""}\n\n${textoPieza(fila)}${aviso}`, { botones: botonesPlan(fila.id, { conIA: conIA(fila) }) })
+        .catch((error) => console.error(`No se pudo avisar por Telegram: ${error.message}`));
+      return { ok: true, id: fila.id, estado: "propuesta", fecha, hora: horaPieza, formato: pieza.formato, nota: `Quedó propuesta (ID ${fila.id}) y ya se la mostré a Facundo en Telegram con sus botones. Falta que la apruebe.${aviso}` };
     }
     if (nombre === "aprobar_pieza") {
       const fila = await piezaDe(argumentos.id);
@@ -830,5 +902,5 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     return { fecha: hoy, hora, acciones };
   }
 
-  return { recibirPlan, avisarFalloDelPlan, manejarActualizacion, aprobarDesdeJuego, sugerirCambio, tick, enviarResumenDiario: () => enviarResumenDiario(ahora().fecha) };
+  return { recibirPlan, avisarFalloDelPlan, manejarActualizacion, aprobarDesdeJuego, sugerirCambio, conversarDesdeJuego, charla, tick, enviarResumenDiario: () => enviarResumenDiario(ahora().fecha) };
 }

@@ -68,4 +68,22 @@ describe("cliente de Gemini para el chat", () => {
     await assert.rejects(pedir(async () => respuesta({ candidates: [] })), /no devolvió ninguna respuesta/);
     await assert.rejects(pedir(async () => { throw new Error("ECONNRESET clave-secreta"); }), (e) => e instanceof ErrorLLM && !e.message.includes("clave-secreta"));
   });
+
+  test("reintenta ante un 503 o un corte de red y después responde", async () => {
+    const esperas = [];
+    const { fetchFn, pedidos } = conRespuestas(respuesta({ error: { message: "overloaded" } }, 503), () => { throw new TypeError("fetch failed"); }, texto("Ya estoy."));
+    const salida = await crearLLMGemini({ apiKey: "k", fetchFn, esperar: async (ms) => esperas.push(ms) }).conversar({ ...base, ejecutar: async () => ({}) });
+    assert.equal(salida, "Ya estoy.");
+    assert.equal(pedidos.length, 3);
+    assert.equal(esperas.length, 2);
+  });
+
+  test("si sigue fallando después de los reintentos, avisa; un 429 no se reintenta", async () => {
+    const a = conRespuestas(respuesta({}, 503), respuesta({}, 503), respuesta({}, 503));
+    await assert.rejects(crearLLMGemini({ apiKey: "k", fetchFn: a.fetchFn, esperar: async () => {} }).conversar({ ...base, ejecutar: async () => ({}) }), ErrorLLM);
+    assert.equal(a.pedidos.length, 3);
+    const b = conRespuestas(respuesta({}, 429), texto("no"));
+    await assert.rejects(crearLLMGemini({ apiKey: "k", fetchFn: b.fetchFn, esperar: async () => {} }).conversar({ ...base, ejecutar: async () => ({}) }), /cupo gratis/);
+    assert.equal(b.pedidos.length, 1);
+  });
 });

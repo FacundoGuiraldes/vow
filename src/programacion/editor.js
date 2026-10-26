@@ -35,12 +35,14 @@ export function crearEditor({ cliente, modelo = MODELO_ESTRATEGA, leer, listar }
 
   return {
     // Devuelve { ok, pieza, hora, queCambio, errores, uso }
-    async editarPieza({ fila, instruccion, hoy, alternativa = false }) {
+    async editarPieza({ fila, instruccion, hoy, alternativa = false, nueva = false }) {
       const { cerebro, texto } = await construirSistema(leer, { listar });
       const system = `${texto}
 
 === AHORA NO ARMÁS UN PLAN ===
-${alternativa
+${nueva
+  ? "Facundo quiere programar UNA pieza NUEVA que todavía no existe, para la fecha y con el formato que te indica. Armala completa (gancho, guion, epígrafe, textos, material a producir) siguiendo lo que pide y el contexto que te paso: no repitas lo ya publicado ni lo ya programado. Las reglas de arriba siguen valiendo para lo que escribas."
+  : alternativa
   ? "Facundo quiere OTRA sugerencia para el día de UNA pieza que ya existe. Proponé una pieza nueva y distinta (otro gancho y otro enfoque), para la misma fecha y la misma hora salvo que el contexto pida otra cosa, con el mismo formato salvo que él diga lo contrario. Usá el contexto que te paso (novedades, charla con el bot, rendimiento de Instagram, resto de la semana) para que sea mejor que la actual y no repita lo ya publicado. Las reglas de arriba siguen valiendo para lo que escribas."
   : "Estás editando UNA pieza que ya existe. Aplicá solamente el cambio que pide Facundo y dejá todo lo demás igual. Las reglas de arriba siguen valiendo para lo que escribas."} Podés cambiar la fecha o la hora si te lo pide (la hora, entre ${HORA_MINIMA_PUBLICACION} y ${HORA_MAXIMA_PUBLICACION}; la fecha, de hoy en adelante). Si el cambio rompe una regla de la marca, aplicá la versión más cercana que sí la cumpla y contalo en que_cambio. Respondé llamando a la herramienta actualizar_pieza con la pieza completa.`;
 
@@ -48,7 +50,7 @@ ${alternativa
       const mensajes = [
         {
           role: "user",
-          content: `Hoy es ${hoy}. Pieza actual:\n${JSON.stringify(actual, null, 2)}\n\nCambio pedido por Facundo: ${instruccion}\n\nRespondé llamando a la herramienta actualizar_pieza.`,
+          content: `Hoy es ${hoy}. ${nueva ? "Plantilla de la pieza nueva (vacía)" : "Pieza actual"}:\n${JSON.stringify(actual, null, 2)}\n\n${nueva ? "Pedido de Facundo" : "Cambio pedido por Facundo"}: ${instruccion}\n\nRespondé llamando a la herramienta actualizar_pieza.`,
         },
       ];
       const uso = { entrada: 0, salida: 0 };

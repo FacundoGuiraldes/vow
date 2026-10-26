@@ -62,7 +62,7 @@ export async function armarEstadoOficina({ repo, rendimiento = null, permitirPub
     recordatorios_pendientes: recordatorios.length,
     piezas: filas,
     novedades: novedades.map((n) => ({ id: n.id, fecha: n.fecha, texto: recortar(n.texto, 240), usada: n.usada === true })),
-    chat: (Array.isArray(chat) ? chat : []).slice(-12).map((m) => ({ rol: m.rol, texto: recortar(m.texto, 400) })),
+    chat: (Array.isArray(chat) ? chat : []).slice(-30).map((m) => ({ rol: m.rol, texto: recortar(m.visible ?? m.texto, 1500), canal: m.canal ?? "telegram", en: m.en ?? null })),
     juego,
     rendimiento: rend,
   };
@@ -106,6 +106,16 @@ export async function aplicarAccion({ repo, servicio, rendimiento = null }, acci
     const resultado = await servicio.sugerirCambio(accion.id, { indicacion: recortar(accion.indicacion, 300), contexto: await armarContexto({ repo, rendimiento }, accion.id) });
     if (!resultado.ok) throw new ErrorAccion(resultado.motivo, 409);
     return { ok: true, estado: resultado.estado };
+  }
+
+  // El chat del juego es el mismo bot y la misma memoria que Telegram
+  if (tipo === "chat") {
+    const texto = typeof accion.texto === "string" ? accion.texto.trim() : "";
+    if (!texto) throw new ErrorAccion("Escribí un mensaje.");
+    const resultado = await servicio.conversarDesdeJuego(texto);
+    if (resultado.limite) return { ok: true, respuesta: resultado.respuesta, limite: true };
+    if (!resultado.ok) throw new ErrorAccion(resultado.error, 502);
+    return { ok: true, respuesta: resultado.respuesta };
   }
 
   if (tipo === "cumplir" || tipo === "deshacer" || tipo === "nota" || tipo === "quitar_nota") {

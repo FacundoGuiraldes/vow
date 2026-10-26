@@ -111,7 +111,7 @@ describe("rutas de la publicación programada", () => {
     const cuerpo = await r.json();
     assert.equal(typeof cuerpo.pausa, "boolean");
     assert.ok(Array.isArray(cuerpo.piezas) && Array.isArray(cuerpo.novedades));
-    assert.deepEqual(cuerpo.chat.at(-1), { rol: "usuario", texto: "cambiá el gancho" });
+    assert.deepEqual(cuerpo.chat.at(-1), { rol: "usuario", texto: "cambiá el gancho", canal: "telegram", en: null });
 
     assert.equal((await pedir("/oficina/accion", { metodo: "POST", cuerpo: { accion: "nota", texto: "x" } })).status, 401);
     const nota = await pedir("/oficina/accion", { metodo: "POST", clave: CLAVE, cuerpo: { accion: "nota", clave: "n1", texto: "Ojo con la luz", tipo: "anotacion" } });
