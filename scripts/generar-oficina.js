@@ -19,6 +19,15 @@ export function clasificarEstado(texto) {
   return "por aprobar";
 }
 
+// Del Estado de la pieza queda solo la primera frase, sin enlaces, rutas ni marcas de formato
+export function notaCorta(estado) {
+  const limpio = String(estado).replace(/\*\*/g, "").replace(/`[^`]*`/g, "").replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").replace(/\s+([.:;,])/g, "$1").trim();
+  const pub = /^publicado el \d{2}\/\d{2}\/\d{4}/i.exec(limpio);
+  if (pub) return `P${pub[0].slice(1)}`;
+  const frase = limpio.split(/(?<=[.;])\s/)[0] ?? "";
+  return (frase.length > 140 ? `${frase.slice(0, 137).trim()}…` : frase).replace(/[:;,]\s*$/, "").trim();
+}
+
 // Una pieza sale de su .md: "# Formato · dd/mm/aaaa · pilar" más **Título:** y **Estado:**
 export function leerPieza(md) {
   const cab = /^#\s+(.+?)\s+·\s+(\d{2}\/\d{2}\/\d{4})(?:\s+·\s+(.+))?$/m.exec(md);
@@ -31,7 +40,7 @@ export function leerPieza(md) {
     formato: cab[1].trim().toLowerCase(),
     titulo: campo("Título") || cab[1].trim(),
     estado: clasificarEstado(estado),
-    nota: estado.replace(/\*\*/g, "").replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").slice(0, 220).trim(),
+    nota: notaCorta(estado),
     texto: cuerpo.trim().slice(0, 3000),
   };
   const pendientes = /^## Pendiente\s*\n((?:- .+\n?)+)/m.exec(md)?.[1].split("\n").filter((l) => l.startsWith("- ")).map((l) => l.slice(2).trim()) ?? [];
@@ -54,7 +63,8 @@ export function leerStock(md) {
   }
   const llegada = /entre el (\d{1,2}) y el (\d{1,2})\/(\d{2})\/(\d{4})/.exec(md);
   if (llegada) agenda.push({ f: `${llegada[4]}-${llegada[3]}-${llegada[1].padStart(2, "0")}`, h: "", sala: "deposito", t: "Empiezan a llegar medias y shakers (estimado)" });
-  const pend = /^## Por confirmar\s*\n((?:- .+\n?)+)/m.exec(md)?.[1].split("\n").filter((l) => l.startsWith("- ")).map((l) => ({ sala: "deposito", t: `Confirmar: ${l.slice(2).replace(/\*/g, "").trim().replace(/^(.{0,140})\s.*$/s, (m, a) => (m.length > 150 ? `${a}…` : m))}` })) ?? [];
+  const primera = (t) => { const c = t.replace(/\*/g, "").trim(); const f = c.split(/(?<=\.)\s/)[0]; return f.length > 110 ? `${f.slice(0, 107).trim()}…` : f; };
+  const pend = /^## Por confirmar\s*\n((?:- .+\n?)+)/m.exec(md)?.[1].split("\n").filter((l) => l.startsWith("- ")).map((l) => ({ sala: "deposito", t: `Confirmar: ${primera(l.slice(2))}` })) ?? [];
   return { deposito, agenda, pendientes: pend };
 }
 

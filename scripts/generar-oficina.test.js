@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { clasificarEstado, generar, leerPieza, leerStock, textoDelPlan } from "./generar-oficina.js";
+import { clasificarEstado, generar, leerPieza, leerStock, notaCorta, textoDelPlan } from "./generar-oficina.js";
 
 describe("generador de la oficina", () => {
   test("clasifica el estado de una pieza por lo que dice su documento", () => {
@@ -11,6 +11,11 @@ describe("generador de la oficina", () => {
     assert.equal(clasificarEstado("guion definido. Falta filmar las tomas"), "por filmar");
     assert.equal(clasificarEstado("video cargado en el bot"), "programado");
     assert.equal(clasificarEstado("aprobado por Facundo (textos); falta su aprobación final"), "por aprobar");
+  });
+
+  test("la nota de una pieza queda en una frase, sin rutas ni enlaces", () => {
+    assert.equal(notaCorta("publicado el 19/10/2026 a las 12:02 (hora argentina): https://x.com/p/1. Carrusel de 7 láminas en `docs/a/`."), "Publicado el 19/10/2026");
+    assert.equal(notaCorta("**aprobado** por Facundo (textos). Láminas generadas en `docs/piezas/x/` (falta su aprobación)."), "aprobado por Facundo (textos).");
   });
 
   test("lee una pieza: formato, fecha, título, estado y pendientes", () => {
