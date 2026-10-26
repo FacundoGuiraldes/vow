@@ -144,6 +144,18 @@ describe("rutas de la publicación programada", () => {
     assert.equal((await pedir("/oficina/accion", { metodo: "POST", clave: CLAVE, cuerpo: { accion: "aprobar_pieza" } })).status, 400);
   });
 
+  test("/oficina/archivo recibe la foto o el video como cuerpo y rechaza lo demás", async () => {
+    const guardados = [];
+    servicio.adjuntarDesdeJuego = async (id, datos) => { guardados.push({ id, mime: datos.mime, bytes: datos.datos?.length, reemplazar: datos.reemplazar }); return { ok: true, archivos: 1, falta: null }; };
+    const subir = (consulta, tipo, cuerpo, clave = CLAVE) => fetch(`${base}/oficina/archivo${consulta}`, { method: "POST", headers: { "Content-Type": tipo, ...(clave ? { Authorization: `Bearer ${clave}` } : {}) }, body: cuerpo });
+    assert.equal((await subir("?id=3", "video/mp4", Buffer.from("abc"), null)).status, 401);
+    assert.equal((await subir("?id=3&reemplazar=1", "video/mp4", Buffer.from("abc"))).status, 200);
+    assert.deepEqual(guardados, [{ id: 3, mime: "video/mp4", bytes: 3, reemplazar: true }]);
+    assert.equal((await subir("", "video/mp4", Buffer.from("abc"))).status, 400);
+    servicio.adjuntarDesdeJuego = async () => ({ ok: false, motivo: "Ese tipo de archivo no sirve." });
+    assert.equal((await subir("?id=3", "application/pdf", Buffer.from("abc"))).status, 409);
+  });
+
   test("/novedades devuelve lo pendiente, con clave", async () => {
     await repo.agregarNovedad("Llegaron las gorras");
     assert.equal((await pedir("/novedades")).status, 401);

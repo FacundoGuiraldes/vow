@@ -196,6 +196,56 @@ describe("cambiar una pieza desde la oficina", () => {
   });
 });
 
+describe("editar una publicación a mano desde el juego", () => {
+  const llm = { async conversar() { return ""; } };
+
+  test("el epígrafe conserva los párrafos y la edición borra la confirmación", async () => {
+    const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00", llm });
+    const fila = await e.cargarPieza();
+    await e.repo.agregarMedio({ piezaId: fila.id, tipo: "video", mime: "video/mp4", datos: Buffer.from("x") });
+    await aplicarAccion(e, { accion: "aprobar_pieza", id: fila.id });
+    await aplicarAccion(e, { accion: "confirmar_pieza", id: fila.id });
+    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "confirmada");
+    const epigrafe = "Primer párrafo del epígrafe.\r\n\r\n\r\n\r\nSegundo párrafo.\nLínea siguiente. Anotate en la lista: link en la bio.  ";
+    const r = await aplicarAccion(e, { accion: "editar_pieza", id: fila.id, cambios: { epigrafe } });
+    assert.equal(r.estado, "propuesta");
+    const tras = await e.repo.obtenerPieza(fila.id);
+    assert.equal(tras.pieza.epigrafe, "Primer párrafo del epígrafe.\n\nSegundo párrafo.\nLínea siguiente. Anotate en la lista: link en la bio.");
+    assert.equal(tras.confirmada_el, null);
+    assert.ok(e.telegram.buscar("Editada desde la oficina"));
+  });
+
+  test("cambiar el tipo descarta el archivo que ya no sirve y valida lo pedido", async () => {
+    const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00", llm });
+    const fila = await e.cargarPieza();
+    await e.repo.agregarMedio({ piezaId: fila.id, tipo: "video", mime: "video/mp4", datos: Buffer.from("x") });
+    await assert.rejects(aplicarAccion(e, { accion: "editar_pieza", id: fila.id, cambios: { formato: "podcast" } }), (error) => error.estado === 409 && /tipo/i.test(error.message));
+    await assert.rejects(aplicarAccion(e, { accion: "editar_pieza", id: fila.id, cambios: {} }), (error) => error.estado === 409);
+    await assert.rejects(aplicarAccion(e, { accion: "editar_pieza", id: fila.id, cambios: { hora: "mañana" } }), (error) => error.estado === 409);
+    await aplicarAccion(e, { accion: "editar_pieza", id: fila.id, cambios: { formato: "imagen" } });
+    assert.equal((await e.repo.obtenerPieza(fila.id)).pieza.formato, "imagen");
+    assert.equal((await e.repo.mediosDePieza(fila.id)).length, 0);
+  });
+
+  test("adjuntar desde el juego: solo el archivo que pide el tipo, y borra la confirmación", async () => {
+    const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00", llm });
+    const fila = await e.cargarPieza();
+    const malo = await e.servicio.adjuntarDesdeJuego(fila.id, { mime: "image/jpeg", datos: Buffer.from("x") });
+    assert.equal(malo.ok, false);
+    assert.match(malo.motivo, /video/);
+    assert.equal((await e.servicio.adjuntarDesdeJuego(fila.id, { mime: "application/pdf", datos: Buffer.from("x") })).ok, false);
+    const bien = await e.servicio.adjuntarDesdeJuego(fila.id, { mime: "video/mp4", datos: Buffer.from("video") });
+    assert.deepEqual([bien.ok, bien.archivos, bien.falta], [true, 1, null]);
+    await aplicarAccion(e, { accion: "aprobar_pieza", id: fila.id });
+    await aplicarAccion(e, { accion: "confirmar_pieza", id: fila.id });
+    await e.servicio.adjuntarDesdeJuego(fila.id, { mime: "video/mp4", datos: Buffer.from("otro") });
+    assert.equal((await e.repo.mediosDePieza(fila.id)).length, 1, "un reel lleva un solo video");
+    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "aprobada");
+    await aplicarAccion(e, { accion: "quitar_archivos", id: fila.id });
+    assert.equal((await e.repo.mediosDePieza(fila.id)).length, 0);
+  });
+});
+
 describe("datos de la operación: ida y vuelta entre el juego y el bot", () => {
   test("lo que se edita en el juego queda en la base, llega al estado y al Estratega como novedad", async () => {
     const e = crearEscenario();

@@ -480,6 +480,89 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     return { ok: false, motivo: r.error ?? (r.errores ?? []).join(" ") };
   }
 
+  // "Editar" en el juego: cambia la publicación que ya existe (tipo, epígrafe con párrafos, gancho, hora) sin pedirle nada a la IA.
+  // Si la pieza solo está en los documentos, primero se carga tal cual en el sistema. Cualquier edición borra la confirmación.
+  const FORMATOS_EDITABLES = ["reel", "carrusel", "imagen", "story"];
+  async function editarDesdeJuego({ id = null, fecha = null, formato = null, base = "", cambios = {} } = {}) {
+    const { fecha: hoy } = ahora();
+    if (!validarEdicion) return { ok: false, motivo: "La edición no está disponible en este momento." };
+    let fila = Number.isInteger(id) ? await repo.obtenerPieza(id) : null;
+    if (!fila && esFechaISO(fecha)) {
+      fila = (await repo.piezasDelDia(fecha)).find((f) => VIVAS.includes(f.estado)) ?? null;
+      if (!fila) {
+        const pedido = `Esta pieza existe solo en los documentos. Cargala en el sistema SIN cambiar su contenido (mismo gancho, guion, epígrafe y textos; solo completá lo que falte para cumplir las reglas).\n${String(base).slice(0, 1500)}`;
+        const r = await programarPieza({ fecha, formato: String(formato || "reel").toLowerCase(), indicacion: pedido }, { hoy, canal: "juego" });
+        if (!r.ok) return { ok: false, motivo: r.error ?? (r.errores ?? []).join(" ") };
+        fila = await repo.obtenerPieza(r.id);
+      }
+    }
+    if (!fila) return { ok: false, motivo: "Esa pieza no existe." };
+    if (!VIVAS.includes(fila.estado)) return { ok: false, motivo: `Esa pieza está ${ESTADOS_LEGIBLES[fila.estado]}: ya no se puede editar.` };
+    if (fila.fecha < hoy) return { ok: false, motivo: "Esa fecha ya pasó." };
+
+    const nuevos = {};
+    if (cambios.formato !== undefined) {
+      const f = String(cambios.formato).toLowerCase();
+      if (!FORMATOS_EDITABLES.includes(f)) return { ok: false, motivo: "El tipo tiene que ser publicación (imagen o carrusel), reel o historia." };
+      nuevos.formato = f;
+    }
+    for (const campo of ["epigrafe", "gancho"]) {
+      if (cambios[campo] === undefined) continue;
+      // Se respetan los párrafos y los saltos de línea, como en Instagram
+      const texto = String(cambios[campo]).replace(/\r\n?/g, "\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+      if (campo === "epigrafe" && texto.length > 2200) return { ok: false, motivo: "El epígrafe de Instagram admite hasta 2200 caracteres." };
+      if (campo === "gancho" && texto.includes("\n")) return { ok: false, motivo: "El gancho es una sola línea." };
+      nuevos[campo] = texto;
+    }
+    if (cambios.hora !== undefined) {
+      if (!esHoraValida(cambios.hora)) return { ok: false, motivo: "La hora tiene que ser HH:MM." };
+      nuevos.hora = cambios.hora;
+    }
+    if (!Object.keys(nuevos).length) return { ok: false, motivo: "No cambiaste nada." };
+
+    const pieza = { ...fila.pieza, ...nuevos, fecha: fila.fecha, hora: nuevos.hora ?? fila.hora };
+    const errores = await validarEdicion({ fila, pieza, hoy });
+    if (errores.length) return { ok: false, motivo: `No pasó las reglas de la marca: ${errores.join(" ")}` };
+
+    if (nuevos.formato && nuevos.formato !== fila.pieza.formato) {
+      // Un archivo que no sirve para el tipo nuevo se descarta (un reel necesita video, un carrusel fotos)
+      const requerido = MEDIOS_REQUERIDOS[nuevos.formato];
+      const medios = await repo.mediosDePieza(fila.id);
+      if (medios.some((m) => !requerido || m.tipo !== requerido.tipo)) await repo.borrarMedios(fila.id);
+    }
+    const { nueva, aviso } = await guardarEdicion(fila, { pieza, hora: pieza.hora, hoy });
+    await decirDePieza(nueva, `✏️ Editada desde la oficina\n\n${textoPieza(nueva)}${aviso}`, { botones: botonesPlan(nueva.id, { conIA: conIA(nueva) }) }).catch((error) => console.error(`No se pudo avisar por Telegram: ${error.message}`));
+    return { ok: true, id: nueva.id, estado: nueva.estado };
+  }
+
+  // Archivo subido desde el juego para una pieza (foto JPEG o video MP4/MOV). Vale como mandarlo por Telegram.
+  async function adjuntarDesdeJuego(id, { mime, datos, reemplazar = false } = {}) {
+    const { fecha: hoy } = ahora();
+    const fila = Number.isInteger(id) ? await repo.obtenerPieza(id) : null;
+    if (!fila) return { ok: false, motivo: "Esa pieza no existe." };
+    if (!VIVAS.includes(fila.estado)) return { ok: false, motivo: `Esa pieza está ${ESTADOS_LEGIBLES[fila.estado]}: ya no se le puede cambiar el archivo.` };
+    if (fila.fecha < hoy) return { ok: false, motivo: "Esa fecha ya pasó." };
+    const tipo = mime === "image/jpeg" ? "imagen" : ["video/mp4", "video/quicktime"].includes(mime) ? "video" : null;
+    if (!tipo) return { ok: false, motivo: "Ese tipo de archivo no sirve: subí una foto JPEG o un video MP4." };
+    if (!datos?.length) return { ok: false, motivo: "El archivo llegó vacío." };
+    const requerido = MEDIOS_REQUERIDOS[fila.pieza.formato] ?? { tipo, minimo: 1, maximo: 1 }; // una historia lleva una foto o un video
+    if (tipo !== requerido.tipo) return { ok: false, motivo: `Esta pieza es ${fila.pieza.formato === "story" ? "una historia" : `un ${fila.pieza.formato}`}: necesita ${requerido.tipo === "video" ? "un video" : "fotos"}. Si querés otro tipo, cambialo en Editar.` };
+    if (reemplazar) await repo.borrarMedios(fila.id);
+    const guardado = await guardarMaterial(fila, requerido, { tipo, mime }, datos);
+    if (guardado.error) return { ok: false, motivo: guardado.error };
+    const medios = await repo.mediosDePieza(fila.id);
+    return { ok: true, archivos: medios.length, falta: faltaArchivo({ pieza: fila.pieza }, medios) };
+  }
+
+  async function quitarArchivosDesdeJuego(id) {
+    const fila = Number.isInteger(id) ? await repo.obtenerPieza(id) : null;
+    if (!fila) return { ok: false, motivo: "Esa pieza no existe." };
+    if (!VIVAS.includes(fila.estado)) return { ok: false, motivo: `Esa pieza está ${ESTADOS_LEGIBLES[fila.estado]}.` };
+    await repo.borrarMedios(fila.id);
+    if (["confirmada", "preparada"].includes(fila.estado)) await repo.actualizarPieza(fila.id, { estado: "aprobada", confirmada_el: null, contenedor: null });
+    return { ok: true };
+  }
+
   async function manejarActualizacion(actualizacion) {
     try {
       if (actualizacion.callback_query) return await manejarBoton(actualizacion.callback_query);
@@ -943,5 +1026,5 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     return { fecha: hoy, hora, acciones };
   }
 
-  return { recibirPlan, avisarFalloDelPlan, manejarActualizacion, aprobarDesdeJuego, confirmarDesdeJuego, sugerirCambio, cambiarSinFila, conversarDesdeJuego, charla, tick, enviarResumenDiario: () => enviarResumenDiario(ahora().fecha) };
+  return { recibirPlan, avisarFalloDelPlan, manejarActualizacion, aprobarDesdeJuego, confirmarDesdeJuego, sugerirCambio, cambiarSinFila, editarDesdeJuego, adjuntarDesdeJuego, quitarArchivosDesdeJuego, conversarDesdeJuego, charla, tick, enviarResumenDiario: () => enviarResumenDiario(ahora().fecha) };
 }

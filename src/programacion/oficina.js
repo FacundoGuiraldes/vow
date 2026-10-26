@@ -125,6 +125,26 @@ export async function aplicarAccion({ repo, servicio, rendimiento = null }, acci
     return { ok: true, estado: resultado.estado };
   }
 
+  // "Editar": cambia la publicación existente a mano (tipo, epígrafe con párrafos, gancho, hora), sin IA
+  if (tipo === "editar_pieza") {
+    const cambios = accion.cambios && typeof accion.cambios === "object" ? accion.cambios : {};
+    const resultado = await servicio.editarDesdeJuego({
+      id: Number.isInteger(accion.id) ? accion.id : null,
+      fecha: typeof accion.fecha === "string" ? accion.fecha : null,
+      formato: typeof accion.formato === "string" ? accion.formato : null,
+      base: recortar(accion.base, 1500),
+      cambios,
+    });
+    if (!resultado.ok) throw new ErrorAccion(resultado.motivo, 409);
+    return { ok: true, id: resultado.id, estado: resultado.estado };
+  }
+
+  if (tipo === "quitar_archivos") {
+    const resultado = await servicio.quitarArchivosDesdeJuego(accion.id);
+    if (!resultado.ok) throw new ErrorAccion(resultado.motivo, 409);
+    return { ok: true };
+  }
+
   // El chat del juego es el mismo bot y la misma memoria que Telegram
   if (tipo === "chat") {
     const texto = typeof accion.texto === "string" ? accion.texto.trim() : "";
