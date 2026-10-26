@@ -142,6 +142,11 @@ form.nota .fil2{display:flex;gap:8px}form.nota .fil2 select{flex:1;min-width:0}
 #chIn::placeholder{color:#9b9482}
 #chSend{flex:0 0 auto;min-width:76px;min-height:46px;border:0;border-radius:23px;background:linear-gradient(var(--bordo2),var(--bordo));color:#fff;font:700 12.5px var(--f-display);letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
 #chSend:disabled{opacity:.45}
+#nrap{position:absolute;left:12px;right:12px;bottom:calc(max(16px,env(safe-area-inset-bottom,0px)) + 62px);display:flex;gap:8px;padding:8px;background:rgba(18,17,16,.95);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid var(--borde);border-radius:26px;box-shadow:0 10px 30px rgba(0,0,0,.5);z-index:18;max-width:520px;margin:0 auto}
+#nrap[hidden]{display:none}
+#nrap input{flex:1;min-width:0;min-height:42px;padding:0 14px;border-radius:21px;border:1px solid var(--borde);background:rgba(255,255,255,.08);color:var(--hueso);font:16px var(--f-body)}
+#nrap button{flex:0 0 auto;min-height:42px;padding:0 18px;border:0;border-radius:21px;background:linear-gradient(var(--bordo2),var(--bordo));color:#fff;font:700 12px var(--f-display);letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+#app.chat-on #nrap,#app.hoja-on #nrap{display:none}
 button:focus-visible{outline:3px solid var(--beige);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){.globo{animation:none}#hoja{transition:none}}
 </style>
@@ -151,6 +156,7 @@ button:focus-visible{outline:3px solid var(--beige);outline-offset:2px}
   <canvas id="gl" aria-label="Aldea VOW en vista isométrica: un edificio por cada área"></canvas>
   <div id="capa"></div>
   <div id="top"><div id="marca"><i id="luz"></i>VOW HQ <small id="est">conectando…</small></div><div id="sinCon" hidden></div><div id="res"></div><div id="pista">Tocá un edificio · arrastrá · pellizcá</div></div>
+  <form id="nrap" hidden autocomplete="off"><input id="nrapIn" type="text" maxlength="300" placeholder="Anotale algo al bot…" enterkeyhint="send"><button type="submit">Anotar</button></form>
   <div id="abajo"><button class="gran sec" id="bAnotar" type="button">Anotar</button><button class="gran" id="bChat" type="button">Hablar con el bot<span id="bChatN" hidden></span></button></div>
   <div id="hoja" role="dialog" aria-modal="false"><header><h2 id="hT"></h2><button class="x" id="hX" type="button" aria-label="Cerrar">✕</button></header><div id="cuerpo"></div></div>
   <div id="chat" role="dialog" aria-modal="false" aria-label="Chat con el bot"><header><h2>Bot VOW<small>La misma charla que en Telegram</small></h2><button class="x" id="chX" type="button" aria-label="Cerrar">✕</button></header><div id="chMsgs"></div><div id="chChips"></div><form id="chForm" autocomplete="off"><input id="chIn" type="text" placeholder="Escribile al bot…" enterkeyhint="send" maxlength="2000"><button id="chSend" type="submit">Enviar</button></form></div>
@@ -751,7 +757,11 @@ PANEL.hq=function(){
   var ks=notasDe();
   if(ks.length){r.appendChild(el('h4',null,'Anotado para el bot'));ks.slice(0,4).forEach(function(k){var n=NOTAS[k],f=el('div','fila'),t=el('div','tx');if(n.tipo==='confirmado')t.appendChild(el('strong',null,'Confirmado: '));t.appendChild(document.createTextNode(n.t));f.appendChild(t);var a=el('div','acc');a.appendChild(boton('Quitar','ck sec',function(){quitarNota(k)}));f.appendChild(a);r.appendChild(f)})}
   seccionAgenda(r);
-  r.appendChild(el('h4',null,'Anotar al bot'));r.appendChild(formNota());
+  /* todo lo editable en un solo lugar: no hace falta entrar a cada edificio */
+  var dd2=el('details'),dep=D.deposito||{},est=D.estrategia||{};dd2.appendChild(el('summary',null,'Datos de depósito, Drop y estrategia'));
+  [['deposito.gorras','Gorras',dep.gorras],['deposito.medias','Medias',dep.medias],['deposito.shakers','Shakers',dep.shakers],['deposito.venta','Venta',dep.venta],['recepcion.productos','Productos del Drop',(D.recepcion||{}).productos],['estrategia.foco','Foco',est.foco],['estrategia.notas','Notas',est.notas]].forEach(function(c){dd2.appendChild(filaEditable(c[0],c[1],c[2]))});
+  r.appendChild(dd2);
+  var dn=el('details');dn.appendChild(el('summary',null,'Anotar al bot con sala y tipo'));dn.appendChild(formNota());r.appendChild(dn);
   var hs=Object.keys(HECHO).filter(function(k){return HECHO[k]&&HECHO[k].t}).sort(function(a,b){return (HECHO[b].cuando||'').localeCompare(HECHO[a].cuando||'')}).slice(0,5);
   if(hs.length){var de=el('details');de.appendChild(el('summary',null,'Hecho hace poco'));hs.forEach(function(k){var f=el('div','fila'),t=el('div','tx');t.appendChild(document.createTextNode('✓ '+HECHO[k].t));t.appendChild(el('div','mono',fechaHora(HECHO[k].cuando)));f.appendChild(t);var a=el('div','acc');a.appendChild(boton('Deshacer','ck sec',function(){deshacerHecho(k)}));f.appendChild(a);de.appendChild(f)});r.appendChild(de)}
   var n=pz.length+otros.length;return {t:'Centro de control',s:n?n+' pendiente'+(n>1?'s':'')+' tuyo'+(n>1?'s':''):'todo al día',b:r};
@@ -825,7 +835,8 @@ function abrirEdif(id,silencioso){
 function abrirPanel(id,s){abrirEdif(id,s)}
 function cerrarHoja(){$('hoja').classList.remove('on');$('app').classList.remove('hoja-on');panelAbierto=null;selecc(null)}
 $('hX').addEventListener('click',cerrarHoja);
-$('bAnotar').addEventListener('click',function(){abrirEdif('hq');setTimeout(function(){var f=$('formNota');if(f){f.scrollIntoView({block:'center'});f.querySelector('input').focus()}},60)});
+$('bAnotar').addEventListener('click',function(){var f=$('nrap');f.hidden=!f.hidden;if(!f.hidden)$('nrapIn').focus()});
+$('nrap').addEventListener('submit',function(ev){ev.preventDefault();var i=$('nrapIn'),t=i.value.trim();if(!t)return;agregarNota(t,'bot','nota');i.value='';$('nrap').hidden=true});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&panelAbierto)cerrarHoja()});
 /* ================= chat con el bot: la misma charla y la misma memoria que Telegram ================= */
 var CH={abierto:false,local:[],enviando:false,error:'',visto:'',sinLeer:0,avisados:0,listo:false,sig:''};
