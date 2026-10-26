@@ -41,24 +41,40 @@ test("aplica el cambio pedido y devuelve la pieza completa, la hora y qué cambi
 });
 
 test("rechaza una edición que rompe las reglas de marca (cifras que no están en los datos)", async () => {
-  const cliente = clienteFalso(conPieza({ ...crearPieza({ gancho: "Entrená 5 días seguidos." }), que_cambio: "x" }));
+  const mala = conPieza({ ...crearPieza({ gancho: "Entrená 5 días seguidos." }), que_cambio: "x" });
+  const cliente = clienteFalso(mala, mala, mala);
   const r = await crearEditor({ cliente }).editarPieza({ fila: fila(), instruccion: "poné un número", hoy: "2026-10-26" });
   assert.equal(r.ok, false);
   assert.match(r.errores.join(" "), /cifra/);
 });
 
 test("rechaza una hora fuera del rango de publicación", async () => {
-  const cliente = clienteFalso(conPieza({ ...crearPieza(), hora: "07:30", que_cambio: "x" }));
+  const mala = conPieza({ ...crearPieza(), hora: "07:30", que_cambio: "x" });
+  const cliente = clienteFalso(mala, mala, mala);
   const r = await crearEditor({ cliente }).editarPieza({ fila: fila(), instruccion: "a las 7:30", hoy: "2026-10-26" });
   assert.equal(r.ok, false);
   assert.match(r.errores.join(" "), /hora/);
 });
 
 test("rechaza una fecha que ya pasó", async () => {
-  const cliente = clienteFalso(conPieza({ ...crearPieza({ fecha: "2026-10-20" }), que_cambio: "x" }));
+  const mala = conPieza({ ...crearPieza({ fecha: "2026-10-20" }), que_cambio: "x" });
+  const cliente = clienteFalso(mala, mala, mala);
   const r = await crearEditor({ cliente }).editarPieza({ fila: fila(), instruccion: "pasala al 20", hoy: "2026-10-26" });
   assert.equal(r.ok, false);
   assert.match(r.errores.join(" "), /ya pasó/);
+});
+
+test("si la pieza no pasa las reglas, le devuelve los errores a la IA y acepta la versión corregida", async () => {
+  const mala = { ...conPieza({ ...crearPieza({ gancho: "Entrená 5 días seguidos." }), que_cambio: "x" }) };
+  mala.content[0].id = "tu_1";
+  const cliente = clienteFalso(mala, conPieza({ ...crearPieza({ gancho: "Cumplí sin avisar." }), que_cambio: "Corregido." }));
+  const r = await crearEditor({ cliente }).editarPieza({ fila: fila(), instruccion: "poné un número", hoy: "2026-10-26" });
+  assert.equal(r.ok, true, r.errores?.join("; "));
+  assert.equal(r.pieza.gancho, "Cumplí sin avisar.");
+  assert.equal(cliente.pedidos.length, 2);
+  const devuelto = cliente.pedidos[1].messages.at(-1).content[0];
+  assert.deepEqual([devuelto.type, devuelto.tool_use_id, devuelto.is_error], ["tool_result", "tu_1", true]);
+  assert.match(devuelto.content, /cifra/);
 });
 
 test("si la IA no usa la herramienta, reintenta una vez y después avisa", async () => {
