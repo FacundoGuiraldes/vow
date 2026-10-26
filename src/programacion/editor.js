@@ -31,6 +31,13 @@ export function crearValidadorEdicion({ leer, listar } = {}) {
   };
 }
 
+// Anthropic exige que cada tool_use tenga su tool_result en el mensaje siguiente (aunque la respuesta venga cortada o con varias herramientas)
+function respuestaAlModelo(contenido, texto) {
+  const usos = (Array.isArray(contenido) ? contenido : []).filter((b) => b.type === "tool_use");
+  if (!usos.length) return texto;
+  return usos.map((b) => ({ type: "tool_result", tool_use_id: b.id, is_error: true, content: texto }));
+}
+
 export function crearEditor({ cliente, modelo = MODELO_ESTRATEGA, leer, listar } = {}) {
   if (!cliente) throw new Error("Falta el cliente de Anthropic para el editor.");
 
@@ -78,7 +85,7 @@ ${nueva
           bloque = respuesta.stop_reason === "max_tokens" ? null : (respuesta.content?.find((b) => b.type === "tool_use" && b.name === HERRAMIENTA_EDICION.name) ?? null);
           if (!bloque) {
             mensajes.push({ role: "assistant", content: respuesta.content ?? [] });
-            mensajes.push({ role: "user", content: "Tenés que responder llamando a la herramienta actualizar_pieza." });
+            mensajes.push({ role: "user", content: respuestaAlModelo(respuesta.content, "Tenés que responder llamando a la herramienta actualizar_pieza con la pieza completa.") });
           }
         }
         if (!bloque) return { ok: false, errores: ["La IA no devolvió la pieza en el formato esperado. Probá de nuevo."], uso };
@@ -91,7 +98,7 @@ ${nueva
         mensajes.push({ role: "assistant", content: respuesta.content });
         mensajes.push({
           role: "user",
-          content: [{ type: "tool_result", tool_use_id: bloque.id, is_error: true, content: `La pieza no pasó las reglas de la marca:\n${errores.map((e) => `- ${e}`).join("\n")}\nCorregí SOLO esos puntos y volvé a llamar a actualizar_pieza con la pieza completa.` }],
+          content: respuestaAlModelo(respuesta.content, `La pieza no pasó las reglas de la marca:\n${errores.map((e) => `- ${e}`).join("\n")}\nCorregí SOLO esos puntos y volvé a llamar a actualizar_pieza con la pieza completa.`),
         });
       }
       return { ok: false, errores: ultimosErrores, uso };

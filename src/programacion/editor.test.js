@@ -100,3 +100,15 @@ test("la herramienta pide la pieza completa más una frase de qué cambió", () 
     assert.ok(properties[campo], `falta ${campo} en properties`);
   }
 });
+
+test("cada tool_use de la respuesta anterior recibe su tool_result, también si vino cortada o con dos herramientas", async () => {
+  const cortada = { stop_reason: "max_tokens", usage: {}, content: [{ type: "tool_use", id: "tu_a", name: "actualizar_pieza", input: {} }] };
+  const doble = { stop_reason: "tool_use", usage: {}, content: [{ type: "tool_use", id: "tu_b", name: "actualizar_pieza", input: { ...crearPieza({ gancho: "Entrená 5 días seguidos." }), que_cambio: "x" } }, { type: "tool_use", id: "tu_c", name: "otra", input: {} }] };
+  const buena = conPieza({ ...crearPieza({ gancho: "Cumplí sin avisar." }), que_cambio: "ok" });
+  const cliente = clienteFalso(cortada, doble, buena);
+  const r = await crearEditor({ cliente }).editarPieza({ fila: fila(), instruccion: "otro gancho", hoy: "2026-10-26" });
+  assert.equal(r.ok, true, r.errores?.join("; "));
+  // el arreglo de mensajes es el mismo en los tres pedidos: al final tiene toda la conversación
+  const resultados = cliente.pedidos[2].messages.filter((m) => m.role === "user" && Array.isArray(m.content) && m.content.some((b) => b.type === "tool_result")).map((m) => m.content.map((b) => b.tool_use_id));
+  assert.deepEqual(resultados, [["tu_a"], ["tu_b", "tu_c"]]);
+});
