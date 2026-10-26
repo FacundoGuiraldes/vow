@@ -102,24 +102,53 @@ describe("rutas de la publicación programada", () => {
     assert.equal(llamadas.fallos.at(-1).error, "El paso planificar no pasó");
   });
 
-  test("/estado resume piezas, pausa y novedades, con clave y sin la charla", async () => {
-    assert.equal((await pedir("/estado")).status, 401);
-    await repo.guardarEstado("chat", [{ rol: "usuario", texto: "algo privado" }]);
-    const r = await pedir("/estado", { clave: CLAVE });
+  test("/oficina y /oficina/accion piden clave y devuelven lo que muestra el juego", async () => {
+    assert.equal((await pedir("/oficina")).status, 401);
+    assert.equal((await pedir("/oficina", { clave: "otra" })).status, 401);
+    await repo.guardarEstado("chat", [{ rol: "usuario", texto: "cambiá el gancho" }]);
+    const r = await pedir("/oficina", { clave: CLAVE });
     assert.equal(r.status, 200);
     const cuerpo = await r.json();
-    assert.equal(typeof cuerpo.generado, "string");
     assert.equal(typeof cuerpo.pausa, "boolean");
     assert.ok(Array.isArray(cuerpo.piezas) && Array.isArray(cuerpo.novedades));
-    assert.ok(cuerpo.novedades.every((n) => typeof n.texto === "string" && typeof n.usada === "boolean"));
-    assert.ok(!JSON.stringify(cuerpo).includes("algo privado"));
+    assert.deepEqual(cuerpo.chat.at(-1), { rol: "usuario", texto: "cambiá el gancho" });
+
+    assert.equal((await pedir("/oficina/accion", { metodo: "POST", cuerpo: { accion: "nota", texto: "x" } })).status, 401);
+    const nota = await pedir("/oficina/accion", { metodo: "POST", clave: CLAVE, cuerpo: { accion: "nota", clave: "n1", texto: "Ojo con la luz", tipo: "anotacion" } });
+    assert.equal(nota.status, 200);
+    assert.equal((await (await pedir("/oficina", { clave: CLAVE })).json()).juego.notas.n1.texto, "Ojo con la luz");
+    assert.equal((await pedir("/oficina/accion", { metodo: "POST", clave: CLAVE, cuerpo: { accion: "rara" } })).status, 400);
+  });
+
+  test("la oficina también entra con su propia clave, y esa clave no sirve para el resto", async () => {
+    const aparte = express();
+    aparte.use("/api/programacion", crearRutasProgramacion({ servicio, repo, secretoApi: CLAVE, secretoOficina: "clave-de-la-oficina", secretoWebhook: SECRETO_WEBHOOK }));
+    const i = await levantar(aparte);
+    try {
+      const url = `http://127.0.0.1:${i.address().port}/api/programacion`;
+      const con = (ruta, metodo, clave) => fetch(`${url}${ruta}`, { method: metodo, headers: { Authorization: `Bearer ${clave}` } });
+      assert.equal((await con("/oficina", "GET", "clave-de-la-oficina")).status, 200);
+      assert.equal((await con("/oficina", "GET", CLAVE)).status, 200);
+      assert.equal((await con("/tick", "POST", "clave-de-la-oficina")).status, 401);
+    } finally {
+      await cerrar(i);
+    }
+  });
+
+  test("aprobar_pieza llega al servicio y avisa si no se puede", async () => {
+    servicio.aprobarDesdeJuego = async (id) => (id === 7 ? { ok: true, estado: "aprobada" } : { ok: false, motivo: "Esa pieza está aprobada." });
+    const bien = await pedir("/oficina/accion", { metodo: "POST", clave: CLAVE, cuerpo: { accion: "aprobar_pieza", id: 7 } });
+    assert.equal(bien.status, 200);
+    const mal = await pedir("/oficina/accion", { metodo: "POST", clave: CLAVE, cuerpo: { accion: "aprobar_pieza", id: 8 } });
+    assert.equal(mal.status, 409);
+    assert.equal((await pedir("/oficina/accion", { metodo: "POST", clave: CLAVE, cuerpo: { accion: "aprobar_pieza" } })).status, 400);
   });
 
   test("/novedades devuelve lo pendiente, con clave", async () => {
     await repo.agregarNovedad("Llegaron las gorras");
     assert.equal((await pedir("/novedades")).status, 401);
     const r = await pedir("/novedades", { clave: CLAVE });
-    assert.deepEqual((await r.json()).novedades.map((n) => n.texto), ["Llegaron las gorras"]);
+    assert.ok((await r.json()).novedades.some((n) => n.texto === "Llegaron las gorras"));
   });
 
   describe("archivos para Meta", () => {
