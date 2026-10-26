@@ -158,6 +158,18 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     return { ok: true, estado: "aprobada" };
   }
 
+  // La confirmación final desde el juego: es la misma decisión de Facundo que el botón de Telegram (mismas reglas: mismo día, con material, antes de la hora)
+  async function confirmarDesdeJuego(id) {
+    const fila = await repo.obtenerPieza(id);
+    if (!fila) return { ok: false, motivo: "Esa pieza no existe." };
+    let texto = "";
+    await confirmar(fila, async (t) => { texto = String(t); }, null);
+    const tras = await repo.obtenerPieza(id);
+    if (tras.estado !== "confirmada") return { ok: false, motivo: texto.replace(/^[^\p{L}\p{N}¿¡]+/u, "") || "No se pudo confirmar." };
+    await decir(`✅ Confirmaste desde la oficina: "${fila.pieza.gancho}" (${fechaLegible(fila.fecha)} ${fila.hora}). ${texto.replace(/^✅ Confirmada\.\s*/, "")}`).catch((error) => console.error(`No se pudo avisar por Telegram: ${error.message}`));
+    return { ok: true, estado: "confirmada", detalle: texto };
+  }
+
   async function confirmar(fila, responder, mensajeId) {
     const { fecha: hoy, hora: horaActual } = ahora();
     if (fila.fecha !== hoy) {
@@ -172,7 +184,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
       return responder(`Ya pasó la hora de esta pieza (${fila.hora}). No publico fuera de hora sin que me lo pidas: ¿la publico ahora?`, { botones: botonesTarde(fila.id) });
     }
     await repo.actualizarPieza(fila.id, { estado: "confirmada", confirmada_el: hoy, intentos: 0, error: null });
-    telegram.quitarBotones(mensajeId);
+    if (mensajeId) telegram.quitarBotones(mensajeId);
     const detalle = MEDIOS_REQUERIDOS[fila.pieza.formato] ? `Se publica hoy a las ${fila.hora}.` : `Las stories todavía las publicás vos: a las ${fila.hora} te aviso.`;
     return responder(`✅ Confirmada. ${detalle}${permitirPublicar ? "" : "\n🧪 Modo simulación: no se publica de verdad."}`);
   }
@@ -902,5 +914,5 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     return { fecha: hoy, hora, acciones };
   }
 
-  return { recibirPlan, avisarFalloDelPlan, manejarActualizacion, aprobarDesdeJuego, sugerirCambio, conversarDesdeJuego, charla, tick, enviarResumenDiario: () => enviarResumenDiario(ahora().fecha) };
+  return { recibirPlan, avisarFalloDelPlan, manejarActualizacion, aprobarDesdeJuego, confirmarDesdeJuego, sugerirCambio, conversarDesdeJuego, charla, tick, enviarResumenDiario: () => enviarResumenDiario(ahora().fecha) };
 }

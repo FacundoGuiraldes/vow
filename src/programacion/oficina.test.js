@@ -173,4 +173,25 @@ describe("cambiar una pieza desde la oficina", () => {
     const sinIA = crearEscenario();
     await assert.rejects(aplicarAccion(sinIA, { accion: "chat", texto: "hola" }), (error) => error instanceof ErrorAccion && /no está configurado/.test(error.message));
   });
+
+  test("confirmar desde el juego es la confirmación final real: mismas reglas que el botón y avisa por Telegram", async () => {
+    const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00" });
+    const fila = await e.cargarPieza();
+    await aplicarAccion(e, { accion: "aprobar_pieza", id: fila.id });
+    await assert.rejects(aplicarAccion(e, { accion: "confirmar_pieza", id: fila.id }), (error) => error instanceof ErrorAccion && error.estado === 409 && /video/i.test(error.message), "sin archivo no se confirma");
+    assert.notEqual((await e.repo.obtenerPieza(fila.id)).estado, "confirmada");
+    await e.repo.agregarMedio({ piezaId: fila.id, tipo: "video", mime: "video/mp4", datos: Buffer.from("x") });
+    const r = await aplicarAccion(e, { accion: "confirmar_pieza", id: fila.id });
+    assert.equal(r.estado, "confirmada");
+    const tras = await e.repo.obtenerPieza(fila.id);
+    assert.equal(tras.estado, "confirmada");
+    assert.equal(tras.confirmada_el, "2026-10-30");
+    assert.ok(e.telegram.buscar("Confirmaste desde la oficina"));
+  });
+
+  test("confirmar una pieza de otro día se rechaza", async () => {
+    const e = crearEscenario({ fecha: "2026-10-28", hora: "08:00" });
+    const fila = await e.cargarPieza();
+    await assert.rejects(aplicarAccion(e, { accion: "confirmar_pieza", id: fila.id }), (error) => error.estado === 409 && /mismo día/.test(error.message));
+  });
 });

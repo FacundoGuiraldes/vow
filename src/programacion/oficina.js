@@ -101,6 +101,13 @@ export async function aplicarAccion({ repo, servicio, rendimiento = null }, acci
     return { ok: true, estado: resultado.estado };
   }
 
+  if (tipo === "confirmar_pieza") {
+    if (!Number.isInteger(accion.id)) throw new ErrorAccion("Falta el id de la pieza.");
+    const resultado = await servicio.confirmarDesdeJuego(accion.id);
+    if (!resultado.ok) throw new ErrorAccion(resultado.motivo, 409);
+    return { ok: true, estado: resultado.estado, detalle: resultado.detalle };
+  }
+
   if (tipo === "cambiar_pieza") {
     if (!Number.isInteger(accion.id)) throw new ErrorAccion("Falta el id de la pieza.");
     const resultado = await servicio.sugerirCambio(accion.id, { indicacion: recortar(accion.indicacion, 300), contexto: await armarContexto({ repo, rendimiento }, accion.id) });
