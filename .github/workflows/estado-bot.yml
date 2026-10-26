@@ -1,0 +1,51 @@
+name: Estado del bot para el juego
+
+# Cada 30 minutos le pide al servicio un resumen del bot (piezas, pausa y novedades) y lo deja en la rama `estado-bot`,
+# en el archivo bot.json. El juego de la oficina (artefacto de Claude) lo lee desde ahí.
+# El repo es PÚBLICO: el resumen NO incluye la charla con el bot, solo lo que sale en /api/programacion/estado.
+# Usa los mismos secretos que el publicador (URL_PUBLICA y PROGRAMACION_SECRETO): no hace falta configurar nada nuevo.
+# La rama `estado-bot` se reescribe con un solo commit cada vez, para no llenar la historia de `main`.
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: estado-bot
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  exportar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      URL_PUBLICA: ${{ secrets.URL_PUBLICA }}
+      PROGRAMACION_SECRETO: ${{ secrets.PROGRAMACION_SECRETO }}
+    steps:
+      - name: Pedir el resumen al servicio
+        run: |
+          if [ -z "$URL_PUBLICA" ] || [ -z "$PROGRAMACION_SECRETO" ]; then
+            echo "Faltan los secretos URL_PUBLICA y PROGRAMACION_SECRETO: no hago nada."
+            exit 0
+          fi
+          mkdir -p salida
+          # Con el plan gratis de Render el servicio puede estar dormido y tardar cerca de un minuto en despertar
+          curl --silent --show-error --fail-with-body --max-time 100 --retry 2 --retry-all-errors \
+            -H "Authorization: Bearer $PROGRAMACION_SECRETO" \
+            -o salida/bot.json "${URL_PUBLICA%/}/api/programacion/estado"
+          python3 -c "import json; d = json.load(open('salida/bot.json')); assert isinstance(d.get('piezas'), list) and isinstance(d.get('novedades'), list)"
+
+      - name: Publicar en la rama estado-bot
+        run: |
+          [ -f salida/bot.json ] || exit 0
+          cd salida
+          git init -q -b estado-bot
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bot.json
+          git commit -q -m "Estado del bot"
+          git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" estado-bot

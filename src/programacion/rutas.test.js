@@ -102,6 +102,19 @@ describe("rutas de la publicación programada", () => {
     assert.equal(llamadas.fallos.at(-1).error, "El paso planificar no pasó");
   });
 
+  test("/estado resume piezas, pausa y novedades, con clave y sin la charla", async () => {
+    assert.equal((await pedir("/estado")).status, 401);
+    await repo.guardarEstado("chat", [{ rol: "usuario", texto: "algo privado" }]);
+    const r = await pedir("/estado", { clave: CLAVE });
+    assert.equal(r.status, 200);
+    const cuerpo = await r.json();
+    assert.equal(typeof cuerpo.generado, "string");
+    assert.equal(typeof cuerpo.pausa, "boolean");
+    assert.ok(Array.isArray(cuerpo.piezas) && Array.isArray(cuerpo.novedades));
+    assert.ok(cuerpo.novedades.every((n) => typeof n.texto === "string" && typeof n.usada === "boolean"));
+    assert.ok(!JSON.stringify(cuerpo).includes("algo privado"));
+  });
+
   test("/novedades devuelve lo pendiente, con clave", async () => {
     await repo.agregarNovedad("Llegaron las gorras");
     assert.equal((await pedir("/novedades")).status, 401);

@@ -3,6 +3,7 @@
 //   POST /tick           lo llaman cron-job.org y GitHub Actions: manda el aviso de las 8 y publica lo que toque (clave)
 //   POST /plan           lo llama el workflow del lunes con el plan ya armado por los agentes (clave)
 //   GET  /novedades      lo que Facundo le contó al bot y todavía no leyó el Estratega (clave)
+//   GET  /estado        resumen para el juego de la oficina: piezas, pausa y novedades recientes (clave)
 //   GET  /medios/:token  el archivo de una pieza: Meta lo descarga desde acá (el token es imposible de adivinar)
 import { createHash, timingSafeEqual } from "node:crypto";
 import { Router, json } from "express";
@@ -11,6 +12,28 @@ import { esFechaISO, esHoraValida } from "./fechas.js";
 
 const FORMATO_TOKEN = /^[a-f0-9]{48}$/;
 const LIMITE_PIEZAS = 5;
+const DIA_MS = 86_400_000;
+const fechaISO = (ms) => new Date(ms).toISOString().slice(0, 10);
+
+// Lo que el juego de la oficina puede mostrar del bot. A propósito NO incluye la charla con el bot ni los archivos: el repo es público.
+export async function armarEstado(repo, ahora = Date.now()) {
+  const [piezas, novedades, recordatorios, pausa] = await Promise.all([
+    repo.piezasEntre(fechaISO(ahora - 21 * DIA_MS), fechaISO(ahora + 45 * DIA_MS)),
+    repo.novedadesRecientes(20),
+    repo.recordatoriosPendientes(fechaISO(ahora + 45 * DIA_MS)),
+    repo.leerEstado("pausa"),
+  ]);
+  return {
+    generado: new Date(ahora).toISOString(),
+    pausa: pausa === true,
+    recordatorios_pendientes: recordatorios.length,
+    piezas: piezas.map((p) => ({
+      id: p.id, fecha: p.fecha, hora: p.hora, estado: p.estado, formato: p.pieza?.formato ?? null, gancho: p.pieza?.gancho ?? null,
+      confirmada_el: p.confirmada_el ?? null, permalink: p.permalink ?? null, error: p.error ?? null,
+    })),
+    novedades: novedades.map((n) => ({ id: n.id, fecha: n.fecha, texto: String(n.texto).slice(0, 240), usada: n.usada === true })),
+  };
+}
 
 const huella = (texto) => createHash("sha256").update(String(texto)).digest();
 const iguales = (a, b) => timingSafeEqual(huella(a), huella(b));
@@ -105,6 +128,14 @@ export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoWebh
   router.get("/novedades", conClave, async (req, res, siguiente) => {
     try {
       res.json({ novedades: await repo.novedadesPendientes() });
+    } catch (error) {
+      siguiente(error);
+    }
+  });
+
+  router.get("/estado", conClave, async (req, res, siguiente) => {
+    try {
+      res.json(await armarEstado(repo));
     } catch (error) {
       siguiente(error);
     }
