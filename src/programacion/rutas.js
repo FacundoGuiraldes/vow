@@ -133,9 +133,13 @@ export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOfic
     }
   });
 
+  const segundoPlano = (trabajo) => {
+    pendientes.add(trabajo);
+    trabajo.finally(() => pendientes.delete(trabajo));
+  };
   router.post("/oficina/accion", conClaveOficina, async (req, res, siguiente) => {
     try {
-      res.json(await aplicarAccion({ repo, servicio, rendimiento }, req.body));
+      res.json(await aplicarAccion({ repo, servicio, rendimiento, segundoPlano }, req.body));
     } catch (error) {
       if (error instanceof ErrorAccion) return res.status(error.estado).json({ error: error.message });
       return siguiente(error);
