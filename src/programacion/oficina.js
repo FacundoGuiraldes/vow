@@ -111,6 +111,13 @@ export async function aplicarAccion({ repo, servicio, rendimiento = null }, acci
     return { ok: true, estado: resultado.estado, detalle: resultado.detalle };
   }
 
+  if (tipo === "cambiar_pieza" && !Number.isInteger(accion.id) && typeof accion.fecha === "string") {
+    // La pieza solo está en los documentos: la IA arma la nueva en el momento y queda propuesta para aprobar
+    const resultado = await servicio.cambiarSinFila({ fecha: accion.fecha, formato: accion.formato, indicacion: recortar(accion.indicacion, 300), base: recortar(accion.base, 1500) });
+    if (!resultado.ok) throw new ErrorAccion(resultado.motivo, 409);
+    return { ok: true, estado: resultado.estado, id: resultado.id };
+  }
+
   if (tipo === "cambiar_pieza") {
     if (!Number.isInteger(accion.id)) throw new ErrorAccion("Falta el id de la pieza.");
     const resultado = await servicio.sugerirCambio(accion.id, { indicacion: recortar(accion.indicacion, 300), contexto: await armarContexto({ repo, rendimiento }, accion.id) });
