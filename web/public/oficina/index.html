@@ -709,6 +709,7 @@ function guardarEditar(e,k){
   var tipo=t.tipo||fmt0,epi=t.epi!=null?t.epi:epi0,problema=revisarArchivos(tipo,fs);
   if(problema){aviso(problema,7000);return}
   var cambios={};if(tipo!==fmt0)cambios.formato=tipo;if(epi.trim()!==epi0.trim())cambios.epigrafe=epi;
+  if(e._id&&t.hora&&t.hora!==(e._hora||''))cambios.hora=t.hora;
   if(!Object.keys(cambios).length&&!fs.length){aviso('No cambiaste nada');return}
   if(!Object.keys(cambios).length&&!e._id)cambios.epigrafe=epi; /* una pieza solo de los documentos pasa al sistema al guardar */
   EDOCUPADO[k]=true;refrescar();
@@ -726,13 +727,14 @@ function guardarEditar(e,k){
   }).catch(function(er){delete EDOCUPADO[k];refrescar();aviso(er.estado===401?'La clave no es válida':('No se guardó: '+(er.message||'error')),9000);if(er.estado===401)pedirClave('La clave no es válida.')});
 }
 function formEditar(e,k,m){
-  var t=EDTXT[k]=EDTXT[k]||{tipo:normFmt(e._fmt||e.formato),epi:epiEditable(e,m)};
+  var t=EDTXT[k]=EDTXT[k]||{tipo:normFmt(e._fmt||e.formato),epi:epiEditable(e,m),hora:e._hora||''};
   var fo=el('form','nota');
   fo.appendChild(el('label','t','Tipo de publicación'));
   var se=el('select');TIPOS.forEach(function(x){var o=el('option',null,x[1]);o.value=x[0];if(x[0]===t.tipo)o.selected=true;se.appendChild(o)});
   se.addEventListener('change',function(){t.tipo=se.value;pintarArch()});fo.appendChild(se);
   fo.appendChild(el('label','t','Epígrafe (Enter hace un salto de línea; dejá una línea en blanco para separar párrafos)'));
   var ta=el('textarea');ta.value=t.epi;ta.maxLength=2200;ta.addEventListener('input',function(){t.epi=ta.value});fo.appendChild(ta);
+  if(e._id){fo.appendChild(el('label','t','Hora de publicación'));var hi=el('input');hi.type='time';hi.value=t.hora||'';hi.addEventListener('input',function(){t.hora=hi.value});fo.appendChild(hi)}
   fo.appendChild(el('label','t','Archivo que se publica'));
   var info=el('p','arch'),inp=el('input');inp.type='file';inp.style.display='none';
   function pintarArch(){
@@ -1045,7 +1047,7 @@ function api(ruta,op){
   });
 }
 var ESTADO_MAP={propuesta:'por aprobar',aprobada:'programado',confirmada:'programado',preparando:'programado',preparada:'programado',publicando:'programado',publicada:'publicado',fallida:'fallida'};
-var ESTADO_TXT={propuesta:'propuesta, esperando tu aprobación',aprobada:'aprobada; falta tu confirmación final por Telegram el día',confirmada:'confirmada, se publica solo',preparando:'preparando la publicación',preparada:'lista para publicar',publicando:'publicando',publicada:'publicada',fallida:'falló al publicar'};
+var ESTADO_TXT={propuesta:'propuesta, esperando tu aprobación',aprobada:'aprobada; falta tu confirmación final el día de la publicación',confirmada:'confirmada, se publica solo',preparando:'preparando la publicación',preparada:'lista para publicar',publicando:'publicando',publicada:'publicada',fallida:'falló al publicar'};
 function textoPieza(p){
   var q=p.pieza||{},o=[];
   if(q.gancho)o.push('**Gancho:** '+q.gancho);

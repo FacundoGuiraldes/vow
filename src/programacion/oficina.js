@@ -2,7 +2,7 @@
 //   armarEstadoOficina → lo que el juego lee (piezas, medios, novedades, charla, lo que marcaste, rendimiento de Instagram)
 //   aplicarAccion      → lo que el juego puede hacer: aprobar una pieza, marcar pendientes como cumplidos, anotar en el cuaderno
 // Lo que se marca en el juego queda también como novedad: el Estratega lo lee en el próximo plan.
-// NO se puede confirmar la publicación del día desde acá: esa confirmación sigue siendo solo por Telegram.
+// La confirmación final del día también se puede dar desde acá (confirmar_pieza), con las mismas reglas que el botón de Telegram.
 import { ErrorOperacion, aplicarOperacion, leerOperacion } from "./operacion.js";
 import { createHash } from "node:crypto";
 const DIA_MS = 86_400_000;
@@ -43,10 +43,16 @@ function cambiosVisibles(cambios, ahora) {
   return salida;
 }
 
-async function guardarCambio(repo, clave, dato) {
-  const actuales = (await repo.leerEstado("cambios")) ?? {};
-  const recientes = Object.fromEntries(Object.entries(actuales).slice(-9));
-  await repo.guardarEstado("cambios", { ...recientes, [clave]: dato });
+// Uno por vez: dos cambios que terminan juntos no se pisan el avance
+let colaCambios = Promise.resolve();
+function guardarCambio(repo, clave, dato) {
+  const turno = colaCambios.then(async () => {
+    const actuales = (await repo.leerEstado("cambios")) ?? {};
+    const recientes = Object.fromEntries(Object.entries(actuales).slice(-9));
+    await repo.guardarEstado("cambios", { ...recientes, [clave]: dato });
+  });
+  colaCambios = turno.catch(() => {});
+  return turno;
 }
 
 // Lanza el cambio y contesta enseguida. Con `segundoPlano` (el servidor) sigue solo; sin él (pruebas) se espera el resultado.
