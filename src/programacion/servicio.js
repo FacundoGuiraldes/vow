@@ -468,6 +468,18 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     return { ok: true, estado: nueva.estado };
   }
 
+  // "Cambiar" en el juego sobre una pieza que todavía no está en la base (solo en los documentos): la IA arma la nueva en el momento
+  async function cambiarSinFila({ fecha, formato, indicacion = "", base = "" }) {
+    const { fecha: hoy } = ahora();
+    if (!esFechaISO(fecha)) return { ok: false, motivo: "Falta la fecha de la pieza." };
+    const viva = (await repo.piezasDelDia(fecha)).find((f) => VIVAS.includes(f.estado));
+    if (viva) return { ...(await sugerirCambio(viva.id, { indicacion })), id: viva.id };
+    const pedido = `${base ? `Esta pieza existe solo en los documentos y hay que rehacerla o mejorarla. Versión actual:\n${String(base).slice(0, 1500)}\n\n` : ""}Pedido de Facundo: ${indicacion || "armá otra sugerencia mejor para ese día"}`;
+    const r = await programarPieza({ fecha, formato: String(formato || "reel").toLowerCase(), indicacion: pedido }, { hoy, canal: "juego" });
+    if (r.ok) return { ok: true, estado: r.estado, id: r.id };
+    return { ok: false, motivo: r.error ?? (r.errores ?? []).join(" ") };
+  }
+
   async function manejarActualizacion(actualizacion) {
     try {
       if (actualizacion.callback_query) return await manejarBoton(actualizacion.callback_query);
@@ -598,6 +610,49 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     return memoria.slice(-limite).map((m) => ({ rol: m.rol, texto: m.visible ?? m.texto, canal: m.canal ?? "telegram", en: m.en ?? null }));
   }
 
+  // Arma con la IA una pieza nueva para un día libre (la usan el chat y el "Cambiar" del juego para piezas que solo existen en los documentos)
+  async function programarPieza(entrada, { hoy, canal }) {
+    const fecha = String(entrada.fecha ?? "").trim();
+    if (!esFechaISO(fecha)) return { error: "La fecha tiene que ser AAAA-MM-DD." };
+    if (fecha < hoy) return { error: `El ${fechaLegible(fecha)} ya pasó.` };
+    if (diasHasta(hoy, fecha) > 60) return { error: "Solo se programa hasta 60 días hacia adelante." };
+    const formato = String(entrada.formato || "reel").toLowerCase();
+    if (!["reel", "carrusel", "imagen", "story"].includes(formato)) return { error: "El formato tiene que ser reel, carrusel, imagen o story." };
+    const horaPieza = esHoraValida(entrada.hora) ? entrada.hora : HORA_POR_DEFECTO;
+    const indicacion = String(entrada.indicacion ?? "").trim();
+    if (!indicacion) return { error: "Falta la indicación: qué quiere Facundo que diga o muestre la pieza." };
+    if (!editor) return { error: "Armar piezas con IA no está configurado en el servicio (falta ANTHROPIC_API_KEY)." };
+    const viva = (await repo.piezasDelDia(fecha)).find((f) => VIVAS.includes(f.estado));
+    if (viva) return { error: `El ${fechaLegible(fecha)} ya tiene la pieza ${viva.id} ("${viva.pieza.gancho}"). Usá modificar_pieza para cambiarla.` };
+    const claveEdiciones = `ediciones:${hoy}`;
+    const hechas = Number(await repo.leerEstado(claveEdiciones)) || 0;
+    if (hechas >= EDICIONES_MAXIMAS_POR_DIA) return { error: `Se llegó al máximo de ${EDICIONES_MAXIMAS_POR_DIA} ediciones por día (es un freno de gasto).` };
+    await repo.guardarEstado(claveEdiciones, hechas + 1);
+
+    const cercanas = await repo.piezasEntre(sumarDias(hoy, -14), sumarDias(hoy, 14));
+    const contexto = cercanas.map((f) => `- ${fechaLegible(f.fecha)} (${f.pieza.formato}): ${f.pieza.gancho}`).join("\n");
+    const instruccion = `Pieza nueva para el ${fecha} (${fechaLegible(fecha)}), formato ${formato}, a las ${horaPieza}.\n${indicacion}${contexto ? `\n\nPiezas de estos días (no las repitas):\n${contexto}` : ""}`;
+    let resultado;
+    try {
+      resultado = await editor.editarPieza({ fila: { pieza: { formato }, fecha, hora: horaPieza }, instruccion, hoy, nueva: true });
+    } catch (error) {
+      return { error: `No pude armar la pieza: ${error.message}` };
+    }
+    if (!resultado.ok) return { ok: false, errores: resultado.errores };
+
+    const pieza = { ...resultado.pieza, fecha, hora: horaPieza };
+    const fila = await repo.crearPiezaSuelta({ semana: lunesDe(fecha), fecha, hora: horaPieza, pieza });
+    let aviso = "";
+    if (material(fila).length) {
+      const diaAviso = fechaDeAviso(fecha);
+      if (diaAviso > hoy) await repo.crearRecordatorio({ piezaId: fila.id, fecha: diaAviso });
+      else if (diaAviso < hoy) aviso = "\n⚠️ Con esta fecha te quedan menos de 3 días para producir el material.";
+    }
+    await decirDePieza(fila, `🆕 Pieza nueva para el ${fechaLegible(fecha)}, armada desde ${canal === "juego" ? "el juego" : "el chat"}${resultado.queCambio ? `: ${resultado.queCambio}` : ""}\n\n${textoPieza(fila)}${aviso}`, { botones: botonesPlan(fila.id, { conIA: conIA(fila) }) })
+      .catch((error) => console.error(`No se pudo avisar por Telegram: ${error.message}`));
+    return { ok: true, id: fila.id, estado: "propuesta", fecha, hora: horaPieza, formato: pieza.formato, nota: `Quedó propuesta (ID ${fila.id}) y ya se la mostré a Facundo en Telegram con sus botones. Falta que la apruebe.${aviso}` };
+  }
+
   async function ejecutarHerramienta(nombre, argumentos, { hoy, hora, canal = "telegram" }) {
     const piezaDe = async (valor) => {
       const fila = Number.isInteger(Number(valor)) ? await repo.obtenerPieza(Number(valor)) : null;
@@ -645,47 +700,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
       await decirDePieza(nueva, `${argumentos.que_cambio ? `✏️ ${String(argumentos.que_cambio).slice(0, 300)}\n\n` : ""}${textoPieza(nueva)}${aviso}`, { botones: botonesPlan(nueva.id, { conIA: conIA(nueva) }) });
       return { ok: true, estado: ESTADOS_LEGIBLES[nueva.estado], fecha: nueva.fecha, hora: nueva.hora, nota: `Ya le mostré a Facundo la pieza actualizada con sus botones.${aviso ? ` Aviso: ${aviso.trim()}` : ""}` };
     }
-    if (nombre === "programar_pieza") {
-      const fecha = String(argumentos.fecha ?? "").trim();
-      if (!esFechaISO(fecha)) return { error: "La fecha tiene que ser AAAA-MM-DD." };
-      if (fecha < hoy) return { error: `El ${fechaLegible(fecha)} ya pasó.` };
-      if (diasHasta(hoy, fecha) > 60) return { error: "Solo se programa hasta 60 días hacia adelante." };
-      const formato = String(argumentos.formato || "reel").toLowerCase();
-      if (!["reel", "carrusel", "imagen", "story"].includes(formato)) return { error: "El formato tiene que ser reel, carrusel, imagen o story." };
-      const horaPieza = esHoraValida(argumentos.hora) ? argumentos.hora : HORA_POR_DEFECTO;
-      const indicacion = String(argumentos.indicacion ?? "").trim();
-      if (!indicacion) return { error: "Falta la indicación: qué quiere Facundo que diga o muestre la pieza." };
-      if (!editor) return { error: "Armar piezas con IA no está configurado en el servicio (falta ANTHROPIC_API_KEY)." };
-      const viva = (await repo.piezasDelDia(fecha)).find((f) => VIVAS.includes(f.estado));
-      if (viva) return { error: `El ${fechaLegible(fecha)} ya tiene la pieza ${viva.id} ("${viva.pieza.gancho}"). Usá modificar_pieza para cambiarla.` };
-      const claveEdiciones = `ediciones:${hoy}`;
-      const hechas = Number(await repo.leerEstado(claveEdiciones)) || 0;
-      if (hechas >= EDICIONES_MAXIMAS_POR_DIA) return { error: `Se llegó al máximo de ${EDICIONES_MAXIMAS_POR_DIA} ediciones por día (es un freno de gasto).` };
-      await repo.guardarEstado(claveEdiciones, hechas + 1);
-
-      const cercanas = await repo.piezasEntre(sumarDias(hoy, -14), sumarDias(hoy, 14));
-      const contexto = cercanas.map((f) => `- ${fechaLegible(f.fecha)} (${f.pieza.formato}): ${f.pieza.gancho}`).join("\n");
-      const instruccion = `Pieza nueva para el ${fecha} (${fechaLegible(fecha)}), formato ${formato}, a las ${horaPieza}.\n${indicacion}${contexto ? `\n\nPiezas de estos días (no las repitas):\n${contexto}` : ""}`;
-      let resultado;
-      try {
-        resultado = await editor.editarPieza({ fila: { pieza: { formato }, fecha, hora: horaPieza }, instruccion, hoy, nueva: true });
-      } catch (error) {
-        return { error: `No pude armar la pieza: ${error.message}` };
-      }
-      if (!resultado.ok) return { ok: false, errores: resultado.errores };
-
-      const pieza = { ...resultado.pieza, fecha, hora: horaPieza };
-      const fila = await repo.crearPiezaSuelta({ semana: lunesDe(fecha), fecha, hora: horaPieza, pieza });
-      let aviso = "";
-      if (material(fila).length) {
-        const diaAviso = fechaDeAviso(fecha);
-        if (diaAviso > hoy) await repo.crearRecordatorio({ piezaId: fila.id, fecha: diaAviso });
-        else if (diaAviso < hoy) aviso = "\n⚠️ Con esta fecha te quedan menos de 3 días para producir el material.";
-      }
-      await decirDePieza(fila, `🆕 Pieza nueva para el ${fechaLegible(fecha)}, armada desde ${canal === "juego" ? "el juego" : "el chat"}${resultado.queCambio ? `: ${resultado.queCambio}` : ""}\n\n${textoPieza(fila)}${aviso}`, { botones: botonesPlan(fila.id, { conIA: conIA(fila) }) })
-        .catch((error) => console.error(`No se pudo avisar por Telegram: ${error.message}`));
-      return { ok: true, id: fila.id, estado: "propuesta", fecha, hora: horaPieza, formato: pieza.formato, nota: `Quedó propuesta (ID ${fila.id}) y ya se la mostré a Facundo en Telegram con sus botones. Falta que la apruebe.${aviso}` };
-    }
+    if (nombre === "programar_pieza") return programarPieza(argumentos, { hoy, canal });
     if (nombre === "ver_operacion") return resumenParaChat(await leerOperacion(repo));
     if (nombre === "editar_dato" || nombre === "agregar_agenda" || nombre === "quitar_agenda") {
       const cambio = nombre === "editar_dato" ? { tipo: "campo", campo: argumentos.campo, valor: argumentos.valor }
@@ -928,5 +943,5 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     return { fecha: hoy, hora, acciones };
   }
 
-  return { recibirPlan, avisarFalloDelPlan, manejarActualizacion, aprobarDesdeJuego, confirmarDesdeJuego, sugerirCambio, conversarDesdeJuego, charla, tick, enviarResumenDiario: () => enviarResumenDiario(ahora().fecha) };
+  return { recibirPlan, avisarFalloDelPlan, manejarActualizacion, aprobarDesdeJuego, confirmarDesdeJuego, sugerirCambio, cambiarSinFila, conversarDesdeJuego, charla, tick, enviarResumenDiario: () => enviarResumenDiario(ahora().fecha) };
 }

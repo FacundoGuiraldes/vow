@@ -630,18 +630,15 @@ function ponerCapa(){
 
 /* ================= tarjeta de una pieza: ver, aprobar o pedir otra ================= */
 function pedirCambio(pz,indicacion){
-  indicacion=(indicacion||'').trim();var kc=String(pz._id||kPieza(pz));
+  indicacion=(indicacion||'').trim();var kc=String(pz._id||kPieza(pz)),ck=pz._id||kc;
   if(conectado!=='vivo'){aviso('Sin conexión con el bot: el cambio no se guardaría. Revisá el aviso de arriba.',6000);return}
-  if(!pz._id){
-    /* la pieza solo existe en los documentos: no hay fila que editar, así que el pedido le llega al bot como anotación */
-    var d=pd(pz.fecha);agregarNota('Cambiar la pieza del '+(d?dd(d):pz.fecha)+(pz.titulo?' («'+pz.titulo+'»)':'')+(indicacion?': '+indicacion:'.'),'diseno','nota');
-    delete CFABRE[kc];delete CFTXT[kc];aviso('Pedido anotado: el bot lo toma en el próximo plan');refrescar();return;
-  }
-  if(CAMBIANDO[pz._id])return;CAMBIANDO[pz._id]=true;refrescar();
+  if(CAMBIANDO[ck])return;CAMBIANDO[ck]=true;refrescar();
   aviso('La IA está armando otra sugerencia… puede tardar un minuto');
-  api('/oficina/accion',{body:{accion:'cambiar_pieza',id:pz._id,indicacion:indicacion}}).then(function(){
-    delete CAMBIANDO[pz._id];delete CFABRE[kc];delete CFTXT[kc];aviso('Nueva sugerencia lista: revisala y aprobala',5000);return leerVivo(true);
-  }).catch(function(e){delete CAMBIANDO[pz._id];refrescar();aviso(e.estado===401?'La clave no es válida':('No se cambió nada: '+(e.message||'no se pudo armar la sugerencia')),8000);if(e.estado===401)pedirClave('La clave no es válida.')});
+  /* una pieza que solo está en los documentos no tiene fila: el servidor la arma nueva en el momento para ese día */
+  var cuerpo=pz._id?{accion:'cambiar_pieza',id:pz._id,indicacion:indicacion}:{accion:'cambiar_pieza',fecha:pz.fecha,formato:pz.formato,indicacion:indicacion,base:pz.texto||pz.titulo||''};
+  api('/oficina/accion',{body:cuerpo}).then(function(){
+    delete CAMBIANDO[ck];delete CFABRE[kc];delete CFTXT[kc];aviso('Nueva sugerencia lista: revisala y aprobala',5000);return leerVivo(true);
+  }).catch(function(e){delete CAMBIANDO[ck];refrescar();aviso(e.estado===401?'La clave no es válida':('No se cambió nada: '+(e.message||'no se pudo armar la sugerencia')),8000);if(e.estado===401)pedirClave('La clave no es válida.')});
 }
 function formCambio(pz){
   var fo=el('form','nota');var ta=el('input');ta.type='text';ta.placeholder='¿Algo en particular? (opcional)';ta.maxLength=300;
@@ -652,7 +649,7 @@ function tarjetaPieza(e){
   var d=pd(e.fecha),f=el('div','pieza'),m=(MED.piezas||{})[kMed(e)]||{},ap=!!HECHO[kPieza(e)];
   var h=el('div','ph');h.appendChild(el('strong',null,e.titulo||'Pieza'));h.appendChild(chipEstado(e.estado));f.appendChild(h);
   f.appendChild(el('div','mono',(d?dd(d)+' · ':'')+(e.formato||'')+(e.hora?' · '+e.hora:'')+(d?' · '+rel(dias(d)):'')));
-  if(CAMBIANDO[e._id])f.appendChild(el('p','vacio','La IA está armando otra sugerencia…'));
+  if(CAMBIANDO[e._id||kPieza(e)])f.appendChild(el('p','vacio','La IA está armando otra sugerencia…'));
   else if(e.nota&&e.estado!=='publicado')f.appendChild(el('p','mono',e.nota));
   if(m.imgs&&m.imgs.length)f.appendChild(galeria(m.imgs));
   if(m.vid){var v=document.createElement('video');v.src=m.vid;v.controls=true;v.playsInline=true;v.preload='metadata';v.className='vid';f.appendChild(v)}
@@ -660,7 +657,7 @@ function tarjetaPieza(e){
   var a=el('div','acc');
   if(e.estado==='por aprobar'&&!ap&&!esConfirmable(e))a.appendChild(boton('Aprobar','ck si',function(){if(conectado!=='vivo'){aviso('Sin conexión con el bot: no se puede aprobar ahora.',6000);return}aprobarPieza(e)}));
   if(esConfirmable(e)&&!CAMBIANDO['c'+e._id])a.appendChild(boton('Confirmar publicación','ck si',function(){confirmarPieza(e)}));
-  if(e.estado!=='publicado'&&!CAMBIANDO[e._id]){
+  if(e.estado!=='publicado'&&!CAMBIANDO[e._id||kPieza(e)]){
     var kc=String(e._id||kPieza(e)),cf=null;
     function abrirForm(foco){cf=formCambio(e);var inp=cf.querySelector('input');inp.value=CFTXT[kc]||'';inp.addEventListener('input',function(){CFTXT[kc]=inp.value});f.appendChild(cf);if(foco)inp.focus()}
     a.appendChild(boton('↻ Cambiar','ck sec',function(){if(cf){cf.remove();cf=null;delete CFABRE[kc]}else{CFABRE[kc]=true;abrirForm(true)}}));
@@ -950,7 +947,7 @@ function armarD(){
     (v.piezas||[]).forEach(function(p){
       if(p.estado==='cancelada')return;
       var est=ESTADO_MAP[p.estado]||p.estado,titulo=p.gancho||('Pieza del '+p.fecha),fm=(p.formato||'')==='imagen'?'carrusel':(p.formato||'pieza');
-      var ex=piezas.filter(function(x){return x.fecha===p.fecha&&x.formato===p.formato&&!x._id})[0];
+      var ex=piezas.filter(function(x){return x.fecha===p.fecha&&(x.formato===p.formato||x.formato===fm)&&!x._id})[0];
       var nota=(ESTADO_TXT[p.estado]||p.estado)+(p.hora?' · '+p.hora:'')+(p.error?' · '+p.error:'');
       if(ex){ex.estado=est;ex._id=p.id;ex._est=p.estado;ex._hora=p.hora;ex.nota=nota;ex.fecha=p.fecha;if(p.permalink)ex.permalink=p.permalink}
       else piezas.push({fecha:p.fecha,formato:fm,titulo:titulo,estado:est,nota:nota,texto:textoPieza(p),_id:p.id,_est:p.estado,_hora:p.hora,permalink:p.permalink||null,_vivo:true});
