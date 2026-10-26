@@ -3,11 +3,14 @@
 //   POST /tick           lo llaman cron-job.org y GitHub Actions: manda el aviso de las 8 y publica lo que toque (clave)
 //   POST /plan           lo llama el workflow del lunes con el plan ya armado por los agentes (clave)
 //   GET  /novedades      lo que Facundo le contó al bot y todavía no leyó el Estratega (clave)
+//   GET  /oficina       todo lo que muestra el juego de la oficina: piezas, medios, charla, novedades y rendimiento (clave)
+//   POST /oficina/accion lo que hace el juego: aprobar una pieza, marcar pendientes, anotar en el cuaderno (clave)
 //   GET  /medios/:token  el archivo de una pieza: Meta lo descarga desde acá (el token es imposible de adivinar)
 import { createHash, timingSafeEqual } from "node:crypto";
 import { Router, json } from "express";
 import { rateLimit } from "express-rate-limit";
 import { esFechaISO, esHoraValida } from "./fechas.js";
+import { ErrorAccion, aplicarAccion, armarEstadoOficina } from "./oficina.js";
 
 const FORMATO_TOKEN = /^[a-f0-9]{48}$/;
 const LIMITE_PIEZAS = 5;
@@ -46,7 +49,7 @@ function entregar(req, res, { mime, datos }) {
     .end(datos.subarray(inicio, fin + 1));
 }
 
-export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoWebhook, limitePorMinuto = 120 }) {
+export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOficina = null, secretoWebhook, rendimiento = null, permitirPublicar = false, limitePorMinuto = 120 }) {
   const router = Router();
   const pendientes = new Set(); // procesamientos del webhook que siguen en curso (los tests los esperan)
   router.use(json({ limit: "256kb" }));
@@ -107,6 +110,32 @@ export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoWebh
       res.json({ novedades: await repo.novedadesPendientes() });
     } catch (error) {
       siguiente(error);
+    }
+  });
+
+  // La oficina entra con su propia clave (OFICINA_SECRETO) o con la de la programación
+  const conClaveOficina = (req, res, siguiente) => {
+    const claves = [secretoOficina, secretoApi].filter(Boolean);
+    if (!claves.length) return res.status(503).json({ error: "OFICINA_SECRETO no está configurado." });
+    const [tipo, clave] = String(req.headers.authorization ?? "").split(" ");
+    if (tipo !== "Bearer" || !clave || !claves.some((c) => iguales(clave, c))) return res.status(401).json({ error: "No autorizado." });
+    return siguiente();
+  };
+
+  router.get("/oficina", conClaveOficina, async (req, res, siguiente) => {
+    try {
+      res.set("Cache-Control", "no-store").json(await armarEstadoOficina({ repo, rendimiento, permitirPublicar }));
+    } catch (error) {
+      siguiente(error);
+    }
+  });
+
+  router.post("/oficina/accion", conClaveOficina, async (req, res, siguiente) => {
+    try {
+      res.json(await aplicarAccion({ repo, servicio }, req.body));
+    } catch (error) {
+      if (error instanceof ErrorAccion) return res.status(error.estado).json({ error: error.message });
+      return siguiente(error);
     }
   });
 

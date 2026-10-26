@@ -149,6 +149,15 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     return responder(`✅ Aprobada. El ${fechaLegible(fila.fecha)} a las 8 te pido la confirmación final.`);
   }
 
+  // Aprobación desde la oficina (el juego): vale como el botón "Aprobar" de Telegram. La confirmación final del día sigue siendo solo por Telegram.
+  async function aprobarDesdeJuego(id) {
+    const fila = await repo.obtenerPieza(id);
+    if (!fila) return { ok: false, motivo: "Esa pieza no existe." };
+    if (!(await repo.reclamar(fila.id, ["propuesta"], "aprobada"))) return { ok: false, motivo: `Esa pieza está ${ESTADOS_LEGIBLES[fila.estado]}.` };
+    await decir(`✅ Aprobaste desde la oficina: "${fila.pieza.gancho}" (${fechaLegible(fila.fecha)}). El día de la publicación a las 8 te pido la confirmación final.`).catch((error) => console.error(`No se pudo avisar por Telegram: ${error.message}`));
+    return { ok: true, estado: "aprobada" };
+  }
+
   async function confirmar(fila, responder, mensajeId) {
     const { fecha: hoy, hora: horaActual } = ahora();
     if (fila.fecha !== hoy) {
@@ -779,5 +788,5 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     return { fecha: hoy, hora, acciones };
   }
 
-  return { recibirPlan, avisarFalloDelPlan, manejarActualizacion, tick, enviarResumenDiario: () => enviarResumenDiario(ahora().fecha) };
+  return { recibirPlan, avisarFalloDelPlan, manejarActualizacion, aprobarDesdeJuego, tick, enviarResumenDiario: () => enviarResumenDiario(ahora().fecha) };
 }

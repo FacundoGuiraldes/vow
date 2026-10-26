@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "node ../scripts/generar-oficina.js && vite",
+    "build": "node ../scripts/generar-oficina.js && vite build",
     "preview": "vite preview"
   },
   "dependencies": {

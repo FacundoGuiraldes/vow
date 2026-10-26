@@ -1,5 +1,6 @@
 # Reel · 02/11/2026 · pilar promesa
 
+**Título:** Reel de la promesa
 **Estado:** guion definido con Facundo. Falta filmar las tomas reales (las filma Facundo o alguien que entrene); después se edita y se aprueba. La fecha es tentativa: si se publica otro día, se actualiza acá.
 
 La versión de solo texto (`docs/piezas/2026-11-02-reel-promesa/reel.mp4`, `npm run reel`) quedó como alternativa: a Facundo no le gustó como pieza principal porque quería una persona real haciendo algo real.

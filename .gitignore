@@ -10,3 +10,5 @@ docs/ejecuciones/*-simulado.json
 evals/resultados/
 docs/gasto/
 docs/rendimiento/*-simulado.*
+web/public/oficina/datos.json
+web/public/oficina/medios/

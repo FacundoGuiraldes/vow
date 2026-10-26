@@ -138,6 +138,10 @@ export function crearRepositorio(pool, { prefijoEstado = "" } = {}) {
       await pool.query("INSERT INTO novedades (texto) VALUES ($1)", [texto]);
     },
 
+    // Las últimas novedades (usadas o no), para mostrarlas en el juego de la oficina
+    novedadesRecientes: (limite = 20) =>
+      filas("SELECT id, texto, to_char(creado_en AT TIME ZONE 'America/Argentina/Buenos_Aires', 'YYYY-MM-DD') AS fecha, usada_en IS NOT NULL AS usada FROM novedades ORDER BY id DESC LIMIT $1", [limite]),
+
     novedadesPendientes: () => filas("SELECT id, texto FROM novedades WHERE usada_en IS NULL ORDER BY id"),
 
     async marcarNovedadesUsadas(ids) {
