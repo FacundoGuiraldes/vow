@@ -89,7 +89,7 @@ export async function aplicarAccion({ repo, servicio }, accion, ahora = Date.now
       if (!texto) throw new ErrorAccion("Falta el texto.");
       const sala = recortar(accion.sala, 30);
       if (tipo === "cumplir") {
-        juego.hechos[accion.clave] = { en, texto, sala };
+        juego.hechos[accion.clave] = { en, texto, sala, ...(accion.tipo === "pieza" ? { tipo: "pieza" } : {}) };
         await repo.agregarNovedad(`Cumplido desde la oficina: ${texto}`);
       } else {
         const clase = TIPOS_NOTA.has(accion.tipo) ? accion.tipo : "anotacion";
