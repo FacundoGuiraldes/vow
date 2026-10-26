@@ -342,3 +342,25 @@ describe("datos de la operación: ida y vuelta entre el juego y el bot", () => {
     assert.equal((await e.repo.piezasDelDia("2026-10-29")).length, 1);
   });
 });
+
+describe("editar y adjuntar: casos de borde", () => {
+  const llm = { async conversar() { return ""; } };
+
+  test("editar una pieza que solo está en los documentos la carga primero con la IA y después aplica el cambio", async () => {
+    const editor = { async editarPieza({ nueva, instruccion }) { assert.ok(nueva); assert.match(instruccion, /SIN cambiar su contenido/); return { ok: true, pieza: crearPieza({ fecha: "2026-10-29", formato: "reel" }), hora: "19:00", queCambio: "", errores: [] }; } };
+    const e = crearEscenario({ fecha: "2026-10-26", hora: "08:00", editor, llm });
+    const r = await aplicarAccion(e, { accion: "editar_pieza", fecha: "2026-10-29", formato: "reel", base: "Texto del documento", cambios: { epigrafe: "Uno.\n\nDos. Anotate en la lista: link en la bio." } });
+    assert.equal(r.estado, "propuesta");
+    assert.equal((await e.repo.obtenerPieza(r.id)).pieza.epigrafe, "Uno.\n\nDos. Anotate en la lista: link en la bio.");
+    await assert.rejects(aplicarAccion(e, { accion: "editar_pieza", id: 999, cambios: { epigrafe: "x" } }), (error) => error.estado === 409);
+  });
+
+  test("una historia acepta una foto o un video, y uno solo", async () => {
+    const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00", llm });
+    const fila = await e.cargarPieza();
+    await aplicarAccion(e, { accion: "editar_pieza", id: fila.id, cambios: { formato: "story" } });
+    assert.equal((await e.servicio.adjuntarDesdeJuego(fila.id, { mime: "image/jpeg", datos: Buffer.from("a") })).ok, true);
+    assert.equal((await e.servicio.adjuntarDesdeJuego(fila.id, { mime: "video/mp4", datos: Buffer.from("b") })).ok, true);
+    assert.equal((await e.repo.mediosDePieza(fila.id)).length, 1);
+  });
+});
