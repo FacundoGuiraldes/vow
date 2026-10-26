@@ -1,8 +1,34 @@
 {
-  "campos": {},
+  "campos": {
+    "deposito.medias": "Pedido de medias VOW (Mar Textil): 11 docenas, 132 pares. Negro, 5 docenas (60 pares): 30 pares Grande (37-40) y 30 pares Súper (41-44). Hueso, 3 docenas (36 pares): 18 pares Grande (37-40) y 18 pares Súper (41-44). Beige, 3 docenas (36 pares): 18 pares Grande (37-40) y 18 pares Súper (41-44). Total",
+    "estrategia.foco": "Esta semana el enfoque es de darle suspenso al Drop 00 que se vendra. Necesitamos dar indicios, ademas del video que subiremos el jueves",
+    "deposito.shakers": "10 blancos y 10 negros"
+  },
   "agenda": {
     "propias": {},
     "ocultas": []
   },
-  "historial": []
+  "estrategia": {
+    "semana": "",
+    "editadas": {},
+    "quitadas": [],
+    "propias": {}
+  },
+  "historial": [
+    {
+      "en": "2026-10-26T21:27:50.139Z",
+      "texto": "Foco de la estrategia: Esta semana el enfoque es de darle suspenso al Drop 00 que se vendra. Necesitamos dar indicios, ademas del video que subiremos el jueves",
+      "origen": "juego"
+    },
+    {
+      "en": "2026-10-26T21:44:48.493Z",
+      "texto": "Medias (entrega y estado): Pedido de medias VOW (Mar Textil): 11 docenas, 132 pares. Negro, 5 docenas (60 pares): 30 pares Grande (37-40) y 30 pares Súper (41-44). Hueso, 3 docenas (36 pares): 18 pare",
+      "origen": "juego"
+    },
+    {
+      "en": "2026-10-26T21:45:08.850Z",
+      "texto": "Shakers (entrega y estado): 10 blancos y 10 negros",
+      "origen": "juego"
+    }
+  ]
 }

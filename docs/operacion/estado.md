@@ -6,13 +6,12 @@ Copia automática de lo que se cambió en VOW HQ y en el chat del bot. La fuente
 
 | Dato | Valor |
 | --- | --- |
-| Gorras (entrega y estado) | _igual que los documentos_ |
-| Medias (entrega y estado) | _igual que los documentos_ |
-| Shakers (entrega y estado) | _igual que los documentos_ |
-| Venta (cuándo y cómo) | _igual que los documentos_ |
-| Productos del Drop | _igual que los documentos_ |
-| Foco de la estrategia | _igual que los documentos_ |
+| Foco de la semana | Esta semana el enfoque es de darle suspenso al Drop 00 que se vendra. Necesitamos dar indicios, ademas del video que subiremos el jueves |
 | Notas de estrategia | _igual que los documentos_ |
+
+## Estrategia de la semana (cambios sobre la investigación)
+
+_Igual que la investigación._
 
 ## Agenda agregada
 
@@ -24,4 +23,6 @@ _Ninguno._
 
 ## Últimos cambios
 
-_Sin cambios._
+- 2026-10-26 21:45 UTC · juego · Shakers (entrega y estado): 10 blancos y 10 negros
+- 2026-10-26 21:44 UTC · juego · Medias (entrega y estado): Pedido de medias VOW (Mar Textil): 11 docenas, 132 pares. Negro, 5 docenas (60 pares): 30 pares Grande (37-40) y 30 pares Súper (41-44). Hueso, 3 docenas (36 pares): 18 pare
+- 2026-10-26 21:27 UTC · juego · Foco de la estrategia: Esta semana el enfoque es de darle suspenso al Drop 00 que se vendra. Necesitamos dar indicios, ademas del video que subiremos el jueves
