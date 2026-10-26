@@ -702,12 +702,14 @@ function revisarArchivos(tipo,fs){
   if(fs.some(function(f){return f.size>40*1024*1024}))return 'Cada archivo puede pesar hasta 40 MB.';
   return '';
 }
+function epiEditable(e,m){return e._id?(e._epi||''):epigrafeDe(e,m)}
 function guardarEditar(e,k){
-  var t=EDTXT[k]||{},fs=EDARCH[k]||[],fmt0=normFmt(e._fmt||e.formato),m=(MED.piezas||{})[kMed(e)]||{},epi0=epigrafeDe(e,m);
+  var t=EDTXT[k]||{},fs=EDARCH[k]||[],fmt0=normFmt(e._fmt||e.formato),m=(MED.piezas||{})[kMed(e)]||{},epi0=epiEditable(e,m);
   if(conectado!=='vivo'){aviso('Sin conexión con el bot: no se guardó.',6000);return}
   var tipo=t.tipo||fmt0,epi=t.epi!=null?t.epi:epi0,problema=revisarArchivos(tipo,fs);
   if(problema){aviso(problema,7000);return}
   var cambios={};if(tipo!==fmt0)cambios.formato=tipo;if(epi.trim()!==epi0.trim())cambios.epigrafe=epi;
+  if(e._id&&t.hora&&t.hora!==(e._hora||''))cambios.hora=t.hora;
   if(!Object.keys(cambios).length&&!fs.length){aviso('No cambiaste nada');return}
   if(!Object.keys(cambios).length&&!e._id)cambios.epigrafe=epi; /* una pieza solo de los documentos pasa al sistema al guardar */
   EDOCUPADO[k]=true;refrescar();
@@ -725,13 +727,14 @@ function guardarEditar(e,k){
   }).catch(function(er){delete EDOCUPADO[k];refrescar();aviso(er.estado===401?'La clave no es válida':('No se guardó: '+(er.message||'error')),9000);if(er.estado===401)pedirClave('La clave no es válida.')});
 }
 function formEditar(e,k,m){
-  var t=EDTXT[k]=EDTXT[k]||{tipo:normFmt(e._fmt||e.formato),epi:epigrafeDe(e,m)};
+  var t=EDTXT[k]=EDTXT[k]||{tipo:normFmt(e._fmt||e.formato),epi:epiEditable(e,m),hora:e._hora||''};
   var fo=el('form','nota');
   fo.appendChild(el('label','t','Tipo de publicación'));
   var se=el('select');TIPOS.forEach(function(x){var o=el('option',null,x[1]);o.value=x[0];if(x[0]===t.tipo)o.selected=true;se.appendChild(o)});
   se.addEventListener('change',function(){t.tipo=se.value;pintarArch()});fo.appendChild(se);
   fo.appendChild(el('label','t','Epígrafe (Enter hace un salto de línea; dejá una línea en blanco para separar párrafos)'));
   var ta=el('textarea');ta.value=t.epi;ta.maxLength=2200;ta.addEventListener('input',function(){t.epi=ta.value});fo.appendChild(ta);
+  if(e._id){fo.appendChild(el('label','t','Hora de publicación'));var hi=el('input');hi.type='time';hi.value=t.hora||'';hi.addEventListener('input',function(){t.hora=hi.value});fo.appendChild(hi)}
   fo.appendChild(el('label','t','Archivo que se publica'));
   var info=el('p','arch'),inp=el('input');inp.type='file';inp.style.display='none';
   function pintarArch(){
@@ -1044,7 +1047,7 @@ function api(ruta,op){
   });
 }
 var ESTADO_MAP={propuesta:'por aprobar',aprobada:'programado',confirmada:'programado',preparando:'programado',preparada:'programado',publicando:'programado',publicada:'publicado',fallida:'fallida'};
-var ESTADO_TXT={propuesta:'propuesta, esperando tu aprobación',aprobada:'aprobada; falta tu confirmación final por Telegram el día',confirmada:'confirmada, se publica solo',preparando:'preparando la publicación',preparada:'lista para publicar',publicando:'publicando',publicada:'publicada',fallida:'falló al publicar'};
+var ESTADO_TXT={propuesta:'propuesta, esperando tu aprobación',aprobada:'aprobada; falta tu confirmación final el día de la publicación',confirmada:'confirmada, se publica solo',preparando:'preparando la publicación',preparada:'lista para publicar',publicando:'publicando',publicada:'publicada',fallida:'falló al publicar'};
 function textoPieza(p){
   var q=p.pieza||{},o=[];
   if(q.gancho)o.push('**Gancho:** '+q.gancho);
@@ -1053,6 +1056,13 @@ function textoPieza(p){
   if(q.epigrafe)o.push('**Epígrafe:** '+q.epigrafe);
   if(q.cta)o.push('**Acción:** '+q.cta);
   return o.join('\n\n');
+}
+/* lo que se ve de una pieza de la base: el epígrafe; una historia no lo tiene, así que se ve el texto que lleva en pantalla */
+function textoVisible(p){
+  var q=p.pieza||{};
+  if(q.epigrafe&&String(q.epigrafe).trim())return String(q.epigrafe).trim();
+  if(q.texto_en_pantalla&&q.texto_en_pantalla.length)return q.texto_en_pantalla.join('\n');
+  return q.gancho||'';
 }
 /* junta lo que dicen los documentos con lo que dice la base (la base manda en el estado) */
 function armarD(){
@@ -1064,8 +1074,8 @@ function armarD(){
       var est=ESTADO_MAP[p.estado]||p.estado,titulo=p.gancho||('Pieza del '+p.fecha),fm=(p.formato||'')==='imagen'?'carrusel':(p.formato||'pieza');
       var ex=piezas.filter(function(x){return x.fecha===p.fecha&&(x.formato===p.formato||x.formato===fm)&&!x._id})[0]||(function(){var u=piezas.filter(function(x){return x.fecha===p.fecha&&!x._id});return u.length===1?u[0]:undefined})();
       var nota=(ESTADO_TXT[p.estado]||p.estado)+(p.hora?' · '+p.hora:'')+(p.error?' · '+p.error:'');
-      if(ex){if(p.pieza&&p.pieza.epigrafe)ex.epigrafe=p.pieza.epigrafe;ex.formato=fm;ex._fmt=p.formato;ex.estado=est;ex._id=p.id;ex._est=p.estado;ex._hora=p.hora;ex.nota=nota;ex.fecha=p.fecha;if(p.permalink)ex.permalink=p.permalink}
-      else piezas.push({fecha:p.fecha,formato:fm,titulo:titulo,estado:est,nota:nota,texto:textoPieza(p),epigrafe:(p.pieza&&p.pieza.epigrafe)||'',_id:p.id,_fmt:p.formato,_est:p.estado,_hora:p.hora,permalink:p.permalink||null,_vivo:true});
+      if(ex){ex.epigrafe=textoVisible(p);ex._epi=(p.pieza&&p.pieza.epigrafe)||'';ex.titulo=titulo;ex.texto=textoPieza(p);ex.formato=fm;ex._fmt=p.formato;ex.estado=est;ex._id=p.id;ex._est=p.estado;ex._hora=p.hora;ex.nota=nota;ex.fecha=p.fecha;if(p.permalink)ex.permalink=p.permalink}
+      else piezas.push({fecha:p.fecha,formato:fm,titulo:titulo,estado:est,nota:nota,texto:textoPieza(p),epigrafe:textoVisible(p),_epi:(p.pieza&&p.pieza.epigrafe)||'',_id:p.id,_fmt:p.formato,_est:p.estado,_hora:p.hora,permalink:p.permalink||null,_vivo:true});
       var k=p.fecha+'_'+fm;
       if(p.medios&&p.medios.length){MEDIOS_VIVOS[k]={imgs:p.medios.filter(function(m){return m.tipo==='imagen'}).map(function(m){return API+'/api/programacion/medios/'+m.token}),vid:(p.medios.filter(function(m){return m.tipo==='video'})[0]||{}).token?API+'/api/programacion/medios/'+p.medios.filter(function(m){return m.tipo==='video'})[0].token:undefined}}
       var tt=ex?ex.titulo:titulo;

@@ -150,7 +150,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     return responder(`✅ Aprobada. El ${fechaLegible(fila.fecha)} a las 8 te pido la confirmación final.`);
   }
 
-  // Aprobación desde la oficina (el juego): vale como el botón "Aprobar" de Telegram. La confirmación final del día sigue siendo solo por Telegram.
+  // Aprobación desde la oficina (el juego): vale como el botón "Aprobar" de Telegram. La confirmación final del día se da con confirmarDesdeJuego o con el botón de Telegram.
   async function aprobarDesdeJuego(id) {
     const fila = await repo.obtenerPieza(id);
     if (!fila) return { ok: false, motivo: "Esa pieza no existe." };
