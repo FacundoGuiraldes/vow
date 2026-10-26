@@ -7,7 +7,7 @@
 //   POST /oficina/accion lo que hace el juego: aprobar una pieza, pedir otra sugerencia, marcar pendientes, anotar en el cuaderno (clave)
 //   GET  /medios/:token  el archivo de una pieza: Meta lo descarga desde acá (el token es imposible de adivinar)
 import { createHash, timingSafeEqual } from "node:crypto";
-import { Router, json } from "express";
+import { Router, json, raw } from "express";
 import { rateLimit } from "express-rate-limit";
 import { esFechaISO, esHoraValida } from "./fechas.js";
 import { ErrorAccion, aplicarAccion, armarEstadoOficina } from "./oficina.js";
@@ -142,6 +142,21 @@ export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOfic
     }
   });
 
+  // Archivo subido desde el juego: el cuerpo es el archivo mismo (image/jpeg, video/mp4 o video/quicktime)
+  const LIMITE_ARCHIVO = "40mb";
+  router.post("/oficina/archivo", conClaveOficina, raw({ type: ["image/jpeg", "video/mp4", "video/quicktime"], limit: LIMITE_ARCHIVO }), async (req, res, siguiente) => {
+    try {
+      const id = Number(req.query.id);
+      if (!Number.isInteger(id)) return res.status(400).json({ error: "Falta el id de la pieza." });
+      const mime = String(req.headers["content-type"] ?? "").split(";")[0].trim();
+      const resultado = await servicio.adjuntarDesdeJuego(id, { mime, datos: Buffer.isBuffer(req.body) ? req.body : null, reemplazar: req.query.reemplazar === "1" });
+      if (!resultado.ok) return res.status(409).json({ error: resultado.motivo });
+      res.json(resultado);
+    } catch (error) {
+      siguiente(error);
+    }
+  });
+
   router.get("/medios/:token", async (req, res, siguiente) => {
     try {
       if (!FORMATO_TOKEN.test(req.params.token)) return res.sendStatus(404);
@@ -156,7 +171,7 @@ export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOfic
   router.use((error, req, res, siguiente) => {
     void siguiente;
     if (error.type === "entity.parse.failed") return res.status(400).json({ error: "El pedido no es un JSON válido." });
-    if (error.type === "entity.too.large") return res.status(413).json({ error: "El pedido es demasiado grande." });
+    if (error.type === "entity.too.large") return res.status(413).json({ error: "El archivo es demasiado grande (máximo 40 MB)." });
     console.error(`Error en la publicación programada: ${error.message}`);
     return res.status(500).json({ error: "Error interno." });
   });
