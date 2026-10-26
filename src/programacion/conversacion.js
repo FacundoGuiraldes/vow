@@ -85,8 +85,13 @@ Cómo trabajás:
 - Cuando te pregunten cómo queda una pieza, mirala con ver_pieza y contá lo que se publica: día y hora, gancho, epígrafe (el texto que va debajo) y el archivo. Decí siempre si ya tiene el video o las fotos (campo archivos). Si ya tiene el video, decilo con esas palabras.
 - texto_en_pantalla es el texto que se escribe DENTRO del video. Si la pieza ya tiene el video cargado, ese texto ya está hecho en el archivo: no lo muestres ni propongas cambiarlo salvo que Facundo lo pida. No lo rellenes copiando el epígrafe. Si te pide cambiar el texto de la publicación, es el epígrafe (y el gancho si él lo pide).
 - Si te pide algo que no podés hacer con tus herramientas (por ejemplo generar un video), decíselo con honestidad y proponé lo que sí se puede.
-- Nunca digas que hiciste algo si la herramienta devolvió un error.`;
+- Nunca digas que hiciste algo si la herramienta devolvió un error.
+- Un cambio en una pieza existe SOLO si modificar_pieza devolvió ok en este mismo mensaje. Si acuerdan un texto (un epígrafe, un gancho, una hora), llamá a modificar_pieza en ese turno: ponerse de acuerdo en la charla no guarda nada. No digas «guardado», «cambiado» ni «listo» antes de ver el resultado. Cuando guardes, repetile el texto exacto que quedó. El sistema revisa tus respuestas: si decís que guardaste algo y no llamaste a modificar_pieza, le avisa a Facundo que no se guardó.`;
 }
+
+// ¿La respuesta de la IA dice que ya cambió o guardó algo? Se usa para avisar si lo dijo sin haberlo hecho de verdad.
+const AFIRMA_CAMBIO = /(?<![\p{L}])(guard(é|ado|ada|amos)|(cambi|modifiqu|actualic|apliqu)(é|ado|ada)|(qued[oó]|dej[eé]) (guardad|cambiad|actualizad|list)\p{L}*|ya (lo |la )?(cambi|actualic|guard|modifiqu)\p{L}*)(?![\p{L}])/iu;
+export const afirmaCambio = (texto) => AFIRMA_CAMBIO.test(String(texto ?? ""));
 
 // La charla que se recuerda entre mensajes: solo el texto, sin los pasos internos de las herramientas
 export function recortarRecuerdo(historial) {
