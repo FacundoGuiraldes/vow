@@ -5,6 +5,7 @@ import { HERRAMIENTA_PLAN, MODELO_ESTRATEGA, construirSistema, extraerGanchosCon
 
 const MAX_TOKENS_EDICION = 4096;
 const INTENTOS_MAXIMOS = 2;
+const INTENTOS_CORRECCION = 3; // veces que la IA puede corregir una pieza que no pasó las reglas de la marca
 const ITEM = HERRAMIENTA_PLAN.input_schema.properties.piezas.items;
 
 export const HERRAMIENTA_EDICION = {
@@ -54,35 +55,46 @@ ${nueva
         },
       ];
       const uso = { entrada: 0, salida: 0 };
-      let bloque = null;
-
-      for (let intento = 1; intento <= INTENTOS_MAXIMOS && !bloque; intento++) {
-        const respuesta = await cliente.messages.create({
-          model: modelo,
-          max_tokens: MAX_TOKENS_EDICION,
-          system,
-          messages: mensajes,
-          tools: [HERRAMIENTA_EDICION],
-          tool_choice: { type: "auto" },
-        });
-        uso.entrada += respuesta.usage?.input_tokens ?? 0;
-        uso.salida += respuesta.usage?.output_tokens ?? 0;
-        bloque = respuesta.stop_reason === "max_tokens" ? null : (respuesta.content?.find((b) => b.type === "tool_use" && b.name === HERRAMIENTA_EDICION.name) ?? null);
-        if (!bloque) {
-          mensajes.push({ role: "assistant", content: respuesta.content ?? [] });
-          mensajes.push({ role: "user", content: "Tenés que responder llamando a la herramienta actualizar_pieza." });
-        }
-      }
-      if (!bloque) return { ok: false, errores: ["La IA no devolvió la pieza en el formato esperado. Probá de nuevo."], uso };
-
-      const { que_cambio: queCambio = "", ...pieza } = bloque.input;
       const { conocidos } = extraerGanchosConocidos(cerebro);
       // Se permite lo que la pieza ya tenía: editar un texto no vuelve a discutir si había producto o gente
       const recursos = { producto: fila.pieza.pilar === "producto en uso", gente: fila.pieza.pilar === "gente que entrena" };
-      const { errores } = validarPlan({ resumen: "edición", piezas: [pieza] }, { piezas: 1, recursos, ganchosConocidos: conocidos });
-      if (typeof pieza.fecha === "string" && pieza.fecha < hoy) errores.push(`La fecha ${pieza.fecha} ya pasó.`);
-      if (errores.length) return { ok: false, errores, uso };
-      return { ok: true, pieza, hora: pieza.hora ?? fila.hora, queCambio, errores: [], uso };
+      let ultimosErrores = [];
+
+      // Si la pieza no pasa las reglas de la marca, se le devuelven los errores a la IA para que los corrija (hasta INTENTOS_CORRECCION veces)
+      for (let ronda = 1; ronda <= INTENTOS_CORRECCION; ronda++) {
+        let bloque = null;
+        let respuesta = null;
+        for (let intento = 1; intento <= INTENTOS_MAXIMOS && !bloque; intento++) {
+          respuesta = await cliente.messages.create({
+            model: modelo,
+            max_tokens: MAX_TOKENS_EDICION,
+            system,
+            messages: mensajes,
+            tools: [HERRAMIENTA_EDICION],
+            tool_choice: { type: "auto" },
+          });
+          uso.entrada += respuesta.usage?.input_tokens ?? 0;
+          uso.salida += respuesta.usage?.output_tokens ?? 0;
+          bloque = respuesta.stop_reason === "max_tokens" ? null : (respuesta.content?.find((b) => b.type === "tool_use" && b.name === HERRAMIENTA_EDICION.name) ?? null);
+          if (!bloque) {
+            mensajes.push({ role: "assistant", content: respuesta.content ?? [] });
+            mensajes.push({ role: "user", content: "Tenés que responder llamando a la herramienta actualizar_pieza." });
+          }
+        }
+        if (!bloque) return { ok: false, errores: ["La IA no devolvió la pieza en el formato esperado. Probá de nuevo."], uso };
+
+        const { que_cambio: queCambio = "", ...pieza } = bloque.input;
+        const { errores } = validarPlan({ resumen: "edición", piezas: [pieza] }, { piezas: 1, recursos, ganchosConocidos: conocidos });
+        if (typeof pieza.fecha === "string" && pieza.fecha < hoy) errores.push(`La fecha ${pieza.fecha} ya pasó.`);
+        if (!errores.length) return { ok: true, pieza, hora: pieza.hora ?? fila.hora, queCambio, errores: [], uso };
+        ultimosErrores = errores;
+        mensajes.push({ role: "assistant", content: respuesta.content });
+        mensajes.push({
+          role: "user",
+          content: [{ type: "tool_result", tool_use_id: bloque.id, is_error: true, content: `La pieza no pasó las reglas de la marca:\n${errores.map((e) => `- ${e}`).join("\n")}\nCorregí SOLO esos puntos y volvé a llamar a actualizar_pieza con la pieza completa.` }],
+        });
+      }
+      return { ok: false, errores: ultimosErrores, uso };
     },
   };
 }
