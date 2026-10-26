@@ -1065,3 +1065,103 @@ describe("chat con la IA", () => {
     assert.match(e.telegram.ultimo().texto, /Anotado/);
   });
 });
+
+describe("el mismo bot en Telegram y en el juego", () => {
+  const editorNuevo = (calls = []) => ({
+    editarPieza: async (pedido) => {
+      calls.push(pedido);
+      return { ok: true, pieza: crearPieza({ fecha: pedido.fila.fecha, hora: pedido.fila.hora, formato: pedido.fila.pieza.formato, gancho: "Gancho de la pieza nueva" }), hora: pedido.fila.hora, queCambio: "Armé la pieza." };
+    },
+  });
+  async function escenario(guion, { editor = editorNuevo() } = {}) {
+    const llm = llmFalso(guion);
+    const e = crearEscenario({ fecha: "2026-10-28", hora: "10:00", llm, editor });
+    await e.cargarPieza();
+    return { e, llm };
+  }
+
+  test("lo que se charla en Telegram lo ve el juego y lo que se escribe en el juego lo ve Telegram (misma memoria)", async () => {
+    const { e, llm } = await escenario(async ({ historial }) => `Veo ${historial.length}`);
+    await e.mandar(e.actualizacion.texto("hola desde telegram"));
+    const r = await e.servicio.conversarDesdeJuego("hola desde el juego");
+    assert.equal(r.ok, true);
+    assert.deepEqual(llm.llamadas[1].historial.map((m) => m.texto), ["hola desde telegram", "Veo 1", "[Mensaje escrito en el juego VOW HQ] hola desde el juego"]);
+    await e.mandar(e.actualizacion.texto("y ahora otra vez en telegram"));
+    assert.equal(llm.llamadas[2].historial.length, 5);
+    const charla = await e.servicio.charla();
+    assert.deepEqual(charla.map((m) => m.canal), ["telegram", "telegram", "juego", "asistente" === "x" ? "" : "juego", "telegram", "telegram"]);
+    assert.equal(charla[2].texto, "hola desde el juego", "el juego muestra lo que Facundo escribió, sin la marca interna");
+  });
+
+  test("dos mensajes casi juntos se procesan de a uno", async () => {
+    let enCurso = 0;
+    let maximo = 0;
+    const { e } = await escenario(async () => {
+      enCurso++;
+      maximo = Math.max(maximo, enCurso);
+      await new Promise((r) => setTimeout(r, 15));
+      enCurso--;
+      return "ok";
+    });
+    await Promise.all([e.servicio.conversarDesdeJuego("uno"), e.mandar(e.actualizacion.texto("dos")), e.servicio.conversarDesdeJuego("tres")]);
+    assert.equal(maximo, 1);
+    assert.equal((await e.servicio.charla(30)).length, 6);
+  });
+
+  test("un error de la IA en el juego se devuelve para mostrarlo y no se anota como novedad ni se guarda en la memoria", async () => {
+    const { e } = await escenario(async () => { throw new Error("La IA está saturada."); });
+    const r = await e.servicio.conversarDesdeJuego("hacé algo");
+    assert.deepEqual([r.ok, r.error], [false, "La IA está saturada."]);
+    assert.deepEqual(await e.repo.novedadesPendientes(), []);
+    assert.deepEqual(await e.servicio.charla(), []);
+  });
+
+  test("programar_pieza arma una pieza nueva para un día libre, la deja propuesta y se la manda a Telegram con sus botones", async () => {
+    const calls = [];
+    const { e } = await escenario(async ({ ejecutar }) => {
+      const r = await ejecutar("programar_pieza", { fecha: "2026-11-02", formato: "reel", indicacion: "algo sobre constancia" });
+      return r.ok ? "Listo, quedó programada." : `Falló ${r.error}`;
+    }, { editor: editorNuevo(calls) });
+    const r = await e.servicio.conversarDesdeJuego("programame un reel para el lunes 2/11");
+    assert.equal(r.respuesta, "Listo, quedó programada.");
+    assert.match(calls[0].instruccion, /2026-11-02/);
+    assert.match(calls[0].instruccion, /algo sobre constancia/);
+    assert.equal(calls[0].nueva, true);
+    const nuevas = await e.repo.piezasDelDia("2026-11-02");
+    assert.equal(nuevas.length, 1);
+    assert.equal(nuevas[0].estado, "propuesta");
+    assert.equal(nuevas[0].hora, "19:00");
+    assert.equal(nuevas[0].pieza.fecha, "2026-11-02");
+    assert.ok(e.telegram.buscar("Pieza nueva para el"));
+    assert.ok(e.telegram.ultimo().botones[0].some((b) => b.dato.startsWith("aprobar:")));
+    assert.equal((await e.repo.piezasDelDia("2026-10-30")).length, 1, "las otras piezas no se tocan");
+  });
+
+  test("programar_pieza rechaza un día que ya tiene pieza, una fecha pasada y una lejana", async () => {
+    const resultados = [];
+    const { e } = await escenario(async ({ ejecutar }) => {
+      resultados.push(await ejecutar("programar_pieza", { fecha: "2026-10-30", indicacion: "x" }));
+      resultados.push(await ejecutar("programar_pieza", { fecha: "2026-10-20", indicacion: "x" }));
+      resultados.push(await ejecutar("programar_pieza", { fecha: "2027-03-01", indicacion: "x" }));
+      resultados.push(await ejecutar("programar_pieza", { fecha: "mañana", indicacion: "x" }));
+      return "no";
+    });
+    await e.servicio.conversarDesdeJuego("probá");
+    assert.match(resultados[0].error, /ya tiene la pieza/);
+    assert.match(resultados[1].error, /ya pasó/);
+    assert.match(resultados[2].error, /60 días/);
+    assert.match(resultados[3].error, /AAAA-MM-DD/);
+    assert.equal((await e.repo.piezasDelDia("2026-10-20")).length, 0);
+  });
+
+  test("si la pieza armada rompe las reglas de la marca no se guarda y el motivo llega a Facundo", async () => {
+    const editor = { editarPieza: async () => ({ ok: false, errores: ["urgencia falsa"] }) };
+    const { e } = await escenario(async ({ ejecutar }) => {
+      await ejecutar("programar_pieza", { fecha: "2026-11-02", indicacion: "x" });
+      return "Listo, ya la programé.";
+    }, { editor });
+    const r = await e.servicio.conversarDesdeJuego("programá");
+    assert.match(r.respuesta, /No quedó guardado/);
+    assert.equal((await e.repo.piezasDelDia("2026-11-02")).length, 0);
+  });
+});

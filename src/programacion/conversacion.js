@@ -4,7 +4,7 @@
 import { fechaLegible, nombreDelDia, sumarDias } from "./fechas.js";
 
 export const MENSAJES_MAXIMOS_POR_DIA = 80; // freno de uso: el plan gratis tiene cupo diario
-export const TURNOS_DE_MEMORIA = 10; // cuántos mensajes de la charla se recuerdan
+export const TURNOS_DE_MEMORIA = 30; // cuántos mensajes de la charla se recuerdan (la misma charla para Telegram y para el juego)
 export const LARGO_MAXIMO_RECUERDO = 1500;
 
 // Campos de una pieza que el chat puede cambiar (el resto de la pieza queda igual)
@@ -43,6 +43,49 @@ export const HERRAMIENTAS_CHAT = [
       required: ["id", "cambios", "que_cambio"],
     },
   },
+  {
+    name: "programar_pieza",
+    description:
+      "Arma con la IA de estrategia una pieza NUEVA para un día en el que todavía no hay ninguna, y la deja 'propuesta' para que Facundo la apruebe. Usala cuando pide publicar algo un día que no tiene pieza. Tarda unos segundos. Si el día ya tiene una pieza, usá modificar_pieza.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        fecha: { type: "STRING", description: "AAAA-MM-DD, de hoy en adelante (hasta 60 días)." },
+        formato: { type: "STRING", description: "reel, carrusel, imagen o story. Si no lo dice, reel." },
+        hora: { type: "STRING", description: "HH:MM entre 09:00 y 23:00. Si no la dice, 19:00." },
+        indicacion: { type: "STRING", description: "Lo que Facundo pidió: tema, tono, texto que quiere, lo que haya dicho." },
+      },
+      required: ["fecha", "indicacion"],
+    },
+  },
+  { name: "ver_operacion", description: "Muestra los datos de depósito, recepción, estrategia y agenda que se cambiaron desde el juego o el chat (y cuáles se pueden editar).", parameters: { type: "OBJECT", properties: {} } },
+  {
+    name: "editar_dato",
+    description: "Cambia un dato de la operación (entrega o estado de gorras, medias o shakers, venta, productos del Drop, foco o notas de estrategia). El juego lo ve al instante. Mandá valor vacío para volver a lo que dicen los documentos.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        campo: { type: "STRING", description: "deposito.gorras, deposito.medias, deposito.shakers, deposito.venta, recepcion.productos, estrategia.foco o estrategia.notas." },
+        valor: { type: "STRING", description: "El texto nuevo, corto y claro." },
+      },
+      required: ["campo", "valor"],
+    },
+  },
+  {
+    name: "agregar_agenda",
+    description: "Agrega un evento a la agenda de la oficina (llegada de mercadería, una reunión, una fecha límite). No es una publicación: para publicar usá programar_pieza.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        fecha: { type: "STRING", description: "AAAA-MM-DD." },
+        hora: { type: "STRING", description: "HH:MM, opcional." },
+        sala: { type: "STRING", description: "estrategia, bot, diseno, deposito o recepcion." },
+        texto: { type: "STRING", description: "Qué pasa ese día." },
+      },
+      required: ["fecha", "texto"],
+    },
+  },
+  { name: "quitar_agenda", description: "Quita un evento de la agenda que se agregó antes (usá el id que devuelve ver_operacion).", parameters: { type: "OBJECT", properties: { id: { type: "STRING" } }, required: ["id"] } },
   { name: "aprobar_pieza", description: "Aprueba una pieza propuesta para la semana. No la publica ni la confirma.", parameters: { type: "OBJECT", properties: { id }, required: ["id"] } },
   {
     name: "pedir_confirmacion",
@@ -66,7 +109,7 @@ export function calendario(hoy, dias = 15) {
 }
 
 export function construirSistemaChat({ fecha, hora, permitirPublicar }) {
-  return `Sos el asistente de Facundo para planificar y publicar el Instagram de VOW (@vow_ar), una marca argentina de ropa y accesorios técnicos para entrenar que todavía no lanzó su primer producto (Drop 01, 2027). Hablás con él por Telegram, como en un chat.
+  return `Sos el asistente de Facundo para planificar y publicar el Instagram de VOW (@vow_ar), una marca argentina de ropa y accesorios técnicos para entrenar que todavía no lanzó su primer producto (Drop 01, 2027). Hablás con él por Telegram y también por el juego VOW HQ (la oficina en la web): es la MISMA charla, con la misma memoria. Los mensajes que vienen del juego empiezan con «[Mensaje escrito en el juego VOW HQ]». Lo que acordaron en un lado vale en el otro.
 
 Cómo hablás: en español rioplatense (voseo), claro, cálido y breve. Texto plano: sin Markdown, sin asteriscos ni títulos. Respuestas cortas, de pocas líneas. Si algo es ambiguo, preguntá antes de cambiar.
 
@@ -77,6 +120,9 @@ Cómo trabajás:
 - Para saber qué hay, usá ver_semana y ver_pieza. Nunca inventes IDs, fechas ni estados: miralos con las herramientas.
 - Para cambiar una pieza usá modificar_pieza con solo lo que cambia. Las fechas, calculalas con el calendario de arriba. Si el sistema rechaza el cambio por las reglas de marca, explicale a Facundo qué regla fue y proponé una alternativa que la cumpla.
 - Para aprobar una pieza de la semana, aprobar_pieza.
+- Si pide publicar algo un día que no tiene pieza (mirá ver_semana), usá programar_pieza con la fecha exacta, el formato y lo que pidió. Si el día ya tiene una pieza, no armes otra: ofrecé modificarla.
+- Los datos de depósito (gorras, medias, shakers, venta), recepción, el foco de estrategia y la agenda se cambian con editar_dato, agregar_agenda y quitar_agenda; el juego los muestra al instante. Antes de decir qué hay cargado, mirá con ver_operacion.
+- Si pide varias cosas en un mismo mensaje, hacelas todas con las herramientas y contá al final qué quedó hecho y qué no. Si te falta un dato para hacerlo bien (qué día, qué texto), preguntá una sola cosa clara.
 - NUNCA confirmás ni cancelás una publicación por tu cuenta: para confirmar usá pedir_confirmacion y para cancelar pedir_cancelacion. Eso le manda un botón a Facundo y la decisión es suya. Decile claro que te falta que toque el botón.
 - La publicación es automática: se hace sola a la hora indicada, y solo si Facundo confirmó esa pieza ese mismo día. Si no confirma, no se publica nada. No prometas nada distinto.
 - ${permitirPublicar ? "Hoy el sistema publica de verdad." : "Hoy el sistema está en modo simulación: no se publica de verdad en Instagram."}
@@ -90,10 +136,20 @@ Cómo trabajás:
 }
 
 // ¿La respuesta de la IA dice que ya cambió o guardó algo? Se usa para avisar si lo dijo sin haberlo hecho de verdad.
-const AFIRMA_CAMBIO = /(?<![\p{L}])(guard(é|ado|ada|amos)|(cambi|modifiqu|actualic|apliqu)(é|ado|ada)|(qued[oó]|dej[eé]) (guardad|cambiad|actualizad|list)\p{L}*|ya (lo |la )?(cambi|actualic|guard|modifiqu)\p{L}*)(?![\p{L}])/iu;
+const AFIRMA_CAMBIO = /(?<![\p{L}])(guard(é|ado|ada|amos)|(cambi|modifiqu|actualic|apliqu|program|arm)(é|ado|ada)|(qued[oó]|dej[eé]) (guardad|cambiad|actualizad|programad|list)\p{L}*|ya (lo |la )?(cambi|actualic|guard|modifiqu|program|arm)\p{L}*)(?![\p{L}])/iu;
 export const afirmaCambio = (texto) => AFIRMA_CAMBIO.test(String(texto ?? ""));
 
 // La charla que se recuerda entre mensajes: solo el texto, sin los pasos internos de las herramientas
 export function recortarRecuerdo(historial) {
-  return historial.slice(-TURNOS_DE_MEMORIA).map((m) => ({ rol: m.rol, texto: String(m.texto).slice(0, LARGO_MAXIMO_RECUERDO) }));
+  return historial.slice(-TURNOS_DE_MEMORIA).map((m) => ({
+    rol: m.rol,
+    texto: String(m.texto).slice(0, LARGO_MAXIMO_RECUERDO),
+    ...(m.visible ? { visible: String(m.visible).slice(0, LARGO_MAXIMO_RECUERDO) } : {}),
+    ...(m.canal ? { canal: m.canal } : {}),
+    ...(m.en ? { en: m.en } : {}),
+  }));
 }
+
+// Lo que ve el modelo de la charla guardada: solo rol y texto; lo que se escribió en el juego lleva la marca para que sepa de dónde vino
+export const paraElModelo = (historial) =>
+  historial.map((m) => ({ rol: m.rol, texto: m.rol === "usuario" && m.canal === "juego" ? `[Mensaje escrito en el juego VOW HQ] ${m.texto}` : m.texto }));

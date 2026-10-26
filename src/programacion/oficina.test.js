@@ -62,7 +62,8 @@ describe("la oficina", () => {
     assert.equal(estado.piezas[0].medios[0].tipo, "video");
     assert.match(estado.piezas[0].medios[0].token, /^[a-f0-9]{48}$/);
     assert.equal(estado.piezas[0].pieza.gancho, fila.pieza.gancho);
-    assert.equal(estado.chat.length, 12);
+    assert.equal(estado.chat.length, 20);
+    assert.equal(estado.chat[0].canal, "telegram");
     assert.equal(estado.rendimiento.totales.alcance, 5);
     const roto = await armarEstadoOficina({ repo: e.repo, rendimiento: { obtener: async () => { throw new Error("token vencido"); } } });
     assert.equal(roto.rendimiento.error, "token vencido");
@@ -157,5 +158,86 @@ describe("cambiar una pieza desde la oficina", () => {
     assert.equal(a.version, b.version);
     await e.repo.agregarNovedad("algo nuevo");
     assert.notEqual((await armarEstadoOficina({ repo: e.repo })).version, a.version);
+  });
+
+  test("el chat del juego usa el mismo bot: lo escrito queda en la charla compartida y los errores se muestran", async () => {
+    const llm = { async conversar({ historial }) { return `Veo ${historial.length}`; } };
+    const e = crearEscenario({ llm });
+    const r = await aplicarAccion(e, { accion: "chat", texto: "  hola bot  " });
+    assert.deepEqual([r.ok, r.respuesta], [true, "Veo 1"]);
+    const estado = await armarEstadoOficina({ repo: e.repo });
+    assert.deepEqual(estado.chat.map((m) => [m.rol, m.texto, m.canal]), [["usuario", "hola bot", "juego"], ["asistente", "Veo 1", "juego"]]);
+    await assert.rejects(aplicarAccion(e, { accion: "chat", texto: "   " }), (error) => error instanceof ErrorAccion && error.estado === 400);
+    const roto = crearEscenario({ llm: { async conversar() { throw new Error("saturada"); } } });
+    await assert.rejects(aplicarAccion(roto, { accion: "chat", texto: "hola" }), (error) => error instanceof ErrorAccion && error.estado === 502 && /saturada/.test(error.message));
+    const sinIA = crearEscenario();
+    await assert.rejects(aplicarAccion(sinIA, { accion: "chat", texto: "hola" }), (error) => error instanceof ErrorAccion && /no está configurado/.test(error.message));
+  });
+
+  test("confirmar desde el juego es la confirmación final real: mismas reglas que el botón y avisa por Telegram", async () => {
+    const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00" });
+    const fila = await e.cargarPieza();
+    await aplicarAccion(e, { accion: "aprobar_pieza", id: fila.id });
+    await assert.rejects(aplicarAccion(e, { accion: "confirmar_pieza", id: fila.id }), (error) => error instanceof ErrorAccion && error.estado === 409 && /video/i.test(error.message), "sin archivo no se confirma");
+    assert.notEqual((await e.repo.obtenerPieza(fila.id)).estado, "confirmada");
+    await e.repo.agregarMedio({ piezaId: fila.id, tipo: "video", mime: "video/mp4", datos: Buffer.from("x") });
+    const r = await aplicarAccion(e, { accion: "confirmar_pieza", id: fila.id });
+    assert.equal(r.estado, "confirmada");
+    const tras = await e.repo.obtenerPieza(fila.id);
+    assert.equal(tras.estado, "confirmada");
+    assert.equal(tras.confirmada_el, "2026-10-30");
+    assert.ok(e.telegram.buscar("Confirmaste desde la oficina"));
+  });
+
+  test("confirmar una pieza de otro día se rechaza", async () => {
+    const e = crearEscenario({ fecha: "2026-10-28", hora: "08:00" });
+    const fila = await e.cargarPieza();
+    await assert.rejects(aplicarAccion(e, { accion: "confirmar_pieza", id: fila.id }), (error) => error.estado === 409 && /mismo día/.test(error.message));
+  });
+});
+
+describe("datos de la operación: ida y vuelta entre el juego y el bot", () => {
+  test("lo que se edita en el juego queda en la base, llega al estado y al Estratega como novedad", async () => {
+    const e = crearEscenario();
+    await aplicarAccion(e, { accion: "operacion", cambio: { tipo: "campo", campo: "deposito.gorras", valor: "Llegan el 5/11, 100 unidades" } });
+    await aplicarAccion(e, { accion: "operacion", cambio: { tipo: "agenda_agregar", fecha: "2026-11-05", hora: "10:00", sala: "deposito", texto: "Retirar las gorras" } });
+    const estado = await armarEstadoOficina({ repo: e.repo });
+    assert.equal(estado.operacion.campos["deposito.gorras"], "Llegan el 5/11, 100 unidades");
+    const [id, ev] = Object.entries(estado.operacion.agenda.propias)[0];
+    assert.deepEqual([ev.f, ev.h, ev.sala, ev.t], ["2026-11-05", "10:00", "deposito", "Retirar las gorras"]);
+    assert.ok((await e.repo.novedadesPendientes()).some((n) => /Dato actualizado desde la oficina: Gorras/.test(n.texto)));
+    await aplicarAccion(e, { accion: "operacion", cambio: { tipo: "agenda_quitar", clave: id } });
+    await aplicarAccion(e, { accion: "operacion", cambio: { tipo: "agenda_quitar", clave: "2026-11-02|Llegan las medias" } });
+    await aplicarAccion(e, { accion: "operacion", cambio: { tipo: "campo", campo: "deposito.gorras", valor: "" } });
+    const tras = await armarEstadoOficina({ repo: e.repo });
+    assert.deepEqual([tras.operacion.campos, tras.operacion.agenda.propias, tras.operacion.agenda.ocultas], [{}, {}, ["2026-11-02|Llegan las medias"]]);
+    assert.equal(tras.operacion.historial.length, 5);
+  });
+
+  test("rechaza datos que no se pueden editar, fechas inválidas y textos vacíos", async () => {
+    const e = crearEscenario();
+    for (const cambio of [{ tipo: "campo", campo: "marca.nombre", valor: "x" }, { tipo: "agenda_agregar", fecha: "mañana", texto: "x" }, { tipo: "agenda_agregar", fecha: "2026-11-05", texto: " " }, { tipo: "otra" }]) {
+      await assert.rejects(aplicarAccion(e, { accion: "operacion", cambio }), (error) => error instanceof ErrorAccion && error.estado === 400);
+    }
+  });
+
+  test("el bot ve lo que cambió el juego y lo que cambia el bot aparece en el juego", async () => {
+    const llm = {
+      async conversar({ ejecutar }) {
+        const antes = await ejecutar("ver_operacion", {});
+        await ejecutar("editar_dato", { campo: "deposito.medias", valor: "Llegaron, faltan etiquetas" });
+        await ejecutar("agregar_agenda", { fecha: "2026-11-06", texto: "Reunión con el proveedor", sala: "deposito" });
+        return `Antes: ${antes.campos["deposito.gorras"]}. Listo, quedó guardado.`;
+      },
+    };
+    const e = crearEscenario({ llm });
+    await aplicarAccion(e, { accion: "operacion", cambio: { tipo: "campo", campo: "deposito.gorras", valor: "Llegan el 5/11" } });
+    const r = await aplicarAccion(e, { accion: "chat", texto: "actualizá medias y agendá la reunión" });
+    assert.match(r.respuesta, /Antes: Llegan el 5\/11/);
+    assert.doesNotMatch(r.respuesta, /⚠️/);
+    const estado = await armarEstadoOficina({ repo: e.repo });
+    assert.equal(estado.operacion.campos["deposito.medias"], "Llegaron, faltan etiquetas");
+    assert.equal(Object.values(estado.operacion.agenda.propias)[0].t, "Reunión con el proveedor");
+    assert.equal(estado.operacion.historial.at(-1).origen, "bot");
   });
 });

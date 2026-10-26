@@ -3,6 +3,7 @@
 //   aplicarAccion      → lo que el juego puede hacer: aprobar una pieza, marcar pendientes como cumplidos, anotar en el cuaderno
 // Lo que se marca en el juego queda también como novedad: el Estratega lo lee en el próximo plan.
 // NO se puede confirmar la publicación del día desde acá: esa confirmación sigue siendo solo por Telegram.
+import { ErrorOperacion, aplicarOperacion, leerOperacion } from "./operacion.js";
 import { createHash } from "node:crypto";
 const DIA_MS = 86_400_000;
 const LIMITE_ENTRADAS = 200;
@@ -31,13 +32,14 @@ async function guardarJuego(repo, juego) {
 }
 
 export async function armarEstadoOficina({ repo, rendimiento = null, permitirPublicar = false, ahora = Date.now() }) {
-  const [piezas, novedades, recordatorios, pausa, chat, juego] = await Promise.all([
+  const [piezas, novedades, recordatorios, pausa, chat, juego, operacion] = await Promise.all([
     repo.piezasEntre(fechaISO(ahora - 21 * DIA_MS), fechaISO(ahora + 45 * DIA_MS)),
     repo.novedadesRecientes(20),
     repo.recordatoriosPendientes(fechaISO(ahora + 45 * DIA_MS)),
     repo.leerEstado("pausa"),
     repo.leerEstado("chat"),
     leerJuego(repo),
+    leerOperacion(repo),
   ]);
   const filas = await Promise.all(
     piezas.map(async (p) => ({
@@ -62,8 +64,9 @@ export async function armarEstadoOficina({ repo, rendimiento = null, permitirPub
     recordatorios_pendientes: recordatorios.length,
     piezas: filas,
     novedades: novedades.map((n) => ({ id: n.id, fecha: n.fecha, texto: recortar(n.texto, 240), usada: n.usada === true })),
-    chat: (Array.isArray(chat) ? chat : []).slice(-12).map((m) => ({ rol: m.rol, texto: recortar(m.texto, 400) })),
+    chat: (Array.isArray(chat) ? chat : []).slice(-30).map((m) => ({ rol: m.rol, texto: recortar(m.visible ?? m.texto, 1500), canal: m.canal ?? "telegram", en: m.en ?? null })),
     juego,
+    operacion,
     rendimiento: rend,
   };
   // La versión cambia solo cuando cambia algo: el juego pregunta seguido y, si no cambió, el servidor contesta cortito
@@ -101,11 +104,39 @@ export async function aplicarAccion({ repo, servicio, rendimiento = null }, acci
     return { ok: true, estado: resultado.estado };
   }
 
+  if (tipo === "confirmar_pieza") {
+    if (!Number.isInteger(accion.id)) throw new ErrorAccion("Falta el id de la pieza.");
+    const resultado = await servicio.confirmarDesdeJuego(accion.id);
+    if (!resultado.ok) throw new ErrorAccion(resultado.motivo, 409);
+    return { ok: true, estado: resultado.estado, detalle: resultado.detalle };
+  }
+
   if (tipo === "cambiar_pieza") {
     if (!Number.isInteger(accion.id)) throw new ErrorAccion("Falta el id de la pieza.");
     const resultado = await servicio.sugerirCambio(accion.id, { indicacion: recortar(accion.indicacion, 300), contexto: await armarContexto({ repo, rendimiento }, accion.id) });
     if (!resultado.ok) throw new ErrorAccion(resultado.motivo, 409);
     return { ok: true, estado: resultado.estado };
+  }
+
+  // El chat del juego es el mismo bot y la misma memoria que Telegram
+  if (tipo === "chat") {
+    const texto = typeof accion.texto === "string" ? accion.texto.trim() : "";
+    if (!texto) throw new ErrorAccion("Escribí un mensaje.");
+    const resultado = await servicio.conversarDesdeJuego(texto);
+    if (resultado.limite) return { ok: true, respuesta: resultado.respuesta, limite: true };
+    if (!resultado.ok) throw new ErrorAccion(resultado.error, 502);
+    return { ok: true, respuesta: resultado.respuesta };
+  }
+
+  // Datos de depósito, recepción, estrategia y agenda: el juego los edita y el bot los ve (y los puede editar él también)
+  if (tipo === "operacion") {
+    try {
+      const { operacion, resumen } = await aplicarOperacion(repo, accion.cambio, { origen: "juego", ahora });
+      return { ok: true, operacion, resumen };
+    } catch (error) {
+      if (error instanceof ErrorOperacion) throw new ErrorAccion(error.message, 400);
+      throw error;
+    }
   }
 
   if (tipo === "cumplir" || tipo === "deshacer" || tipo === "nota" || tipo === "quitar_nota") {

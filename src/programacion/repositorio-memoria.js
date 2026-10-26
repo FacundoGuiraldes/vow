@@ -26,6 +26,14 @@ export function crearRepositorioMemoria() {
         return copiar(fila);
       });
     },
+    async crearPiezaSuelta({ semana, fecha, hora, pieza }) {
+      const fila = {
+        id: ids.pieza++, semana, fecha, hora, pieza: copiar(pieza), estado: "propuesta", confirmada_el: null,
+        contenedor: null, permalink: null, mensajes: [], error: null, intentos: 0,
+      };
+      piezas.push(fila);
+      return copiar(fila);
+    },
     async obtenerPieza(id) { return copiar(buscar(id)); },
     async piezasDelDia(fecha) {
       return copiar(piezas.filter((p) => p.fecha === fecha && p.estado !== "cancelada").sort((a, b) => a.hora.localeCompare(b.hora) || a.id - b.id));
