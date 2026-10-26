@@ -1,4 +1,4 @@
-# VOW · Cerebro de marca (borrador 3)
+# VOW · Cerebro de marca (borrador 4)
 
 Este archivo es la fuente única de cómo habla y cómo se ve VOW. Todo contenido (textos, guiones, ganchos, y más adelante el agente planificador) se escribe a partir de acá. Si algo contradice este archivo, gana este archivo.
 
@@ -46,6 +46,30 @@ Cómo se resuelve la tensión entre "verse bien" y "no presumir": lo estético e
 - Poco o ningún emoji. Sin signos de exclamación en cadena. Sin mayúsculas gritadas (salvo títulos de diseño).
 - Lunfardo con moderación: si suena forzado, no se usa.
 - Cada pieza termina con **una sola** acción: anotarse en la lista de espera.
+
+### Calidad del texto: que no suene a eslogan
+
+El problema de las sugerencias de la IA no son las reglas duras, es el tono: frases que parecen un póster de gimnasio o un anuncio de auto. Para VOW, una frase buena es simple, concreta y verdadera. Si tiene que sonar "profunda" para funcionar, no sirve.
+
+**La prueba:** ¿se lo dirías en voz alta a un amigo que entrena, sin sentir vergüenza? ¿Se entiende sola, sin contexto, en tres segundos? Si la respuesta es no, se reescribe o no se publica.
+
+**Cosas que dan cringe (no usarlas):**
+- **Teasers vacíos:** "Algo llega", "Mirá bien", "Hay un antes", "Pronto", "Se viene", "Prepárate". Anuncian que hay algo sin decir qué. La intriga sin dato parece humo.
+- **Sentencias pseudo-profundas:** frases que suenan a verdad universal pero no dicen nada ("Lo demás, en silencio", "Lo importante no se ve").
+- **"No es X, es Y"** ("No es moda, es compromiso") y las listas de tres fragmentos con ritmo de publicidad.
+- **Abstracciones apiladas:** promesa + silencio + tiempo + constancia en la misma pieza. Una idea por pieza, y la palabra "promesa" no más de una vez.
+- **Frases de manual de coaching:** "cada paso cuenta", "un paso a la vez", "tu viaje", "el camino".
+- **Dramatismo en mayúsculas y puntos aparte** para frases que no lo merecen.
+
+**Qué sí (en el orden en que conviene probar):**
+1. **Algo concreto y real que le pasa a quien entrena**, dicho con palabras de todos los días. Ejemplos del mismo estilo que ya aprobaste: "¿Hoy no tenés ganas? Entrená igual." (toma 1 del reel de la promesa), "Esto lo dibujo cada vez que cumplo." (reel del logo).
+2. **Una pregunta simple y directa** que se pueda contestar en un comentario: "¿Y vos? ¿Qué te prometés?" (reel del logo).
+3. **Un hecho verdadero de VOW**, sin inventar nada: qué es la marca, para quién es, cómo se anota alguien a la lista, que el Drop 01 sale en 2027. Contado como lo contaría una persona.
+4. **Una frase corta y afirmativa de compromiso**, como las aprobadas de la sección 8. Es el recurso más fácil de gastar: no más de una por semana.
+
+**Si no hay nada concreto y verdadero para decir, se propone menos, no se rellena.** Una story necesita una razón (mostrar algo real o invitar a anotarse con un motivo claro); una story que solo "genera expectativa" no se hace.
+
+**Epígrafe:** son dos a cuatro frases en lenguaje de todos los días, escritas por una persona y no por un eslogan, en párrafos cortos (un salto de línea en blanco entre uno y otro, como en Instagram). Dice algo que la pieza no dice o la completa; no repite el gancho. La acción final (lista de espera, link en la bio) va en su propia línea.
 
 ## 5. Palabras
 
@@ -96,7 +120,8 @@ Cómo se resuelve la tensión entre "verse bien" y "no presumir": lo estético e
 ## 8. Ganchos (primeros 3 segundos)
 
 **Cómo tiene que ser un gancho de VOW:**
-- Potente y sobrio a la vez: una afirmación que compromete, no una explicación.
+- Claro y sobrio: dice algo concreto con palabras simples. Un gancho normal y verdadero vale más que uno que suena a póster (ver "Calidad del texto").
+- Puede ser una afirmación que compromete, una observación concreta o una pregunta simple. No es obligatorio que "suene fuerte".
 - Corto: de 3 a 8 palabras, 12 como máximo.
 - En imperativo y en voseo ("Escribí", "Entrená", "Cumplila"), concreto y sin adornos.
 - Habla de lo que la persona hace o se compromete a hacer, no de lo que la marca todavía no tiene.
@@ -125,6 +150,11 @@ Cómo se resuelve la tensión entre "verse bien" y "no presumir": lo estético e
 - "Escribí tu promesa. Después cumplila." La promesa es de uno consigo mismo, no se escribe: ni en papel ni en la etiqueta.
 - "Sacá lo que sobra" (un carrusel que explica la paleta). No tiene fuerza ni compromiso, y explica la marca por dentro.
 - "Tu palabra primero. Después la barra." Nombra un elemento del gimnasio.
+
+**Sugerencias de la IA que Facundo marcó como cringe (26/10, no repetir el estilo):**
+- "Quedate. Algo llega antes." Teaser vacío: anuncia que hay algo sin decir qué.
+- "Mirá bien. Hay un antes." Misma intriga sin dato, con tono de película.
+- "Lo demás, en silencio." Pseudo-profundo: no dice nada concreto.
 
 **Qué tienen en común los aprobados:** afirman en vez de explicar, hablan de compromiso, constancia o calidad, y tienen un ritmo corto y seco. Se pueden usar tal cual, pero el Estratega tiene que crear ganchos nuevos en el mismo estilo, no repetir esta lista.
 

@@ -11,6 +11,7 @@
     "nombra elementos del gimnasio": ["La barra.", "Las barras.", "Una mancuerna.", "Las mancuernas.", "Las pesas.", "Una kettlebell.", "Las kettlebells.", "Los fierros.", "Los hierros.", "Un disco de peso.", "Los discos de peso."],
     "promesa en papel": ["Escribila a mano.", "Con lapicera.", "Con birome.", "Con lápiz.", "En una cartulina."],
     "exceso de exclamaciones": ["Cumplí!!"],
+    "teaser vacío o frase de eslogan": ["Quedate. Algo llega antes.", "Algo se viene.", "Muy pronto.", "Próximamente en VOW.", "Pronto.", "Mirá bien. Hay un antes.", "Prepárate para lo que viene.", "Ya falta poco.", "Lo demás, en silencio.", "Cada día cuenta.", "Un paso a la vez.", "Tu viaje empieza acá.", "El camino no se acorta.", "No te rindas.", "No es moda, es compromiso."],
     "\"drop\" fuera de \"Drop 01\"": ["Llega el drop.", "Los drops."]
   },
   "no_disparan": ["Una mano cierra la puerta.", "Llegó a manos de quien entrena.", "Primer plano de la mano atando los cordones.", 
@@ -23,6 +24,11 @@
     "Anotate en la lista de espera.",
     "Drop 01 en desarrollo.",
     "Tus grips, tus straps, tu promesa.",
-    "Una promesa con vos."
+    "Una promesa con vos.",
+    "¿Hoy no tenés ganas? Entrená igual.",
+    "Esto lo dibujo cada vez que cumplo.",
+    "¿Y vos? ¿Qué te prometés?",
+    "VOW es una marca argentina de ropa y accesorios para entrenar.",
+    "Anotate en la lista de espera: link en la bio."
   ]
 }
