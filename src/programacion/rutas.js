@@ -35,8 +35,9 @@ export function validarPlanEntrante(cuerpo) {
 function entregar(req, res, { mime, datos }) {
   const total = datos.length;
   // helmet pone Cross-Origin-Resource-Policy: same-origin por defecto y el navegador bloquea el <video> y las <img> del juego (otro dominio).
+  // Cada archivo tiene su propio token (uno nuevo si se reemplaza), así que el navegador puede guardarlo una hora sin volver a pedirlo en cada refresco del juego.
   // Los archivos solo se piden con su token de 48 caracteres (el mismo que usa Instagram), así que se permite verlos desde otro sitio.
-  res.set({ "Content-Type": mime, "Accept-Ranges": "bytes", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Cross-Origin-Resource-Policy": "cross-site" });
+  res.set({ "Content-Type": mime, "Accept-Ranges": "bytes", "Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff", "Cross-Origin-Resource-Policy": "cross-site" });
   const pedido = req.headers.range;
   if (!pedido) return res.status(200).set("Content-Length", String(total)).end(datos);
 
@@ -56,7 +57,7 @@ export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOfic
   const pendientes = new Set(); // procesamientos del webhook que siguen en curso (los tests los esperan)
   router.use(json({ limit: "256kb" }));
 
-  const limitador = rateLimit({ windowMs: 60_000, limit: limitePorMinuto, standardHeaders: true, legacyHeaders: false, message: { error: "Demasiados pedidos." } });
+  const limitador = rateLimit({ windowMs: 60_000, limit: limitePorMinuto, skip: (req) => req.path.startsWith("/medios/"), standardHeaders: true, legacyHeaders: false, message: { error: "Demasiados pedidos." } });
   router.use(limitador);
 
   const conClave = (req, res, siguiente) => {

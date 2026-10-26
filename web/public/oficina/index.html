@@ -649,7 +649,7 @@ function cambiandoAhora(e){
 function revisarCambios(){
   Object.keys(PEDIDOS).forEach(function(ck){
     var p=PEDIDOS[ck],c=VIVO&&VIVO.cambios&&VIVO.cambios[p.clave];
-    function fin(){delete PEDIDOS[ck];delete CAMBIANDO[ck];delete CFABRE[p.kc];delete CFTXT[p.kc]}
+    function fin(){delete PEDIDOS[ck];delete CAMBIANDO[ck];delete CFABRE[p.kc];delete CFTXT[p.kc];delete EDABRE[p.kc];delete EDTXT[p.kc];delete EDARCH[p.kc]}
     if(c&&c.estado==='listo'){fin();aviso('Nueva sugerencia lista: revisala y aprobala',5000)}
     else if(c&&c.estado==='error'){fin();aviso('No se cambió nada: '+(c.motivo||'no se pudo armar la sugerencia'),9000)}
     else if(Date.now()-p.t>6*60000){fin();aviso('No se supo cómo terminó: recargá y revisá la pieza.',8000)}
@@ -771,8 +771,8 @@ function tarjetaPieza(e){
     var kc=String(e._id||kPieza(e)),cf=null,fe=null;
     function abrirForm(foco){cf=formCambio(e);var inp=cf.querySelector('input');inp.value=CFTXT[kc]||'';inp.addEventListener('input',function(){CFTXT[kc]=inp.value});f.appendChild(cf);if(foco)inp.focus()}
     function abrirEditar(foco){fe=formEditar(e,kc,m);f.appendChild(fe);if(foco){var ta=fe.querySelector('textarea');ta.focus()}}
-    a.appendChild(boton('Editar','ck sec',function(){if(fe){fe.remove();fe=null;delete EDABRE[kc]}else{if(cf){cf.remove();cf=null;delete CFABRE[kc]}EDABRE[kc]=true;abrirEditar(true)}}));
-    a.appendChild(boton('↻ Cambiar todo','ck sec',function(){if(cf){cf.remove();cf=null;delete CFABRE[kc]}else{if(fe){fe.remove();fe=null;delete EDABRE[kc]}CFABRE[kc]=true;abrirForm(true)}}));
+    a.appendChild(boton('Editar','ck sec',function(){if(fe){fe.remove();fe=null;delete EDABRE[kc];delete EDTXT[kc];delete EDARCH[kc]}else{if(cf){cf.remove();cf=null;delete CFABRE[kc]}EDABRE[kc]=true;abrirEditar(true)}}));
+    a.appendChild(boton('↻ Cambiar todo','ck sec',function(){if(cf){cf.remove();cf=null;delete CFABRE[kc]}else{if(fe){fe.remove();fe=null;delete EDABRE[kc];delete EDTXT[kc];delete EDARCH[kc]}CFABRE[kc]=true;abrirForm(true)}}));
     if(CFABRE[kc])setTimeout(function(){if(!cf)abrirForm(false)},0);
     if(EDABRE[kc])setTimeout(function(){if(!fe)abrirEditar(false)},0);
   }
