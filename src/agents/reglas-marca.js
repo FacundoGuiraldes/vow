@@ -30,6 +30,12 @@ const REGLAS = [
   },
   // La promesa es de uno consigo mismo, no un papel (corregido por Facundo)
   { regla: "promesa en papel", patron: /\ba mano\b|lapicera|birome|l[aá]piz|cartulina/i },
+  // Tono de eslogan o de teaser (el cerebro de marca, "Calidad del texto"): intriga sin dato, coaching, "no es X, es Y"
+  {
+    regla: "teaser vacío o frase de eslogan",
+    patron:
+      /algo (llega|se viene|viene)|muy pronto|pr[oó]ximamente|(?<!\p{L})pronto(?!\p{L})|hay un antes|mir[aá] bien|prep[aá]rate|ya falta poco|cuenta regresiva|lo dem[aá]s,? en silencio|cada (d[ií]a|paso|rep\w*) (cuenta|suma)|un paso a la vez|tu (viaje|historia)(?!\p{L})|el camino(?!\p{L})|no te rindas|nunca te rindas|(?<!\p{L})no es [^.,;!?\n]{1,40}[,;.]\s*es (?=\p{L})/iu,
+  },
   // Cadenas de signos de exclamación
   { regla: "exceso de exclamaciones", patron: /!{2,}/ },
   // "Drop" suelto: solo se acepta "Drop 01"

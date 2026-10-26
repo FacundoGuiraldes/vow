@@ -39,7 +39,7 @@ test("rechaza lo que no está en voseo, incluso con tilde", () => {
 });
 
 test('"drop" solo se acepta como "Drop 01"', () => {
-  assert.deepEqual(reglasDe("El drop abre pronto"), ['"drop" fuera de "Drop 01"']);
+  assert.deepEqual(reglasDe("El drop abre el lunes"), ['"drop" fuera de "Drop 01"']);
   assert.deepEqual(reglasDe("Drop 01"), []);
 });
 

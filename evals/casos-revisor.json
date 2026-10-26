@@ -245,6 +245,19 @@
       }
     },
     {
+      "id": "teaser-vacio",
+      "descripcion": "Un teaser que anuncia que hay algo sin decir qué suena a humo (sugerencia real que Facundo marcó como cringe)",
+      "pieza": {
+        "epigrafe": "Quedate. Algo llega antes. Anotate en la lista: link en la bio."
+      },
+      "esperado": {
+        "aprobada": false,
+        "problemas_contienen": [
+          "teaser vacío o frase de eslogan"
+        ]
+      }
+    },
+    {
       "id": "elementos-del-gimnasio",
       "descripcion": "Nombrar barras, mancuernas o pesas suena forzado",
       "pieza": {
