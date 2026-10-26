@@ -83,6 +83,7 @@ canvas#gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-a
 .chip.ok{background:#e6dfd0;color:#3b372f}.chip.pend{background:var(--bordo)}.chip.prog{background:var(--beige);color:#1a1918}
 .pieza{margin:0 0 14px;padding:14px;background:#fff;border-radius:18px;box-shadow:0 1px 0 #e3ddd0,0 10px 28px rgba(40,30,20,.09)}
 .pieza .ph{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px}.pieza .ph strong{font:700 15px/1.25 var(--f-body)}
+.pieza .epi{margin:10px 0 4px;padding:10px 12px;background:#f1ede4;border-radius:12px;font:15px/1.5 var(--f-body);white-space:pre-wrap}
 .gal{display:flex;gap:8px;overflow-x:auto;padding:10px 0 6px;touch-action:pan-x}
 .gal img{height:132px;width:auto;flex:0 0 auto;border-radius:12px;cursor:pointer;background:#ddd;box-shadow:0 4px 14px rgba(0,0,0,.18)}
 video.vid{width:min(200px,70%);display:block;margin:8px 0;background:#000;border-radius:12px}
@@ -651,15 +652,20 @@ function formCambio(pz){
   var sb=el('button','ck si','Pedir otra sugerencia');sb.type='submit';fo.appendChild(ta);fo.appendChild(sb);
   fo.addEventListener('submit',function(e){e.preventDefault();pedirCambio(pz,ta.value)});return fo;
 }
+/* de una pieza solo se muestra el contenido visual y el epígrafe */
+function epigrafeDe(e,m){
+  if(e.epigrafe)return String(e.epigrafe).trim();
+  var t=(m&&m.md)||e.texto||'',x=/\*\*Epígrafe:\*\*\s*([\s\S]*?)(?:\n\s*\n|\n\*\*|$)/.exec(t)||/(?:^|\n)##\s*Epígrafe\s*\n+([\s\S]*?)(?:\n\s*\n##|\n##|$)/.exec(t);
+  return x?x[1].replace(/\s+/g,' ').trim():'';
+}
 function tarjetaPieza(e){
   var d=pd(e.fecha),f=el('div','pieza'),m=(MED.piezas||{})[kMed(e)]||{},ap=!!HECHO[kPieza(e)];
   var h=el('div','ph');h.appendChild(el('strong',null,e.titulo||'Pieza'));h.appendChild(chipEstado(e.estado));f.appendChild(h);
   f.appendChild(el('div','mono',(d?dd(d)+' · ':'')+(e.formato||'')+(e.hora?' · '+e.hora:'')+(d?' · '+rel(dias(d)):'')));
   if(CAMBIANDO[e._id||kPieza(e)])f.appendChild(el('p','vacio','La IA está armando otra sugerencia…'));
-  else if(e.nota&&e.estado!=='publicado')f.appendChild(el('p','mono',e.nota));
   if(m.imgs&&m.imgs.length)f.appendChild(galeria(m.imgs));
   if(m.vid){var v=document.createElement('video');v.src=m.vid;v.controls=true;v.playsInline=true;v.preload='metadata';v.className='vid';f.appendChild(v)}
-  if(m.md||e.texto){var de=el('details');de.appendChild(el('summary',null,'Guion y epígrafe'));de.appendChild(md(m.md||e.texto));f.appendChild(de)}
+  var ep=epigrafeDe(e,m);f.appendChild(ep?el('p','epi',ep):el('p','vacio','Todavía no tiene epígrafe.'));
   var a=el('div','acc');
   if(e.estado==='por aprobar'&&!ap&&!esConfirmable(e))a.appendChild(boton('Aprobar','ck si',function(){if(conectado!=='vivo'){aviso('Sin conexión con el bot: no se puede aprobar ahora.',6000);return}aprobarPieza(e)}));
   if(esConfirmable(e)&&!CAMBIANDO['c'+e._id])a.appendChild(boton('Confirmar publicación','ck si',function(){confirmarPieza(e)}));
@@ -960,8 +966,8 @@ function armarD(){
       var est=ESTADO_MAP[p.estado]||p.estado,titulo=p.gancho||('Pieza del '+p.fecha),fm=(p.formato||'')==='imagen'?'carrusel':(p.formato||'pieza');
       var ex=piezas.filter(function(x){return x.fecha===p.fecha&&(x.formato===p.formato||x.formato===fm)&&!x._id})[0];
       var nota=(ESTADO_TXT[p.estado]||p.estado)+(p.hora?' · '+p.hora:'')+(p.error?' · '+p.error:'');
-      if(ex){ex.estado=est;ex._id=p.id;ex._est=p.estado;ex._hora=p.hora;ex.nota=nota;ex.fecha=p.fecha;if(p.permalink)ex.permalink=p.permalink}
-      else piezas.push({fecha:p.fecha,formato:fm,titulo:titulo,estado:est,nota:nota,texto:textoPieza(p),_id:p.id,_est:p.estado,_hora:p.hora,permalink:p.permalink||null,_vivo:true});
+      if(ex){if(p.pieza&&p.pieza.epigrafe)ex.epigrafe=p.pieza.epigrafe;ex.estado=est;ex._id=p.id;ex._est=p.estado;ex._hora=p.hora;ex.nota=nota;ex.fecha=p.fecha;if(p.permalink)ex.permalink=p.permalink}
+      else piezas.push({fecha:p.fecha,formato:fm,titulo:titulo,estado:est,nota:nota,texto:textoPieza(p),epigrafe:(p.pieza&&p.pieza.epigrafe)||'',_id:p.id,_est:p.estado,_hora:p.hora,permalink:p.permalink||null,_vivo:true});
       var k=p.fecha+'_'+fm;
       if(p.medios&&p.medios.length){MEDIOS_VIVOS[k]={imgs:p.medios.filter(function(m){return m.tipo==='imagen'}).map(function(m){return API+'/api/programacion/medios/'+m.token}),vid:(p.medios.filter(function(m){return m.tipo==='video'})[0]||{}).token?API+'/api/programacion/medios/'+p.medios.filter(function(m){return m.tipo==='video'})[0].token:undefined}}
       var tt=ex?ex.titulo:titulo;

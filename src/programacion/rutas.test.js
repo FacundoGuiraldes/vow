@@ -162,6 +162,7 @@ describe("rutas de la publicación programada", () => {
       assert.equal(r.status, 200);
       assert.equal(r.headers.get("content-type"), "video/mp4");
       assert.equal(r.headers.get("accept-ranges"), "bytes");
+      assert.equal(r.headers.get("cross-origin-resource-policy"), "cross-site", "el juego (otro dominio) tiene que poder mostrar el video y las imágenes");
       assert.equal(Buffer.from(await r.arrayBuffer()).toString(), "0123456789");
     });
 

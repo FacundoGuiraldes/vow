@@ -34,7 +34,9 @@ export function validarPlanEntrante(cuerpo) {
 // Entrega un archivo con soporte de Range: Meta puede pedir el video por partes
 function entregar(req, res, { mime, datos }) {
   const total = datos.length;
-  res.set({ "Content-Type": mime, "Accept-Ranges": "bytes", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
+  // helmet pone Cross-Origin-Resource-Policy: same-origin por defecto y el navegador bloquea el <video> y las <img> del juego (otro dominio).
+  // Los archivos solo se piden con su token de 48 caracteres (el mismo que usa Instagram), así que se permite verlos desde otro sitio.
+  res.set({ "Content-Type": mime, "Accept-Ranges": "bytes", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Cross-Origin-Resource-Policy": "cross-site" });
   const pedido = req.headers.range;
   if (!pedido) return res.status(200).set("Content-Length", String(total)).end(datos);
 
