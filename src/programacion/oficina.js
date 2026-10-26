@@ -33,12 +33,15 @@ async function guardarJuego(repo, juego) {
 
 // "Cambiar todo" tarda (la IA arma la pieza y la corrige si rompe una regla): corre en segundo plano y el juego ve el avance acá.
 const MINUTOS_CAMBIO_MAXIMO = 5;
+const MINUTOS_SIN_SENALES = 3; // una sola llamada a la IA no debería tardar más que esto sin que cambie el paso
 function cambiosVisibles(cambios, ahora) {
   const salida = {};
   for (const [clave, c] of Object.entries(cambios && typeof cambios === "object" ? cambios : {})) {
     const edad = ahora - Date.parse(c.en);
     if (!(edad < 60 * 60_000)) continue; // lo viejo no le sirve al juego
-    salida[clave] = c.estado === "trabajando" && edad > MINUTOS_CAMBIO_MAXIMO * 60_000 ? { ...c, estado: "error", motivo: "Se interrumpió: probá de nuevo." } : c;
+    // Si la IA no da señales hace rato (por ejemplo, el servidor se reinició a mitad de camino), no se la deja "trabajando" para siempre
+    const sinSenales = ahora - Date.parse(c.pasoEn ?? c.en) > MINUTOS_SIN_SENALES * 60_000;
+    salida[clave] = c.estado === "trabajando" && (edad > MINUTOS_CAMBIO_MAXIMO * 60_000 || sinSenales) ? { ...c, estado: "error", motivo: "Se interrumpió: probá de nuevo." } : c;
   }
   return salida;
 }
@@ -61,13 +64,22 @@ async function lanzarCambio({ repo, segundoPlano }, clave, ahora, trabajo) {
   if (previo?.estado === "trabajando" && ahora - Date.parse(previo.en) < MINUTOS_CAMBIO_MAXIMO * 60_000) throw new ErrorAccion("La IA ya está armando esa pieza: esperá un momento.", 409);
   const en = new Date(ahora).toISOString();
   await guardarCambio(repo, clave, { estado: "trabajando", en });
+  // El juego muestra en qué paso va la IA (así no parece trabado). Es informativo: si falla el guardado, el cambio sigue.
+  let pasoActual = "";
+  const alAvanzar = (paso) => {
+    const texto = String(paso ?? "").slice(0, 200);
+    if (!texto || texto === pasoActual) return;
+    pasoActual = texto;
+    guardarCambio(repo, clave, { estado: "trabajando", en, paso: texto, pasoEn: new Date().toISOString() }).catch(() => {});
+  };
   const correr = (async () => {
     let r;
     try {
-      r = await trabajo();
+      r = await trabajo(alAvanzar);
     } catch (error) {
       r = { ok: false, motivo: String(error.message ?? error) };
     }
+    pasoActual = "";
     await guardarCambio(repo, clave, r.ok ? { estado: "listo", en: new Date().toISOString(), id: r.id ?? null } : { estado: "error", en: new Date().toISOString(), motivo: String(r.motivo ?? "No se pudo armar la sugerencia.").slice(0, 400) });
     return r;
   })();
@@ -165,16 +177,17 @@ export async function aplicarAccion(deps, accion, ahora = Date.now()) {
 
   if (tipo === "cambiar_pieza" && !Number.isInteger(accion.id) && typeof accion.fecha === "string") {
     // La pieza solo está en los documentos: la IA arma la nueva en el momento y queda propuesta para aprobar
-    return lanzarCambio(deps, `f:${accion.fecha}`, ahora, async () => {
-      const r = await servicio.cambiarSinFila({ fecha: accion.fecha, formato: accion.formato, indicacion: recortar(accion.indicacion, 300), base: recortar(accion.base, 1500) });
+    return lanzarCambio(deps, `f:${accion.fecha}`, ahora, async (alAvanzar) => {
+      const r = await servicio.cambiarSinFila({ fecha: accion.fecha, formato: accion.formato, indicacion: recortar(accion.indicacion, 300), base: recortar(accion.base, 1500), alAvanzar });
       return r.ok ? { ok: true, estado: r.estado, id: r.id } : r;
     });
   }
 
   if (tipo === "cambiar_pieza") {
     if (!Number.isInteger(accion.id)) throw new ErrorAccion("Falta el id de la pieza.");
-    return lanzarCambio(deps, String(accion.id), ahora, async () => {
-      const r = await servicio.sugerirCambio(accion.id, { indicacion: recortar(accion.indicacion, 300), contexto: await armarContexto({ repo, rendimiento }, accion.id) });
+    return lanzarCambio(deps, String(accion.id), ahora, async (alAvanzar) => {
+      alAvanzar("Juntando el contexto (novedades, charla, Instagram)…");
+      const r = await servicio.sugerirCambio(accion.id, { indicacion: recortar(accion.indicacion, 300), contexto: await armarContexto({ repo, rendimiento }, accion.id), alAvanzar });
       return r.ok ? { ok: true, estado: r.estado, id: accion.id } : r;
     });
   }

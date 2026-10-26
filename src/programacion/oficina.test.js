@@ -176,6 +176,33 @@ describe("cambiar una pieza desde la oficina", () => {
     assert.match(c.motivo, /interrumpió/);
   });
 
+  test("mientras la IA trabaja, el estado muestra el paso en el que va; sin señales por 3 minutos se da por interrumpido", async () => {
+    let verPaso;
+    const editor = { editarPieza: async ({ fila, alAvanzar }) => {
+      alAvanzar("Corrigiendo una regla de la marca (intento 2 de 3): urgencia falsa");
+      await verPaso();
+      return { ok: true, pieza: { ...fila.pieza, gancho: "Nuevo." }, hora: fila.hora, queCambio: "", errores: [] };
+    } };
+    const e = crearEscenario({ fecha: "2026-10-30", editor });
+    const fila = await e.cargarPieza();
+    verPaso = async () => {
+      await new Promise((r) => setTimeout(r, 20));
+      const c = (await armarEstadoOficina({ repo: e.repo })).cambios[fila.id];
+      assert.equal(c.estado, "trabajando");
+      assert.match(c.paso, /intento 2 de 3/);
+    };
+    await aplicarAccion(e, { accion: "cambiar_pieza", id: fila.id });
+    const final = (await armarEstadoOficina({ repo: e.repo })).cambios[fila.id];
+    assert.equal(final.estado, "listo");
+    assert.equal(final.paso, undefined);
+
+    const ahora = Date.parse("2026-10-26T12:00:00Z");
+    await e.repo.guardarEstado("cambios", { 7: { estado: "trabajando", en: "2026-10-26T11:57:00Z", paso: "algo", pasoEn: "2026-10-26T11:56:30Z" }, 8: { estado: "trabajando", en: "2026-10-26T11:57:00Z", paso: "algo", pasoEn: "2026-10-26T11:59:30Z" } });
+    const c = (await armarEstadoOficina({ repo: e.repo, ahora })).cambios;
+    assert.equal(c[7].estado, "error");
+    assert.equal(c[8].estado, "trabajando");
+  });
+
   test("una sugerencia que rompe las reglas de la marca no se guarda", async () => {
     const e = crearEscenario({ fecha: "2026-10-26", editor: editorQue({ ok: false, errores: ["urgencia falsa"] }) });
     const fila = await e.cargarPieza();

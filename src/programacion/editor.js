@@ -43,7 +43,9 @@ export function crearEditor({ cliente, modelo = MODELO_ESTRATEGA, leer, listar }
 
   return {
     // Devuelve { ok, pieza, hora, queCambio, errores, uso }
-    async editarPieza({ fila, instruccion, hoy, alternativa = false, nueva = false }) {
+    async editarPieza({ fila, instruccion, hoy, alternativa = false, nueva = false, alAvanzar = null }) {
+      const avisar = (paso) => { try { alAvanzar?.(paso); } catch { /* el avance es solo informativo */ } };
+      avisar("Leyendo la marca y el contexto…");
       const { cerebro, texto } = await construirSistema(leer, { listar });
       const system = `${texto}
 
@@ -69,6 +71,7 @@ ${nueva
 
       // Si la pieza no pasa las reglas de la marca, se le devuelven los errores a la IA para que los corrija (hasta INTENTOS_CORRECCION veces)
       for (let ronda = 1; ronda <= INTENTOS_CORRECCION; ronda++) {
+        avisar(ronda === 1 ? "La IA está escribiendo la pieza…" : `Corrigiendo una regla de la marca (intento ${ronda} de ${INTENTOS_CORRECCION}): ${String(ultimosErrores[0] ?? "").slice(0, 140)}`);
         let bloque = null;
         let respuesta = null;
         for (let intento = 1; intento <= INTENTOS_MAXIMOS && !bloque; intento++) {
