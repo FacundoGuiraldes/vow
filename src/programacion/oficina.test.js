@@ -1,6 +1,6 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { crearEscenario } from "./ayuda-pruebas.js";
+import { crearEscenario, crearPieza } from "./ayuda-pruebas.js";
 import { aplicarAccion, armarEstadoOficina, ErrorAccion } from "./oficina.js";
 import { crearRendimientoJuego } from "./rendimiento-juego.js";
 
@@ -239,5 +239,23 @@ describe("datos de la operación: ida y vuelta entre el juego y el bot", () => {
     assert.equal(estado.operacion.campos["deposito.medias"], "Llegaron, faltan etiquetas");
     assert.equal(Object.values(estado.operacion.agenda.propias)[0].t, "Reunión con el proveedor");
     assert.equal(estado.operacion.historial.at(-1).origen, "bot");
+  });
+
+  test("cambiar una pieza que solo está en los documentos la arma en el momento y queda propuesta (no se manda como nota)", async () => {
+    const calls = [];
+    const editor = { editarPieza: async (pedido) => { calls.push(pedido); return { ok: true, pieza: crearPieza({ fecha: pedido.fila.fecha, formato: pedido.fila.pieza.formato, gancho: "Gancho rehecho" }), hora: "19:00", queCambio: "Rehecha." }; } };
+    const e = crearEscenario({ fecha: "2026-10-26", hora: "10:00", editor });
+    const r = await aplicarAccion(e, { accion: "cambiar_pieza", fecha: "2026-10-29", formato: "carrusel", indicacion: "más simple", base: "Texto del documento" });
+    assert.equal(r.estado, "propuesta");
+    const fila = await e.repo.obtenerPieza(r.id);
+    assert.equal(fila.fecha, "2026-10-29");
+    assert.equal(fila.pieza.gancho, "Gancho rehecho");
+    assert.match(calls[0].instruccion, /Texto del documento/);
+    assert.match(calls[0].instruccion, /más simple/);
+    assert.deepEqual(await e.repo.novedadesPendientes(), [], "no deja una nota suelta");
+    // si el día ya tiene pieza en la base, se cambia esa en vez de crear otra
+    const otra = await aplicarAccion(e, { accion: "cambiar_pieza", fecha: "2026-10-29", formato: "carrusel", indicacion: "otra" });
+    assert.equal(otra.id, r.id);
+    assert.equal((await e.repo.piezasDelDia("2026-10-29")).length, 1);
   });
 });
