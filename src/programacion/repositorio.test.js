@@ -51,16 +51,16 @@ function contrato(nombre, crear, { saltear = false, alTerminar = async () => {} 
       const id = 900_000_000 + (process.pid % 1000);
       assert.equal(await repo.registrarActualizacion(id, { update_id: id, message: { text: "a" } }), true);
       assert.equal(await repo.registrarActualizacion(id, { update_id: id }), false);
-      const futuro = new Date(Date.now() + 60_000);
+      const futuro = new Date(Date.now() + 3_600_000);
       // recién registrada: todavía no toca reintentarla
-      assert.equal((await repo.reclamarActualizacionesPendientes({ antesDe: new Date(Date.now() - 60_000) })).filter((x) => x.id === id).length, 0);
+      assert.equal((await repo.reclamarActualizacionesPendientes({ antesDe: new Date(Date.now() - 3_600_000) })).filter((x) => x.id === id).length, 0);
       const primera = await repo.reclamarActualizacionesPendientes({ antesDe: futuro });
       assert.deepEqual(primera.filter((x) => x.id === id).map((x) => x.cuerpo.message.text), ["a"]);
       // reclamarla la marca como "en intento": otro reclamo inmediato no la devuelve de nuevo
-      assert.equal((await repo.reclamarActualizacionesPendientes({ antesDe: new Date(Date.now() - 1) })).filter((x) => x.id === id).length, 0);
+      assert.equal((await repo.reclamarActualizacionesPendientes({ antesDe: new Date(Date.now() - 3_600_000) })).filter((x) => x.id === id).length, 0);
       await repo.marcarActualizacionProcesada(id);
-      assert.equal((await repo.reclamarActualizacionesPendientes({ antesDe: new Date(Date.now() + 120_000) })).filter((x) => x.id === id).length, 0);
-      await repo.borrarActualizacionesViejas(new Date(Date.now() + 120_000));
+      assert.equal((await repo.reclamarActualizacionesPendientes({ antesDe: new Date(Date.now() + 3_600_000) })).filter((x) => x.id === id).length, 0);
+      await repo.borrarActualizacionesViejas(new Date(Date.now() + 3_600_000));
     });
 
     test("un plan nuevo de la misma semana cancela lo que estaba sin aprobar, y las canceladas no aparecen por día", async () => {
