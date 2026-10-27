@@ -31,12 +31,15 @@ export const INTENTOS_IA_POR_PIEZA = 3; // imágenes con IA por pieza (el plan g
 export const IMAGENES_IA_MAXIMAS_POR_DIA = 10;
 export const MINUTOS_AVISO_SIN_CONFIRMAR = 120; // si dos horas antes todavía no confirmó, se lo recuerda
 
-// Qué archivos necesita cada formato. Las stories todavía no se publican solas.
+// Qué archivos necesita cada formato. Una historia lleva una foto o un video (uno solo).
 export const MEDIOS_REQUERIDOS = {
   reel: { tipo: "video", minimo: 1, maximo: 1 },
   imagen: { tipo: "imagen", minimo: 1, maximo: 1 },
   carrusel: { tipo: "imagen", minimo: 2, maximo: 20 },
+  story: { tipo: "imagen", tipos: ["imagen", "video"], minimo: 1, maximo: 1 },
 };
+const aceptaTipo = (requerido, tipo) => (requerido.tipos ?? [requerido.tipo]).includes(tipo);
+const pideTexto = (requerido) => (requerido.tipos ? "una foto o un video" : requerido.tipo === "video" ? "un video" : "fotos");
 
 const VIVAS = ["propuesta", "aprobada", "confirmada", "preparada"];
 const material = (fila) => (Array.isArray(fila.pieza.material_a_producir) ? fila.pieza.material_a_producir : []);
@@ -45,9 +48,10 @@ const material = (fila) => (Array.isArray(fila.pieza.material_a_producir) ? fila
 export function faltaArchivo(fila, medios) {
   const requerido = MEDIOS_REQUERIDOS[fila.pieza.formato];
   if (!requerido) return null;
-  const sirven = medios.filter((m) => m.tipo === requerido.tipo);
+  const sirven = medios.filter((m) => aceptaTipo(requerido, m.tipo));
   if (sirven.length < medios.length) return "Hay archivos que no son del tipo que pide este formato. Mandalos de nuevo.";
   if (sirven.length >= requerido.minimo) return null;
+  if (requerido.tipos) return "Falta la foto o el video de la historia: mandámelo respondiendo a este mensaje.";
   if (requerido.tipo === "video") return "Falta el video: mandámelo respondiendo a este mensaje.";
   return requerido.minimo === 1
     ? "Falta la foto: mandámela respondiendo a este mensaje."
@@ -188,8 +192,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     }
     await repo.actualizarPieza(fila.id, { estado: "confirmada", confirmada_el: hoy, intentos: 0, error: null });
     if (mensajeId) telegram.quitarBotones(mensajeId);
-    const detalle = MEDIOS_REQUERIDOS[fila.pieza.formato] ? `Se publica hoy a las ${fila.hora}.` : `Las stories todavía las publicás vos: a las ${fila.hora} te aviso.`;
-    return responder(`✅ Confirmada. ${detalle}${permitirPublicar ? "" : "\n🧪 Modo simulación: no se publica de verdad."}`);
+    return responder(`✅ Confirmada. Se publica hoy a las ${fila.hora}.${permitirPublicar ? "" : "\n🧪 Modo simulación: no se publica de verdad."}`);
   }
 
   async function cancelar(fila, responder, mensajeId) {
@@ -220,7 +223,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
   async function problemasParaPublicar(fila) {
     const problemas = [];
     if (MEDIOS_REQUERIDOS[fila.pieza.formato]) {
-      problemas.push(...revisarTextoPublico(fila.pieza.epigrafe));
+      if (fila.pieza.formato !== "story") problemas.push(...revisarTextoPublico(fila.pieza.epigrafe)); // una historia no lleva epígrafe
       const falta = faltaArchivo(fila, await repo.mediosDePieza(fila.id));
       if (falta) problemas.push(falta);
     }
@@ -304,7 +307,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     if (!fila) {
       // Sin pieza a la vista: si hay una sola próxima a la que le falta material, es esa
       for (const f of proximas) {
-        if (!MEDIOS_REQUERIDOS[f.pieza.formato] || !["propuesta", "aprobada", "confirmada"].includes(f.estado) || material(f).length === 0) continue;
+        if (!MEDIOS_REQUERIDOS[f.pieza.formato] || !["propuesta", "aprobada", "confirmada"].includes(f.estado) || (material(f).length === 0 && f.pieza.formato !== "story")) continue;
         if (faltaArchivo(f, await repo.mediosDePieza(f.id))) pendientes.push(f);
       }
       if (pendientes.length === 1) fila = pendientes[0];
@@ -324,11 +327,11 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     }
 
     const requerido = MEDIOS_REQUERIDOS[fila.pieza.formato];
-    if (!requerido) return responder("Las stories todavía no se publican solas, así que no necesito el archivo.");
+    if (!requerido) return responder("Esta pieza no lleva archivo.");
     if (!VIVAS.includes(fila.estado)) return responder(`Esa pieza está ${ESTADOS_LEGIBLES[fila.estado]}: ya no puedo adjuntarle archivos.`);
     const archivo = elegirArchivo(msg);
     if (!archivo) return responder("Ese tipo de archivo no sirve. Mandame una foto JPEG o un video MP4.");
-    if (archivo.tipo !== requerido.tipo) return responder(`Esta pieza es un ${fila.pieza.formato}: necesita ${requerido.tipo === "video" ? "un video" : "fotos"}.`);
+    if (!aceptaTipo(requerido, archivo.tipo)) return responder(`Esta pieza es ${fila.pieza.formato === "story" ? "una historia" : `un ${fila.pieza.formato}`}: necesita ${pideTexto(requerido)}.`);
 
     let datos;
     try {
@@ -531,7 +534,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
       // Un archivo que no sirve para el tipo nuevo se descarta (un reel necesita video, un carrusel fotos)
       const requerido = MEDIOS_REQUERIDOS[nuevos.formato];
       const medios = await repo.mediosDePieza(fila.id);
-      if (medios.some((m) => !requerido || m.tipo !== requerido.tipo)) await repo.borrarMedios(fila.id);
+      if (medios.some((m) => !requerido || !aceptaTipo(requerido, m.tipo))) await repo.borrarMedios(fila.id);
     }
     const { nueva, aviso } = await guardarEdicion(fila, { pieza, hora: pieza.hora, hoy });
     await decirDePieza(nueva, `✏️ Editada desde la oficina\n\n${textoPieza(nueva)}${aviso}`, { botones: botonesPlan(nueva.id, { conIA: conIA(nueva) }) }).catch((error) => console.error(`No se pudo avisar por Telegram: ${error.message}`));
@@ -548,8 +551,8 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     const tipo = mime === "image/jpeg" ? "imagen" : ["video/mp4", "video/quicktime"].includes(mime) ? "video" : null;
     if (!tipo) return { ok: false, motivo: "Ese tipo de archivo no sirve: subí una foto JPEG o un video MP4." };
     if (!datos?.length) return { ok: false, motivo: "El archivo llegó vacío." };
-    const requerido = MEDIOS_REQUERIDOS[fila.pieza.formato] ?? { tipo, minimo: 1, maximo: 1 }; // una historia lleva una foto o un video
-    if (tipo !== requerido.tipo) return { ok: false, motivo: `Esta pieza es ${fila.pieza.formato === "story" ? "una historia" : `un ${fila.pieza.formato}`}: necesita ${requerido.tipo === "video" ? "un video" : "fotos"}. Si querés otro tipo, cambialo en Editar.` };
+    const requerido = MEDIOS_REQUERIDOS[fila.pieza.formato] ?? { tipo, minimo: 1, maximo: 1 };
+    if (!aceptaTipo(requerido, tipo)) return { ok: false, motivo: `Esta pieza es ${fila.pieza.formato === "story" ? "una historia" : `un ${fila.pieza.formato}`}: necesita ${pideTexto(requerido)}. Si querés otro tipo, cambialo en Editar.` };
     if (reemplazar) await repo.borrarMedios(fila.id);
     const guardado = await guardarMaterial(fila, requerido, { tipo, mime }, datos);
     if (guardado.error) return { ok: false, motivo: guardado.error };
@@ -879,6 +882,10 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     if (cupo.total !== null && cupo.usado !== null && cupo.usado >= cupo.total) throw new Error(`Se usó todo el cupo de publicaciones por API de las últimas 24 h (${cupo.usado} de ${cupo.total}).`);
     if (formato === "imagen") return meta.crearContenedor({ image_url: urls[0], caption: epigrafe });
     if (formato === "reel") return meta.crearContenedor({ media_type: "REELS", video_url: urls[0], caption: epigrafe });
+    if (formato === "story") {
+      const [medio] = await repo.mediosDePieza(fila.id); // una historia no lleva epígrafe
+      return meta.crearContenedor({ media_type: "STORIES", ...(medio.tipo === "video" ? { video_url: urls[0] } : { image_url: urls[0] }) });
+    }
     const hijos = [];
     for (const url of urls) hijos.push(await meta.crearContenedor({ image_url: url, is_carousel_item: "true" }));
     return meta.crearContenedor({ media_type: "CAROUSEL", children: hijos.join(","), caption: epigrafe });
@@ -993,11 +1000,6 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
 
     if (fila.estado === "confirmada") {
       if (fila.confirmada_el !== hoy) return null;
-      if (!MEDIOS_REQUERIDOS[fila.pieza.formato]) {
-        if (faltan > 0 || !(await repo.reclamar(fila.id, ["confirmada"], "manual"))) return null;
-        await avisar(fila, `🔔 Es la hora (${fila.hora}) de publicar tu story. Las stories todavía las publicás vos a mano.`);
-        return "story";
-      }
       if (faltan > MINUTOS_PARA_PREPARAR) return null;
       if (retraso > TOLERANCIA_MINUTOS) return avisarTarde(fila, hoy);
       if (pausado) return avisarPausa(fila, hoy);

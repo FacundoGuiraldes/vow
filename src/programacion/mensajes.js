@@ -107,8 +107,8 @@ export function textoResumenDiario(fila, { faltaArchivo = null } = {}) {
       `☀️ Hoy se publica a las ${fila.hora} hs (${fila.pieza.formato})`,
       textoPieza(fila),
       fila.error ? `Último problema: ${fila.error}` : "",
-      fila.pieza.formato === "story" ? "Las stories todavía las publicás vos a mano: si confirmás, te aviso a la hora." : faltaArchivo ? `⚠️ ${faltaArchivo}` : "📎 El archivo está listo.",
-      fila.pieza.formato === "story" ? "" : `Si lo confirmás, se publica solo a las ${fila.hora}. Si no lo confirmás, no se publica nada.`,
+      faltaArchivo ? `⚠️ ${faltaArchivo}` : "📎 El archivo está listo.",
+      `Si lo confirmás, se publica solo a las ${fila.hora}. Si no lo confirmás, no se publica nada.`,
     ]
       .filter(Boolean)
       .join("\n\n"),

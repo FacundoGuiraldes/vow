@@ -1,6 +1,7 @@
 /* ================= íconos propios: trazo recto y ángulos, como el isotipo ================= */
 var ICO_D={
   ok:'M4.5 12.5 L9.5 17.5 L19.5 6.5',
+  ver:'M2.5 12 C5 7.5 8.5 5.5 12 5.5 S19 7.5 21.5 12 C19 16.5 15.5 18.5 12 18.5 S5 16.5 2.5 12 Z M12 15 A3 3 0 1 0 12 9 A3 3 0 0 0 12 15 Z',
   alerta:'M12 4 L12 14 M12 18 L12 19.5',
   play:'M7 5 L19 12 L7 19 Z',
   caja:'M4 8 L12 4 L20 8 L20 17 L12 21 L4 17 Z M4 8 L12 12 L20 8 M12 12 L12 21',
@@ -347,8 +348,152 @@ function estadoCarta(e){
   if(raw==='publicada')return {k:'publicada',t:'PUBLICADA',ico:'enviar'};
   return {k:'propuesta',t:String(e.estado||raw).toUpperCase(),ico:'borrador'};
 }
+/* ================= previsualización realista de cómo queda en Instagram ================= */
+var PREVIA={};
+var IGI={
+  corazon:'M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z',
+  comentar:'M20.5 12a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1-4.4A8.5 8.5 0 1 1 20.5 12z',
+  enviar:'M21 3 10.5 13.5 M21 3l-6.5 18-4-7.5L3 9.5z',
+  guardar:'M6 3.5h12v17l-6-4.5-6 4.5z',
+  mas:'M5 12h.01M12 12h.01M19 12h.01',
+  atras:'M15 5l-7 7 7 7',
+  cerrar:'M6 6l12 12M18 6L6 18',
+  camara:'M4 8h3l1.5-2h7L17 8h3v11H4z M12 16.5a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z',
+  inicio:'M4 11l8-7 8 7v9h-5v-6H9v6H4z',
+  buscar:'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z M16.5 16.5L21 21',
+  reels:'M4 5h16v14H4z M4 9h16 M9 5l3 4 M14 5l3 4 M10 12.5l4 2.5-4 2.5z',
+  tienda:'M5 8h14l-1 12H6z M9 8V6a3 3 0 0 1 6 0v2',
+  volumen:'M4 9.5h3.5L12 6v12l-4.5-3.5H4z M16 9a4 4 0 0 1 0 6',
+  musica:'M9 18V6l10-2v12 M9 18a2.5 2.5 0 1 1-2.5-2.5A2.5 2.5 0 0 1 9 18z M19 16a2.5 2.5 0 1 1-2.5-2.5A2.5 2.5 0 0 1 19 16z'
+};
+function igIco(n,px,grueso){
+  var NS='http://www.w3.org/2000/svg',s=document.createElementNS(NS,'svg');s.setAttribute('viewBox','0 0 24 24');s.setAttribute('width',px||24);s.setAttribute('height',px||24);
+  s.setAttribute('fill','none');s.setAttribute('stroke','currentColor');s.setAttribute('stroke-width',grueso||1.9);s.setAttribute('stroke-linecap','round');s.setAttribute('stroke-linejoin','round');s.setAttribute('aria-hidden','true');
+  var p=document.createElementNS(NS,'path');p.setAttribute('d',IGI[n]);s.appendChild(p);return s;
+}
+function igAvatar(px){
+  var NS='http://www.w3.org/2000/svg',w=el('span','ig-av');w.style.width=w.style.height=px+'px';
+  try{
+    var s=document.createElementNS(NS,'svg'),p=document.createElementNS(NS,'path');p.setAttribute('d',LOGO_D);p.setAttribute('fill','#F3EFE7');s.appendChild(p);
+    s.style.cssText='position:absolute;left:-9999px;top:0;width:10px;height:10px';document.body.appendChild(s);
+    var b=p.getBBox();document.body.removeChild(s);
+    var s2=document.createElementNS(NS,'svg'),p2=document.createElementNS(NS,'path'),pad=Math.max(b.width,b.height)*.28;
+    s2.setAttribute('viewBox',(b.x-pad)+' '+(b.y-pad+(b.height-b.width)/2*0)+' '+(b.width+pad*2)+' '+(b.height+pad*2));p2.setAttribute('d',LOGO_D);p2.setAttribute('fill','#F3EFE7');s2.appendChild(p2);w.appendChild(s2);
+  }catch(x){w.textContent='V'}
+  return w;
+}
+/* recorta el epígrafe como Instagram: dos líneas y «… más» */
+function igCaption(texto,oscuro){
+  var d=el('div','ig-cap'+(oscuro?' osc':'')),ab=false,n=el('b',null,'vow_ar'),t=el('span','ig-t'),mas=el('button','ig-mas','más');mas.type='button';
+  d.appendChild(n);d.appendChild(document.createTextNode(' '));d.appendChild(t);
+  var plano=texto.replace(/\s*\n+\s*/g,' ').trim(),largo=plano.length>100;
+  var corto=largo?plano.slice(0,100).replace(/\s+\S*$/,'').replace(/[.,;:\s]+$/,''):plano;
+  function pintar(){t.textContent=ab||!largo?texto:corto+'\u2026 ';t.className='ig-t'+(ab?' abierto':'');if(largo&&!ab){if(!mas.parentNode)d.appendChild(mas)}else if(mas.parentNode)mas.remove()}
+  mas.addEventListener('click',function(){ab=true;pintar()});pintar();return d;
+}
+function igNav(oscuro){
+  var n=el('div','ig-nav'+(oscuro?' osc':''));['inicio','reels','enviar','buscar'].forEach(function(k){n.appendChild(igIco(k,23,1.7))});n.appendChild(igAvatar(22));return n;
+}
+function igEstado(hora){
+  var b=el('div','ig-sb');b.appendChild(el('span',null,hora||'9:41'));var d=el('span','ig-sbd');['','',''].forEach(function(){d.appendChild(el('i'))});b.appendChild(d);return b;
+}
+/* medidas reales del archivo, para avisar si Instagram lo va a recortar o a dejarle bandas */
+function medirImagen(src,cb){var im=new Image();im.onload=function(){cb(im.naturalWidth,im.naturalHeight)};im.onerror=function(){cb(0,0)};im.src=src}
+function previaInstagram(e,m){
+  var fmt=normFmt(e._fmt||e.formato),hora=e._hora||e.hora||'',imgs=(m&&m.imgs)||[],vid=m&&m.vid,epi=String(epigrafeDe(e,m)||'').trim();
+  var raiz=el('div','ig-raiz'),tit=el('div','ig-tit');
+  tit.appendChild(document.createTextNode('Así queda en Instagram'));tit.appendChild(el('span',null,(hora?'hoy a las '+hora+' · ':'')+({imagen:'publicación',carrusel:'carrusel',reel:'reel',story:'historia'}[fmt]||fmt)));raiz.appendChild(tit);
+  var tel=el('div','ig-tel '+(fmt==='reel'||fmt==='story'?'vert':'feed')),pant=el('div','ig-pant'+(fmt==='reel'||fmt==='story'?' osc':''));tel.appendChild(pant);raiz.appendChild(tel);
+  var chk=el('ul','ig-chk');raiz.appendChild(chk);
+  function punto(ok,txt){var li=el('li',ok===true?'ok':ok===false?'mal':'aviso');li.appendChild(el('b',null,ok===true?'✓':ok===false?'✕':'!'));li.appendChild(document.createTextNode(' '+txt));chk.appendChild(li);return li}
+  var falta=(fmt==='reel'&&!vid)||(fmt==='story'&&!vid&&!imgs.length)||((fmt==='imagen'||fmt==='carrusel')&&!imgs.length);
+  var tipos={imagen:'Foto',carrusel:'Fotos',reel:'Video',story:'Foto o video'};
+  if(falta)punto(false,tipos[fmt]+' sin cargar: la pieza no se puede publicar así.');
+  else if(fmt==='carrusel'&&imgs.length<2)punto(false,'Un carrusel necesita al menos 2 fotos (tiene '+imgs.length+').');
+  else punto(true,fmt==='carrusel'?imgs.length+' fotos cargadas':(vid&&fmt!=='imagen'?'Video cargado':'Archivo cargado'));
+  if(fmt==='story'){punto(true,'Una historia no lleva epígrafe')}
+  else if(!epi)punto(false,'Falta el epígrafe');
+  else{var hs=(epi.match(/#[\p{L}\p{N}_]+/gu)||[]).length;punto(epi.length<=2200&&hs<=30,'Epígrafe de '+epi.length+' caracteres'+(hs?' y '+hs+' hashtags':'')+(epi.length>2200?' (Instagram admite hasta 2200)':''))}
+  function proporcion(w,h){
+    if(!w||!h)return;var r=w/h,v=(fmt==='reel'||fmt==='story');
+    if(v){var ok=Math.abs(r-9/16)<.04;punto(ok?true:'a',ok?'Proporción vertical 9:16 (como pide Instagram)':'No es 9:16 ('+w+'×'+h+'): se va a ver con bandas'+(fmt==='reel'?' o recortado':''))}
+    else{var ok2=r>=.79&&r<=1.92;punto(ok2?true:'a',ok2?'Proporción '+(r>=.99&&r<=1.01?'cuadrada':r<1?'vertical':'horizontal')+' dentro de lo que acepta el feed':'Proporción fuera de rango ('+w+'×'+h+'): Instagram la recorta')}
+  }
+  var primero=imgs[0];
+  if(primero)medirImagen(primero,proporcion);
+  if(fmt==='carrusel'&&imgs.length>1){var med=[],pend=imgs.length;imgs.forEach(function(u,i){medirImagen(u,function(w,h){med[i]=h?w/h:0;if(--pend)return;var r0=med[0],igual=med.every(function(r){return r&&Math.abs(r-r0)/r0<.03});if(!igual)punto('a','Las fotos tienen proporciones distintas: Instagram las recorta todas como la primera')})})}
+  else if(vid){var vv=document.createElement('video');vv.preload='metadata';vv.muted=true;vv.onloadedmetadata=function(){proporcion(vv.videoWidth,vv.videoHeight)};vv.src=vid}
+  pant.appendChild(igEstado(hora));
+  if(fmt==='story')igStory(pant,imgs,vid,falta);
+  else if(fmt==='reel')igReel(pant,vid,epi,falta);
+  else igFeed(pant,imgs,epi,falta,fmt==='carrusel');
+  return raiz;
+}
+function igFalta(txt){var f=el('div','ig-falta');f.appendChild(el('span',null,txt));return f}
+function igFeed(pant,imgs,epi,falta,carrusel){
+  var top=el('div','ig-top');top.appendChild(igIco('atras',22,2));var c=el('div','ig-tt');c.appendChild(el('small',null,'vow_ar'));c.appendChild(el('strong',null,'Publicaciones'));top.appendChild(c);pant.appendChild(top);
+  var h=el('div','ig-ph');h.appendChild(igAvatar(32));var nm=el('div','ig-nm');nm.appendChild(el('b',null,'vow_ar'));h.appendChild(nm);h.appendChild(igIco('mas',20,3));pant.appendChild(h);
+  var md=el('div','ig-med');
+  if(falta||!imgs.length)md.appendChild(igFalta('Falta la foto'));
+  else{
+    var sc=el('div','ig-sc');imgs.forEach(function(u){var im=document.createElement('img');im.src=u;im.alt='';sc.appendChild(im)});md.appendChild(sc);
+    if(carrusel&&imgs.length>1){
+      var bd=el('div','ig-bdg','1/'+imgs.length);md.appendChild(bd);
+      var dots=el('div','ig-dots');imgs.forEach(function(_,i){dots.appendChild(el('i',i?'':'on'))});
+      var ir=function(){var i=Math.round(sc.scrollLeft/Math.max(1,sc.clientWidth));bd.textContent=(i+1)+'/'+imgs.length;[].forEach.call(dots.children,function(d,k){d.className=k===i?'on':''})};
+      sc.addEventListener('scroll',ir);md.dataset.dots='1';pant.appendChild(md);
+      var ac=el('div','ig-acc');var iz=el('div','ig-iz');iz.appendChild(igIco('corazon',25));iz.appendChild(igIco('comentar',25));iz.appendChild(igIco('enviar',25));ac.appendChild(iz);ac.appendChild(dots);ac.appendChild(igIco('guardar',25));pant.appendChild(ac);
+      igPie(pant,epi);return;
+    }
+  }
+  pant.appendChild(md);
+  var ac2=el('div','ig-acc'),iz2=el('div','ig-iz');iz2.appendChild(igIco('corazon',25));iz2.appendChild(igIco('comentar',25));iz2.appendChild(igIco('enviar',25));ac2.appendChild(iz2);ac2.appendChild(igIco('guardar',25));pant.appendChild(ac2);
+  igPie(pant,epi);
+}
+function igPie(pant,epi){
+  pant.appendChild(el('div','ig-lk','Sé la primera persona en indicar que le gusta'));
+  if(epi)pant.appendChild(igCaption(epi,false));
+  pant.appendChild(el('div','ig-ago','AHORA'));pant.appendChild(igNav(false));
+}
+function igReel(pant,vid,epi,falta){
+  var md=el('div','ig-full');
+  if(!vid||falta)md.appendChild(igFalta('Falta el video'));
+  else{var v=document.createElement('video');v.src=vid;v.muted=true;v.loop=true;v.autoplay=true;v.playsInline=true;v.preload='metadata';v.addEventListener('click',function(){if(v.paused)v.play();else v.pause()});md.appendChild(v)}
+  pant.appendChild(md);
+  var top=el('div','ig-rtop');top.appendChild(el('strong',null,'Reels'));top.appendChild(igIco('camara',24,1.8));pant.appendChild(top);
+  var der=el('div','ig-der');[['corazon','0'],['comentar','0'],['enviar',''],['mas','']].forEach(function(x){var b=el('div','ig-b');b.appendChild(igIco(x[0],x[0]==='mas'?22:27,x[0]==='mas'?3:1.8));if(x[1])b.appendChild(el('small',null,x[1]));der.appendChild(b)});
+  var au=el('div','ig-disc');au.appendChild(igAvatar(26));der.appendChild(au);pant.appendChild(der);
+  var ab=el('div','ig-rbj'),q=el('div','ig-rus');q.appendChild(igAvatar(30));q.appendChild(el('b',null,'vow_ar'));q.appendChild(el('span','ig-seg','Seguir'));ab.appendChild(q);
+  if(epi)ab.appendChild(igCaption(epi,true));
+  var mu=el('div','ig-mus');mu.appendChild(igIco('musica',13,2));mu.appendChild(document.createTextNode(' vow_ar · Audio original'));ab.appendChild(mu);pant.appendChild(ab);
+  pant.appendChild(igNav(true));
+}
+function igStory(pant,imgs,vid,falta){
+  var md=el('div','ig-full ig-st');
+  if(falta||(!imgs.length&&!vid))md.appendChild(igFalta('Falta la foto o el video'));
+  else{
+    if(vid){
+      var v=document.createElement('video');v.src=vid;v.muted=true;v.loop=true;v.autoplay=true;v.playsInline=true;v.preload='metadata';md.appendChild(v);
+      var fondo=document.createElement('video');fondo.src=vid;fondo.muted=true;fondo.loop=true;fondo.autoplay=true;fondo.playsInline=true;fondo.className='ig-fondo';md.insertBefore(fondo,v);
+    }else{
+      var bg=document.createElement('img');bg.src=imgs[0];bg.className='ig-fondo';bg.alt='';md.appendChild(bg);
+      var im=document.createElement('img');im.src=imgs[0];im.alt='';im.className='ig-fg';md.appendChild(im);
+    }
+  }
+  pant.appendChild(md);
+  var pr=el('div','ig-prog'),bar=el('i');pr.appendChild(bar);pant.appendChild(pr);
+  var h=el('div','ig-sh');h.appendChild(igAvatar(30));h.appendChild(el('b',null,'vow_ar'));h.appendChild(el('span','ig-ah','Ahora'));var r=el('span','ig-der2');r.appendChild(igIco('mas',20,3));r.appendChild(igIco('cerrar',22,2));h.appendChild(r);pant.appendChild(h);
+  var pie=el('div','ig-sp');pie.appendChild(el('span','ig-msg','Enviar mensaje'));pie.appendChild(igIco('corazon',26,1.8));pie.appendChild(igIco('enviar',26,1.8));pant.appendChild(pie);
+}
+function botonPrevia(e,f,est){
+  var k=String(e._id||kPieza(e)),abierta=PREVIA[k]===undefined?est.k==='confirmada':PREVIA[k];
+  var b=botonIco('ver',abierta?'Ocultar la previsualización':'Ver cómo queda en Instagram','ck sec',function(){PREVIA[k]=!abierta;abrirEdif(panelAbierto,true)});
+  return {abierta:abierta,boton:b};
+}
+
 function tarjetaPieza(e){
   var d=pd(e.fecha),f=el('div','pieza'),m=(MED.piezas||{})[kMed(e)]||{},ap=!!HECHO[kPieza(e)];
+  if(e._id&&MEDIOS_ID[e._id])m=Object.assign({},m,{imgs:MEDIOS_ID[e._id].imgs||[],vid:MEDIOS_ID[e._id].vid});
   var est=estadoCarta(e);f.className='pieza carta st-'+est.k+(cambiandoAhora(e)?' trab':'');
   var h=el('div','ph');h.appendChild(el('strong',null,e.titulo||'Pieza'));f.appendChild(h);
   var rb=el('span','cinta-estado');rb.appendChild(ico(est.ico,12));rb.appendChild(document.createTextNode(est.t));f.appendChild(rb);
@@ -357,7 +502,10 @@ function tarjetaPieza(e){
   if(m.imgs&&m.imgs.length)f.appendChild(galeria(m.imgs));
   if(m.vid){var v=document.createElement('video');v.src=m.vid;v.controls=true;v.playsInline=true;v.preload='metadata';v.className='vid';f.appendChild(v)}
   var ep=epigrafeDe(e,m);f.appendChild(ep?el('p','epi',ep):el('p','vacio','Todavía no tiene epígrafe.'));
+  var pv=(e._id&&e.estado!=='publicado')?botonPrevia(e,f,est):null;
+  if(pv&&pv.abierta)f.appendChild(previaInstagram(e,m));
   var a=el('div','acc');
+  if(pv)a.appendChild(pv.boton);
   if(e.estado==='por aprobar'&&!ap&&!esConfirmable(e))a.appendChild(botonIco('ok','Aprobar','ck si',function(){if(conectado!=='vivo'){aviso('Sin conexión con el bot: no se puede aprobar ahora.',6000);return}aprobarPieza(e)}));
   if(esConfirmable(e)&&!CAMBIANDO['c'+e._id])a.appendChild(botonIco('enviar','Confirmar publicación','ck si',function(){confirmarPieza(e)}));
   if(e.estado!=='publicado'&&!cambiandoAhora(e)){
