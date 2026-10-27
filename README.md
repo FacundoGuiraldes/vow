@@ -14,7 +14,68 @@ Este repositorio es la base técnica de la marca:
 
 - **Landing y API** (`web/`, `src/api`): lista de espera y catálogo del Drop 01, publicados y monitoreados.
 - **Un sistema de agentes de IA** que investiga cuentas de referencia y propone el plan de contenido semanal, siempre con reglas de marca, tope de gasto y aprobación de una persona antes de seguir. [Ver cómo funciona](#el-sistema-de-agentes).
+- **Publicación programada de Instagram con un bot de Telegram:** el plan de la semana llega al chat, cada pieza se aprueba, se confirma el mismo día y recién ahí se publica sola. [Ver cómo funciona](#publicación-programada-de-instagram-telegram).
+- **VOW HQ:** el panel de control del sistema, hecho como una aldea isométrica en 3D donde cada edificio es un área real (piezas, bot, estrategia, stock y ventas). [Verlo](#vow-hq-el-sistema-como-un-juego).
 - **Piezas de Instagram hechas con código**: láminas de carruseles y reels que se generan desde el repo, con el mismo sistema visual de la marca.
+
+## VOW HQ: el sistema como un juego
+
+![VOW HQ: aldea isométrica con un edificio por cada área del sistema](docs/img/hq/aldea.jpg)
+
+**VOW HQ** es el panel de control de la marca, pero en vez de tablas y menús es una **aldea isométrica en 3D** (three.js, con ciclo de día y noche): cada edificio es un área real del sistema y todo lo que se ve está conectado en vivo con el servicio y con el bot de Telegram. Los globos rojos marcan lo que necesita la mirada de una persona. Se abre en [`/oficina/`](https://vow-17x.pages.dev/oficina/) de la web.
+
+![Recorrido de VOW HQ: abrir edificios, cargar stock, registrar una venta y hablar con el bot](docs/img/hq/recorrido.gif)
+
+*Recorrido acelerado (datos de demostración). [Ver el video completo (54 s)](docs/img/hq/recorrido.mp4).*
+
+### Qué hay en cada edificio
+
+| Edificio | Para qué sirve |
+|---|---|
+| **Centro de control** | Muestra solo lo pendiente (piezas por aprobar o confirmar) y deja anotarle algo al bot. |
+| **Taller de diseño** | Las piezas de Instagram por salir: se aprueban, se editan a mano, se les carga la foto o el video, o se le pide a la IA otra sugerencia. Al confirmar una pieza del día muestra **cómo queda en Instagram** antes de que se suba. |
+| **Torre del bot** | Estado del bot y de la publicación (simulación o real), tests y evals, y la charla reciente con el bot. |
+| **Estrategia** | Las líneas de la semana que salieron de la última investigación. Se pueden editar, quitar, agregar o restaurar hasta el lunes. |
+| **Instagram** | Rendimiento de @vow_ar (alcance, guardados, compartidos) cuando la cuenta está conectada al servicio. |
+| **Almacén** | Stock por producto (gorras, shakers y medias). Arranca en 0 hasta registrar la llegada de la mercadería. |
+| **Caja** | Registro de ventas: descuentan el stock solas y se pueden anular. **Los precios los fija el sistema** y el juego no los puede cambiar. |
+
+### Previsualización realista antes de publicar
+
+Al confirmar una pieza para el día, el HQ arma una maqueta del teléfono con el archivo real y el epígrafe, tal como se vería en Instagram (publicación, carrusel, reel o historia). Además chequea el archivo: si la proporción se va a recortar o a verse con bandas, si el epígrafe es muy largo, si faltan archivos o si un carrusel mezcla proporciones. En las historias se puede activar una guía con las zonas que Instagram tapa con su interfaz.
+
+![Previsualización de una publicación en el Taller de diseño](docs/img/hq/previa-publicacion.jpg)
+
+### Una sola fuente de verdad
+
+Lo que se hace en el juego y lo que se dice en el chat del bot es lo mismo: las dos cosas llaman a las mismas herramientas del servicio (ver stock, registrar una llegada o una venta, editar la estrategia, agregar eventos a la agenda, aprobar una pieza, y más). Todo se guarda en la base, le llega al Estratega como novedad para el próximo plan y el workflow `Sincronizar operación` lo copia cada 30 minutos a [`docs/operacion/`](docs/operacion/).
+
+<table>
+<tr>
+<td width="50%"><img src="docs/img/hq/estrategia.jpg" alt="Panel de Estrategia con las líneas de la semana"><br><sub>Estrategia: líneas de la semana, editables hasta el lunes.</sub></td>
+<td width="50%"><img src="docs/img/hq/torre-del-bot.jpg" alt="Panel de la Torre del bot con las publicaciones programadas"><br><sub>Torre del bot: estado, publicación en simulación y lo programado.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/img/hq/almacen.jpg" alt="Panel del Almacén con el stock por producto"><br><sub>Almacén: stock por producto, con «Llegó» y «Contar».</sub></td>
+<td width="50%"><img src="docs/img/hq/caja.jpg" alt="Panel de la Caja registrando una venta"><br><sub>Caja: el precio sale del sistema; avisa si no alcanza el stock.</sub></td>
+</tr>
+</table>
+
+### Qué cuida
+
+- **La IA propone, una persona decide:** aprobar una pieza desde el juego equivale al botón de Telegram, pero **la confirmación final del día sigue siendo solo por Telegram**. Cualquier edición o archivo nuevo borra la confirmación.
+- **Precios solo desde el sistema:** el catálogo vive en `CATALOGO` (`src/programacion/inventario.js`) y el servidor rechaza cualquier precio que mande el juego.
+- **Con clave:** las rutas del juego piden `OFICINA_SECRETO` (o `PROGRAMACION_SECRETO` si no está definida). La clave se escribe una vez y queda en ese navegador.
+- **Los cambios largos no cuelgan el juego:** pedirle otra sugerencia a la IA tarda, así que el servidor contesta enseguida y el avance (`trabajando`, `listo` o `error` con el motivo) viaja en el campo `cambios`; el juego lo muestra solo.
+
+### Cómo funciona por dentro
+
+- **Lectura:** el juego consulta `GET /api/programacion/oficina?v=<versión>` cada 3 segundos (piezas con sus archivos, charla reciente con el bot, novedades, lo marcado en el juego y rendimiento de Instagram). Si no cambió nada, el servidor contesta cortito.
+- **Acciones:** `POST /api/programacion/oficina/accion` con `aprobar_pieza`, `cambiar_pieza`, `editar_pieza`, `quitar_archivos`, `cumplir`, `deshacer`, `nota`, `quitar_nota`, `inventario` (`entrada`, `ajuste`, `venta`, `anular_venta`) y `operacion` (tipos `estrategia_*` y datos editables).
+- **Archivos:** `POST /api/programacion/oficina/archivo?id=<pieza>` recibe como cuerpo la foto JPEG o el video MP4/MOV (hasta 40 MB) que se va a publicar.
+- **Documentos del repo:** `scripts/generar-oficina.js` arma en cada build de la web los datos de estrategia, piezas y depósito; el estado de tests y evals sale de la API pública de GitHub.
+- **CORS:** la web tiene que estar en `ALLOWED_ORIGINS`.
+- **Cómo se edita el juego:** las fuentes están en [`web/fuentes-oficina/`](web/fuentes-oficina/) (partes JS y HTML) y se ensamblan con `python3 web/fuentes-oficina/asm.py`, que regenera `web/public/oficina/index.html`. Ese archivo es generado: no se edita a mano. Necesita three.js r128, que se carga desde cdnjs.
 
 ## Qué demuestra este proyecto
 
@@ -24,7 +85,7 @@ La parte difícil de usar IA en serio no es llamarla, es **poder confiar en lo q
 - **Evals con un número:** hay casos fijos que corren gratis en cada cambio y una corrida con la IA real que mide qué porcentaje de planes cumple las reglas y cuánto cuesta cada uno.
 - **Tests que prueban a los tests:** el mutation testing (romper el código a propósito y comprobar que algún test lo detecte) se aplicó a mano en las partes críticas, como las reglas de marca (ver `evals/README.md`). No corre automáticamente en el CI: ahí solo corre `npm test`.
 - **Control del gasto:** tope por corrida, tope mensual y modo simulado que prueba todo el flujo sin gastar.
-- **La IA propone, una persona decide:** ningún agente publica nada.
+- **La IA propone, una persona decide:** ningún agente publica por su cuenta. Una pieza solo sale si una persona la confirma el mismo día, y sin esa confirmación no se publica nada.
 
 ## Qué funciona hoy
 
@@ -33,14 +94,16 @@ La parte difícil de usar IA en serio no es llamarla, es **poder confiar en lo q
 - **Sección Drop 01 en la landing:** muestra la imagen conceptual del drop y el listado que trae de la API, con avisos mientras el servidor despierta y si la carga falla.
 - **Conexión a PostgreSQL (Neon):** pool de conexiones, script de prueba y migración de las tablas `lista_espera` y `productos`.
 - **Rendimiento propio:** `npm run rendimiento` mide las publicaciones de @vow_ar (alcance, guardados, compartidos) y las compara con las cuentas de referencia, sin IA. El Estratega lee el último informe.
+- **Publicación programada por Telegram:** el bot manda el plan, recuerda qué filmar, pide la confirmación del día y publica solo lo confirmado (imágenes, carruseles, reels e historias). Detalle en [Publicación programada](#publicación-programada-de-instagram-telegram).
+- **VOW HQ:** el panel de control en forma de juego, con Taller de diseño, previsualización realista de Instagram, Estrategia, Almacén y Caja conectados al bot. Detalle en [VOW HQ](#vow-hq-el-sistema-como-un-juego).
 - **Sistema de agentes:** Investigador, Estratega y Revisor, coordinados por un orquestador que frena donde hace falta una persona. Detalle en [El sistema de agentes](#el-sistema-de-agentes).
 - **Reglas de marca en código:** voseo, palabras y frases prohibidas, máximo de emojis, y toda cifra tiene que existir en los datos cargados.
-- **Evals offline y online:** 121 casos gratis en el CI y una corrida con la IA real contra una línea base. Detalle en [Cómo sé que funciona](#cómo-sé-que-funciona).
+- **Evals offline y online:** 145 casos gratis en el CI y una corrida con la IA real contra una línea base. Detalle en [Cómo sé que funciona](#cómo-sé-que-funciona).
 - **Tope de gasto:** por corrida y mensual (`TOPE_MENSUAL_USD`), con `npm run gasto` para ver cuánto va del mes.
 - **Piezas de Instagram por código:** láminas de carruseles (`npm run laminas`) y reels animados (`npm run reel:logo`) generados con Playwright y ffmpeg, más la foto de perfil. Las piezas definidas viven en `docs/piezas/`.
 - **Motor de agentes base:** `src/core/runAgent.js` ejecuta agentes sobre el SDK de Anthropic con herramientas, límite de turnos y conteo de tokens.
 - **Calculadora de costos:** calcula el costo de importación por unidad y el margen a partir de los datos de una orden. Todavía no incluye IVA de importación ni Ingresos Brutos, que quedan pendientes de confirmar con un contador.
-- **Tests y CI:** más de 240 tests automáticos (`node --test`) que corren en GitHub Actions con cada push. Los que necesitan base de datos se saltean si no hay `DATABASE_URL`, pero en el CI fallan si falta.
+- **Tests y CI:** más de 500 tests automáticos (`node --test`) que corren en GitHub Actions con cada push. Los que necesitan base de datos se saltean si no hay `DATABASE_URL`, pero en el CI fallan si falta.
 - **Tests e2e:** suite de Playwright en TypeScript (smoke, funcionales con la API simulada, accesibilidad con axe e integración contra la base `dev`) en cuatro navegadores.
 - **Monitoreo:** un workflow programado revisa cada 10 minutos que la landing y `GET /api/salud` respondan, y cada 6 horas que el catálogo del Drop 01 devuelva productos.
 - **Entorno de desarrollo:** configuración de GitHub Codespaces que instala las dependencias y levanta la API y la landing al arrancar.
@@ -59,14 +122,16 @@ flowchart LR
 
     subgraph sg_cloudflare["Cloudflare Pages"]
         landing["Landing de lista de espera<br/>web/ · Vite"]
+        hq["VOW HQ<br/>/oficina/ · three.js"]
     end
 
     subgraph sg_render["Render"]
         api["API de lista de espera y catálogo<br/>src/api · Express"]
+        prog["Publicación programada<br/>src/programacion"]
     end
 
     subgraph sg_neon["Neon · PostgreSQL"]
-        db[("Rama production<br/>tablas lista_espera y productos")]
+        db[("Rama production<br/>tablas del servicio")]
         dbdev[("Rama dev")]
     end
 
@@ -79,10 +144,20 @@ flowchart LR
     end
 
     anthropic["API de Anthropic"]
+    telegram(["Bot de Telegram"])
+    meta["API de Meta<br/>Instagram de @vow_ar"]
+    persona(["Facundo"])
 
     visitante --> landing
     landing -->|"GET /api/salud<br/>POST /api/lista-espera<br/>GET /api/productos?drop=1"| api
     api --> db
+    persona --> hq
+    hq -->|"GET /oficina<br/>POST /oficina/accion"| prog
+    persona <--> telegram
+    telegram -->|"webhook"| prog
+    prog --> db
+    prog -->|"publica lo confirmado"| meta
+    prog --> anthropic
     repo -->|"despliegue automático"| landing
     repo -->|"despliegue automático"| api
     ci -->|"tests de la API"| dbdev
@@ -95,7 +170,7 @@ flowchart LR
 
     classDef existe fill:#ECE8E1,stroke:#0A0A0A,color:#0A0A0A
     classDef planificado fill:#ffffff,stroke:#7A7064,stroke-dasharray:5 5,color:#4F4840
-    class repo,ci,monitoreo,landing,api,db,dbdev,motor,costos,contenido existe
+    class repo,ci,monitoreo,landing,hq,api,prog,db,dbdev,motor,costos,contenido,telegram,meta,persona existe
     class soporte,inventario planificado
     style agentes fill:#ffffff,stroke:#7A7064,color:#4F4840
 ```
@@ -177,8 +252,8 @@ Para usarlo, la app de Meta necesita los permisos `instagram_basic`, `pages_show
 
 Un sistema con IA no se prueba mirando una vez la salida. Hay tres capas:
 
-1. **Tests** (`npm test`): más de 240 tests de reglas, agentes, orquestador, API y diseño, con la IA reemplazada por un cliente simulado.
-2. **Evals offline** (`npm run evals`, gratis, en el CI): 121 casos fijos. Incluyen los falsos positivos reales que ya se corrigieron, para que no vuelvan, y una frase por cada palabra de cada regla de marca. Si una regla no tiene ningún caso que la dispare, el test falla.
+1. **Tests** (`npm test`): más de 500 tests de reglas, agentes, orquestador, API y diseño, con la IA reemplazada por un cliente simulado.
+2. **Evals offline** (`npm run evals`, gratis, en el CI): 145 casos fijos. Incluyen los falsos positivos reales que ya se corrigieron, para que no vuelvan, y una frase por cada palabra de cada regla de marca. Si una regla no tiene ningún caso que la dispare, el test falla.
 3. **Evals online** (`npm run evals:online`, con la IA real): pide al Estratega seis pedidos distintos (con y sin producto, con y sin gente, distintas fases), mide el porcentaje que cumple las reglas, el costo por plan y qué reglas rechazan más, y lo compara con una línea base guardada. Última línea base: **6 de 6 aprobados, unos US$ 0,08 por plan.**
 
 Además, en las partes críticas (reglas de marca) se aplicó **mutation testing** a mano: se rompe el código de a una cosa y se comprueba que algún test falle; los que no fallan se corrigen o se documentan como equivalentes. No está automatizado en el CI, que solo corre `npm test`.
@@ -238,11 +313,13 @@ Flujo: el **lunes** el Estratega arma el plan de la semana y te llega por Telegr
 
 - Recordatorio de filmación: 3 días antes de la fecha de la pieza (si el plan llega con menos margen, sale marcado como urgente).
 - Seguridad: la confirmación vale solo el día en que se da; cualquier edición la borra; una publicación nunca se reintenta sola; si el sistema llega más de 20 minutos tarde, pregunta; `/pausar` y `/reanudar` frenan todo; sin `INSTAGRAM_PERMITIR_PUBLICAR=1` corre en simulación.
+- **No se pierden mensajes:** el webhook guarda cada mensaje de Telegram en la base (`telegram_pendientes`) antes de contestarle OK a Telegram. Si el servidor se reinicia a mitad de camino, el mensaje queda pendiente y se vuelve a procesar solo (en el `tick` y a los 90 segundos de arrancar), hasta 3 intentos. El procesamiento es "al menos una vez": un mensaje recuperado podría correr de nuevo.
+- **El plan semanal es todo o nada:** reemplazar el plan de una semana corre en una transacción, así que si una pieza falla no se cancela el plan anterior.
 - Las historias se publican solas igual que las demás piezas (una foto o un video, sin epígrafe, con la confirmación del día); no hay música de la biblioteca vía API; Telegram solo deja bajar archivos de hasta 20 MB.
 - Cómo se hace cada pieza: el plan indica si es con **video o fotos propios**, **con IA** o **mixta**. Si es con IA, la tarjeta de la pieza trae una indicación lista para copiar y pegar en tu herramienta de IA (qué mostrar, formato, colores y textos exactos). Vos creás el archivo y lo mandás respondiendo al mensaje de la pieza, como con un video filmado. La misma indicación va en el recordatorio de 3 días antes.
 - Imágenes con IA integradas (opcional, atajo): con `CLOUDFLARE_ACCOUNT_ID` y `CLOUDFLARE_API_TOKEN` (Cloudflare Workers AI, FLUX, 10.000 neurons gratis por día; Gemini solo sirve con plan pago de Google), las piezas de tipo imagen muestran el botón 🎨 *Generar con IA*; también sirve `/ia <descripción>` respondiendo a la pieza. La imagen llega por Telegram para que la veas, con *Usar esta*, *Otra* o *Cambiar indicación*. El recorte 4:5 y el isotipo de VOW los pone el código (la IA no dibuja textos ni logos). Tope: 3 intentos por pieza y 10 por día. Los reels y carruseles siguen con tus archivos.
 - Piezas: `src/programacion/`. Plan semanal: `npm run plan:lunes` (workflow `plan-lunes.yml`). Ticker: cron-job.org cada minuto + `tick.yml` de respaldo.
-- **La oficina** (`/oficina/` en la web, el juego de VOW HQ: una aldea isométrica con un edificio por área —Ayuntamiento, Taller de diseño, Torre del bot, Estrategia, Instagram, Almacén y Caja—; los globos rojos marcan lo que necesita tu ojo): lee en vivo `GET /api/programacion/oficina` (piezas con sus archivos, charla reciente con el bot, novedades, lo marcado en el juego y rendimiento de Instagram) y manda sus acciones a `POST /api/programacion/oficina/accion` (`aprobar_pieza`, `cambiar_pieza`, `cumplir`, `deshacer`, `nota`, `quitar_nota`). Las dos rutas piden clave: `OFICINA_SECRETO` (opcional, en Render; si no está, vale `PROGRAMACION_SECRETO`). La clave se escribe una vez en el juego y queda en ese navegador. `cambiar_pieza` hace que la IA arme otra sugerencia para el día de esa pieza (con las novedades, la charla con el bot, el resto de la semana y el rendimiento de Instagram como contexto) y la deja para aprobar de nuevo, con aviso en Telegram. Como tarda, el servidor contesta enseguida y la IA sigue en segundo plano: el avance (`trabajando`, `listo` o `error` con el motivo) viaja en el campo `cambios` del estado, y el juego lo muestra solo. `editar_pieza` edita la publicación existente a mano, sin IA (tipo: publicación, carrusel, reel o historia; epígrafe respetando párrafos; si la pieza solo estaba en los documentos, primero se carga en el sistema), y `POST /oficina/archivo?id=<pieza>` recibe como cuerpo la foto JPEG o el video MP4/MOV (hasta 40 MB) que se publica; `quitar_archivos` los borra. Cualquier edición o archivo nuevo borra la confirmación. El juego consulta `GET /oficina?v=<versión>` cada 3 segundos: si no cambió nada, el servidor contesta cortito. Al confirmar una pieza del día, el juego muestra una previsualización realista de cómo queda en Instagram (feed, carrusel, reel o historia, con el archivo real y el epígrafe) y avisa si la proporción del archivo se va a recortar o a ver con bandas. Aprobar una pieza desde el juego equivale al botón de Telegram y avisa por Telegram; **la confirmación final del día sigue siendo solo por Telegram**. Lo cumplido y las notas también quedan como novedades para el próximo plan. El **Almacén** muestra solo cantidades por producto (stock en 0 hasta registrar la llegada) y la **Caja** registra ventas que descuentan stock solas (acción `inventario`: `entrada`, `ajuste`, `venta`, `anular_venta`; los precios los fija el sistema en `CATALOGO` de `src/programacion/inventario.js` y se rechaza cualquier precio enviado). La **Estrategia** muestra las líneas de la semana, tomadas de la última investigación (`docs/investigacion/informe-*.json`), y se pueden editar, quitar, agregar o restaurar hasta el lunes (acción `operacion`, tipos `estrategia_*`). Todo eso también se maneja desde el chat del bot (`ver_stock`, `registrar_llegada`, `ajustar_stock`, `registrar_venta`, `anular_venta`, `editar_estrategia`, `editar_dato`, `agregar_agenda`, `quitar_agenda`): se guarda en la base, mandan sobre los documentos, le llegan al Estratega como novedad y el workflow `Sincronizar operación` los copia cada 30 minutos a `docs/operacion/` (incluido `inventario.md`) (usa los secretos `URL_PUBLICA` y `PROGRAMACION_SECRETO`). Los documentos del repo (estrategia, piezas, depósito) los arma `scripts/generar-oficina.js` en cada build de la web; el estado de tests y evals sale de la API pública de GitHub. La web tiene que estar en `ALLOWED_ORIGINS`. **El juego se edita en `web/fuentes-oficina/`** (partes JS/HTML) y se ensambla con `python3 web/fuentes-oficina/asm.py`, que regenera `web/public/oficina/index.html`; no edites ese archivo a mano.
+- **VOW HQ** (`/oficina/` en la web): el panel de control del sistema, hecho como un juego. Qué es, qué hace cada edificio y cómo funciona por dentro está en [VOW HQ](#vow-hq-el-sistema-como-un-juego).
 
 Puesta en marcha:
 1. Crear el bot con @BotFather, mandarle `/start` para ver tu chat id.
@@ -261,6 +338,8 @@ Puesta en marcha:
 | Base de datos | PostgreSQL (Neon) |
 | Landing | Vite + JavaScript, con Lenis y GSAP |
 | Agentes | SDK de Anthropic, con un cliente simulado para tests y modo `--simulado` |
+| VOW HQ | three.js r128 (aldea isométrica 3D) en un solo HTML generado desde `web/fuentes-oficina/` |
+| Publicación programada | Bot de Telegram (webhook), API de Meta (contenedores y publicación), Gemini (chat) y Claude (editor de piezas) |
 | Piezas de Instagram | Playwright (render de cuadros) y ffmpeg (video) |
 | Tests | `node --test` y Playwright (e2e) con axe-core |
 | CI y monitoreo | GitHub Actions |
@@ -297,7 +376,11 @@ cp .env.example .env
 | `DATABASE_URL` | Cadena de conexión a PostgreSQL. La usan la API, la migración y los tests de la API. |
 | `TOPE_MENSUAL_USD` | Tope de gasto mensual en dólares para los comandos que usan la IA. Opcional; por defecto 5. |
 | `INSTAGRAM_TOKEN` y `INSTAGRAM_USER_ID` | Acceso a la API oficial de Meta: el Investigador baja datos públicos de las cuentas de referencia y el conector MCP gestiona @vow_ar. |
-| `INSTAGRAM_PERMITIR_PUBLICAR` | Con `1`, el conector MCP puede publicar y responder comentarios. Vacía, solo lee. |
+| `INSTAGRAM_PERMITIR_PUBLICAR` | Con `1`, el conector MCP puede publicar y responder comentarios, y la publicación programada publica de verdad. Vacía, solo lee y simula. |
+| `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_WEBHOOK_SECRETO` | El bot de la publicación programada: token de @BotFather, tu chat y el secreto del webhook. Ver [Puesta en marcha](#publicación-programada-de-instagram-telegram). |
+| `PROGRAMACION_SECRETO`, `URL_PUBLICA` | Clave con la que GitHub Actions y cron-job.org llaman a la API, y la dirección pública de la API. `OFICINA_SECRETO` (opcional, en Render) es una clave aparte para VOW HQ. |
+| `GEMINI_API_KEY`, `GEMINI_MODELO_CHAT`, `GEMINI_MODELO` | Opcionales: el chat con la IA por Telegram (Gemini, plan gratis de Google AI Studio) y, solo con plan pago, imágenes. Sin la clave el bot sigue con botones y comandos. |
+| `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | Opcionales: imágenes con IA (Cloudflare Workers AI). |
 | `ALLOWED_ORIGINS` | Orígenes que pueden llamar a la API desde el navegador, separados por coma. Hace falta cuando la landing llama a la API en otro dominio o puerto (por ejemplo, si `VITE_API_URL` apunta a `http://localhost:3000`, tiene que incluir la dirección donde corre Vite). Si queda vacía, ningún otro sitio puede llamar a la API. |
 | `VITE_API_URL` | URL base de la API que usa la landing. Si queda vacía, la landing llama a `/api/...` en su mismo dominio; en desarrollo, Vite reenvía esas rutas a la API local en el puerto 3000. |
 | `TRUST_PROXY` | Se activa con `1` solo cuando la API corre detrás de un proxy. Así el límite de pedidos usa la IP real del visitante (`X-Forwarded-For`) y no la del proxy. En local se deja vacía. |
@@ -345,15 +428,18 @@ El `.env` no se crea solo: hay que copiarlo de `.env.example` y completarlo, com
 | `npm run test:e2e` | Corre la suite e2e de Playwright (ver [Tests e2e](#tests-e2e-playwright)). |
 | `npm run servidor` | Levanta la API (lista de espera y catálogo). |
 | `npm run db-probar` | Verifica la conexión a la base y muestra la versión de PostgreSQL. |
-| `npm run db-migrar` | Crea las tablas `lista_espera` y `productos` si no existen y agrega las columnas nuevas a las tablas existentes. Se puede correr más de una vez. |
+| `npm run db-migrar` | Crea las tablas que faltan (lista de espera, catálogo, piezas programadas y sus archivos, recordatorios, estado del bot, mensajes pendientes de Telegram y novedades) y agrega las columnas nuevas. Se puede correr más de una vez. |
 | `npm run db-seed` | Carga o actualiza los productos del Drop 01. Se puede correr más de una vez sin duplicar y nunca borra registros. |
 | `npm run costos` | Corre la calculadora de costos con un caso de ejemplo. |
-| `npm run evals` | Corre las 121 evals offline (gratis). |
+| `npm run evals` | Corre las 145 evals offline (gratis). |
 | `npm run evals:online` | Corre las evals con la IA real contra la línea base. **Gasta**; tiene `--tope-usd`, `--solo`, `--repeticiones` y `--simulado`. |
 | `npm run semana -- --semana AAAA-MM-DD` | Corre el flujo semanal: planificar, revisar y esperar tu aprobación. Con `--simulado` no gasta. |
 | `npm run plan -- --semana AAAA-MM-DD` | Pide solo el plan al Estratega (sin orquestador). |
 | `npm run investigar` y `npm run analizar` | Bajan datos de las cuentas de referencia y los analizan con la IA (`analizar` gasta). |
 | `npm run gasto` | Muestra cuánto se gastó este mes contra el tope. |
+| `npm run rendimiento` | Mide las publicaciones de @vow_ar contra las cuentas de referencia (sin IA). |
+| `npm run plan:lunes` | Arma el plan de la semana y lo manda por Telegram (lo usa el workflow `plan-lunes.yml`). |
+| `npm run telegram:webhook` | Registra en Telegram la dirección y el secreto del webhook del bot. |
 | `npm run mcp:instagram` | Levanta el servidor MCP de Instagram a mano (normalmente lo levanta Claude Code desde `.mcp.json`). |
 | `npm run laminas`, `npm run reel`, `npm run reel:logo`, `npm run foto-perfil` | Generan las láminas de los carruseles, los reels y la foto de perfil de Instagram. |
 | `npm run hola` | Pide un eslogan a la API de Anthropic. Hace una llamada real y consume crédito. |
@@ -367,7 +453,7 @@ Dentro de `web/`: `npm run dev`, `npm run build` y `npm run preview`.
 npm test
 ```
 
-Son más de 240 tests: calculadora de costos, lista de espera, catálogo, reglas de marca, agentes, orquestador, tope de gasto y piezas de diseño. Los de la API necesitan `DATABASE_URL` (si falta se saltean en local y fallan en el CI) y antes de empezar corren la migración; los del catálogo también corren el seed. Las dos operaciones se pueden repetir sin duplicar datos. Los de la lista de espera usan emails descartables bajo un dominio `.invalid` y, al terminar, borran los registros que crearon.
+Son más de 500 tests: calculadora de costos, lista de espera, catálogo, reglas de marca, agentes, orquestador, tope de gasto, piezas de diseño, bot de Telegram, publicación programada, oficina, stock y caja. Los del repositorio de la publicación programada corren contra memoria y, si hay `DATABASE_URL`, contra Postgres con el mismo contrato; sin base se saltean unos 20. Los de la API necesitan `DATABASE_URL` (si falta se saltean en local y fallan en el CI) y antes de empezar corren la migración; los del catálogo también corren el seed. Las dos operaciones se pueden repetir sin duplicar datos. Los de la lista de espera usan emails descartables bajo un dominio `.invalid` y, al terminar, borran los registros que crearon.
 
 Los tests de la API usan la rama `dev` de Neon: tanto en local como en la CI, `DATABASE_URL` tiene que apuntar a `dev` y nunca a `production`.
 
@@ -421,6 +507,9 @@ Para cargar `E2E_PROD_DB_HOST` en GitHub: **Settings > Secrets and variables > A
 | [`e2e.yml`](.github/workflows/e2e.yml) | En cada pull request (Chromium); los lunes y a mano, con los cuatro navegadores | Chequea los tipos de `e2e/` y corre la suite de Playwright contra la API local y la base `dev`. Guarda los navegadores en caché y, si algo falla, sube el reporte HTML y las trazas como artefactos. |
 | [`monitoreo.yml`](.github/workflows/monitoreo.yml) | Cada 10 minutos y cada 6 horas (y a mano desde la pestaña Actions) | Cada 10 minutos revisa que la landing cargue y que `GET /api/salud` responda `{ "ok": true }`; de paso, mantiene despierta la API en Render sin tocar la base. Cada 6 horas revisa que `GET /api/productos?drop=1` devuelva al menos un producto. |
 
+| [`tick.yml`](.github/workflows/tick.yml) | Cada 5 minutos y a mano | Respaldo del ticker principal (cron-job.org, cada minuto): llama a `POST /api/programacion/tick`, que publica lo confirmado a su hora, manda recordatorios y recupera mensajes de Telegram pendientes. |
+| [`plan-lunes.yml`](.github/workflows/plan-lunes.yml) | Los lunes a las 11:00 UTC y a mano | Arma el plan de la semana y lo manda por Telegram. |
+| [`sincronizar-operacion.yml`](.github/workflows/sincronizar-operacion.yml) | Cada 30 minutos y a mano | Copia a `docs/operacion/` lo que se editó en VOW HQ y en el chat del bot. |
 | [`evals-online.yml`](.github/workflows/evals-online.yml), [`plan-semanal.yml`](.github/workflows/plan-semanal.yml), [`investigar.yml`](.github/workflows/investigar.yml) | Solo a mano desde la pestaña Actions, y solo desde `main` | Corren las evals online, el plan semanal y la investigación de cuentas con la IA real. Gastan, por eso nunca corren solos. El resultado queda en el resumen de la corrida y como archivo descargable. |
 
 El monitoreo necesita el secreto `API_URL` con la URL base de la API; si falta, falla con un aviso que lo indica. GitHub solo ejecuta los workflows programados desde la rama por defecto (`main`).
@@ -440,6 +529,9 @@ El monitoreo necesita el secreto `API_URL` con la URL base de la API; si falta, 
 - [x] Catálogo del Drop 01 en la API y en la landing.
 - [x] Agentes de contenido (Investigador, Estratega y Revisor) con evaluaciones, línea base y tope de gasto.
 - [x] Piezas de Instagram generadas por código (carruseles y reels).
+- [x] Publicación programada por Telegram: plan semanal, confirmación del día y publicación automática (incluye historias).
+- [x] VOW HQ: panel de control en forma de juego, con previsualización realista de Instagram, Estrategia, Almacén y Caja.
+- [ ] Probar una historia real contra la API de Instagram (hasta ahora se probó con un Meta simulado).
 - [ ] Publicar con constancia (una pieza por semana desde el 2/11/2026) y sumar material real filmado.
 - [ ] Medir el rendimiento de @vow_ar con sus propios datos.
 - [ ] Agente de atención al cliente y agente de inventario (cuando haya producto).
