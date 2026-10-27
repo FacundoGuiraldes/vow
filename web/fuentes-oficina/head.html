@@ -281,6 +281,17 @@ button:focus-visible{outline:3px solid var(--beige);outline-offset:2px}
 .ig-chk{list-style:none;margin:10px 4px 0;padding:0;font:12.5px/1.4 var(--f-body);color:#2a261e}
 .ig-chk li{margin:3px 0}.ig-chk b{display:inline-block;width:15px;text-align:center}.ig-chk .ok b{color:#2f8a52}.ig-chk .mal b{color:#b3263a}.ig-chk .aviso b{color:#b87513}
 @media (prefers-reduced-motion:reduce){.ig-prog i{animation:none;transform:scaleX(.4)}}
+
+/* historia: el medio es 9:16 completo arriba; «Enviar mensaje» va debajo, sobre negro, como en un celular alto */
+.ig-full.ig-st{inset:auto;left:0;right:0;top:0;bottom:auto;aspect-ratio:9/16}
+.ig-full.ig-st::after{background:linear-gradient(180deg,rgba(0,0,0,.38),transparent 20%)}
+.ig-pant.ig-conzonas .ig-sp{background:#000;padding:10px 12px 24px}
+.ig-zonas{position:absolute;inset:0;z-index:4;display:none;pointer-events:none}
+.ig-zonas::before,.ig-zonas::after{content:"";position:absolute;left:0;right:0;height:14%;background:repeating-linear-gradient(135deg,rgba(192,64,90,.38) 0 8px,rgba(192,64,90,.18) 8px 16px);border:1.5px dashed #ff8aa0}
+.ig-zonas::before{top:0;border-width:0 0 1.5px}.ig-zonas::after{bottom:0;border-width:1.5px 0 0}
+.ig-zonas span{position:absolute;left:0;right:0;text-align:center;font:600 10px var(--f-body);color:#fff;text-shadow:0 1px 2px #000}.ig-zonas .arr{top:6%}.ig-zonas .aba{bottom:5%}
+.ig-pant.ver-zonas .ig-zonas{display:block}
+.ig-bz{display:block;margin:10px auto 0}
 </style>
 </head>
 <body>
