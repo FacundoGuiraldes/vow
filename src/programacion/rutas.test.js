@@ -57,10 +57,31 @@ describe("rutas de la publicación programada", () => {
     await router.esperarPendientes();
     assert.equal(llamadas.actualizaciones.filter((x) => x.update_id === 10).length, 1);
 
-    // una anterior a la última también se ignora
-    await pedir("/telegram", { metodo: "POST", cuerpo: { update_id: 9 }, encabezados });
+  });
+
+  test("el webhook guarda la actualización antes de contestar y, si el procesamiento se cae, queda pendiente para recuperarla", async () => {
+    const encabezados = { "X-Telegram-Bot-Api-Secret-Token": SECRETO_WEBHOOK };
+    const u = { update_id: 11, message: { text: "se cae" } };
+    const original = servicio.manejarActualizacion;
+    servicio.manejarActualizacion = async () => { throw new Error("se reinició el servidor"); };
+    try {
+      assert.equal((await pedir("/telegram", { metodo: "POST", cuerpo: u, encabezados })).status, 200);
+      await router.esperarPendientes();
+    } finally {
+      servicio.manejarActualizacion = original;
+    }
+    // quedó guardada y sin marcar: se puede reclamar para reintentarla
+    const reclamadas = await repo.reclamarActualizacionesPendientes({ antesDe: new Date(Date.now() + 1000) });
+    assert.deepEqual(reclamadas.map((x) => x.id), [11]);
+    assert.equal(reclamadas[0].cuerpo.message.text, "se cae");
+  });
+
+  test("el webhook ignora lo que no trae un update_id entero", async () => {
+    const encabezados = { "X-Telegram-Bot-Api-Secret-Token": SECRETO_WEBHOOK };
+    const antes = llamadas.actualizaciones.length;
+    assert.equal((await pedir("/telegram", { metodo: "POST", cuerpo: { message: {} }, encabezados })).status, 200);
     await router.esperarPendientes();
-    assert.equal(llamadas.actualizaciones.filter((x) => x.update_id === 9).length, 0);
+    assert.equal(llamadas.actualizaciones.length, antes);
   });
 
   test("/tick exige la clave", async () => {

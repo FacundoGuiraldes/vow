@@ -1190,3 +1190,16 @@ describe("el mismo bot en Telegram y en el juego", () => {
     assert.equal((await e.repo.piezasDelDia("2026-11-02")).length, 0);
   });
 });
+
+describe("recuperación de mensajes de Telegram que no se terminaron de procesar", () => {
+  test("el tick reprocesa una vez lo que quedó pendiente y no vuelve a tocarlo", async () => {
+    const e = crearEscenario({ fecha: "2026-10-26" });
+    const u = { update_id: 77, ...e.actualizacion.texto("hola") };
+    await e.repo.registrarActualizacion(77, u); // llegó, pero el servidor se reinició antes de procesarlo
+    assert.equal(await e.servicio.recuperarActualizaciones({ minutos: 2 }), 0); // todavía es reciente
+    const enviadosAntes = e.telegram.enviados.length;
+    assert.equal(await e.servicio.recuperarActualizaciones({ minutos: -1 }), 1);
+    assert.ok(e.telegram.enviados.length > enviadosAntes); // el bot contestó
+    assert.equal(await e.servicio.recuperarActualizaciones({ minutos: -1 }), 0); // ya está marcado
+  });
+});

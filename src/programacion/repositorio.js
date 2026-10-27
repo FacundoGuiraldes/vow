@@ -17,22 +17,30 @@ export function crearRepositorio(pool, { prefijoEstado = "" } = {}) {
   return {
     // Guarda las piezas de una semana. Lo que estaba sin aprobar de esa semana se cancela (llegó un plan nuevo).
     async crearPiezas(semana, piezas) {
-      await pool.query(
-        "UPDATE piezas_programadas SET estado = 'cancelada', actualizado_en = now() WHERE semana = $1 AND estado IN ('propuesta', 'aprobada')",
-        [semana],
-      );
-      const creadas = [];
-      for (const { fecha, hora, pieza } of piezas) {
-        creadas.push(
-          await una(`INSERT INTO piezas_programadas (semana, fecha, hora, pieza) VALUES ($1, $2, $3, $4::jsonb) RETURNING ${COLUMNAS}`, [
-            semana,
-            fecha,
-            hora,
-            JSON.stringify(pieza),
-          ]),
+      // Todo o nada: si una inserción falla, el plan anterior sigue como estaba (no queda cancelado a medias)
+      const cliente = await pool.connect();
+      try {
+        await cliente.query("BEGIN");
+        await cliente.query(
+          "UPDATE piezas_programadas SET estado = 'cancelada', actualizado_en = now() WHERE semana = $1 AND estado IN ('propuesta', 'aprobada')",
+          [semana],
         );
+        const creadas = [];
+        for (const { fecha, hora, pieza } of piezas) {
+          const { rows } = await cliente.query(
+            `INSERT INTO piezas_programadas (semana, fecha, hora, pieza) VALUES ($1, $2, $3, $4::jsonb) RETURNING ${COLUMNAS}`,
+            [semana, fecha, hora, JSON.stringify(pieza)],
+          );
+          creadas.push(rows[0]);
+        }
+        await cliente.query("COMMIT");
+        return creadas;
+      } catch (error) {
+        await cliente.query("ROLLBACK").catch(() => {});
+        throw error;
+      } finally {
+        cliente.release();
       }
-      return creadas;
     },
 
     // Una pieza suelta (la que arma el chat para un día): no toca las otras piezas de la semana
@@ -126,6 +134,33 @@ export function crearRepositorio(pool, { prefijoEstado = "" } = {}) {
         "INSERT INTO bot_estado (clave, valor) VALUES ($1, $2::jsonb) ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor, actualizado_en = now()",
         [clave(nombre), JSON.stringify(valor)],
       );
+    },
+
+    // Bandeja de entrada de Telegram: el mensaje se guarda ANTES de contestarle OK a Telegram, así un reinicio no lo pierde.
+    // Devuelve true si es nuevo y false si ya estaba (Telegram reenvió el mismo update_id).
+    async registrarActualizacion(id, cuerpo) {
+      const r = await pool.query("INSERT INTO telegram_pendientes (clave, cuerpo) VALUES ($1, $2::jsonb) ON CONFLICT (clave) DO NOTHING RETURNING clave", [clave(`tg:${id}`), JSON.stringify(cuerpo)]);
+      return r.rowCount === 1;
+    },
+
+    async marcarActualizacionProcesada(id) {
+      await pool.query("UPDATE telegram_pendientes SET procesada_en = now() WHERE clave = $1", [clave(`tg:${id}`)]);
+    },
+
+    // Los mensajes que quedaron sin procesar (el servicio se cayó a mitad de camino). Cada uno se reclama de forma atómica:
+    // dos reintentos a la vez no lo toman dos veces, y después de `maximo` intentos se deja de insistir.
+    async reclamarActualizacionesPendientes({ antesDe, maximo = 3 }) {
+      const r = await pool.query(
+        `UPDATE telegram_pendientes SET intento_en = now(), intentos = intentos + 1
+         WHERE procesada_en IS NULL AND intento_en < $1 AND intentos < $2 AND clave LIKE $3
+         RETURNING clave, cuerpo`,
+        [antesDe, maximo, `${clave("tg:")}%`],
+      );
+      return r.rows.map((f) => ({ id: Number(f.clave.slice(clave("tg:").length)), cuerpo: f.cuerpo }));
+    },
+
+    async borrarActualizacionesViejas(antesDe) {
+      await pool.query("DELETE FROM telegram_pendientes WHERE procesada_en IS NOT NULL AND procesada_en < $1 AND clave LIKE $2", [antesDe, `${clave("tg:")}%`]);
     },
 
     // Cambia el valor SOLO si era distinto. Devuelve true si lo cambió: quien lo logra "se queda" con la tarea del día.

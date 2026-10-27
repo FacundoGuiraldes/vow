@@ -1021,10 +1021,28 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
   }
 
   // Se llama cada minuto (cron-job.org) y cada 5 minutos (GitHub Actions, de respaldo). Es idempotente: llamarlo de más no hace nada.
+  // Mensajes de Telegram que se guardaron pero no llegaron a procesarse (el servicio se cayó a mitad de camino).
+  // Se reintentan hasta 3 veces; los ya procesados se borran a los 7 días.
+  async function recuperarActualizaciones({ minutos = 2 } = {}) {
+    const pendientes = await repo.reclamarActualizacionesPendientes({ antesDe: new Date(Date.now() - minutos * 60_000) });
+    for (const { id, cuerpo } of pendientes) {
+      try {
+        await manejarActualizacion(cuerpo);
+        await repo.marcarActualizacionProcesada(id);
+      } catch (error) {
+        console.error(`Error al recuperar el mensaje ${id} de Telegram (se reintenta hasta 3 veces): ${error.message}`);
+      }
+    }
+    await repo.borrarActualizacionesViejas(new Date(Date.now() - 7 * 24 * 60 * 60_000));
+    return pendientes.length;
+  }
+
   async function tick() {
+    const recuperados = await recuperarActualizaciones().catch((error) => (console.error(`No se pudo revisar la bandeja de Telegram: ${error.message}`), 0));
     const { fecha: hoy, hora } = ahora();
     const minutos = minutosDelDia(hora);
     const acciones = [];
+    if (recuperados) acciones.push(`telegram-recuperados:${recuperados}`);
 
     // Aviso de las 8: recordatorios de filmación y confirmación de lo de hoy (una sola vez por día)
     if (minutos >= minutosDelDia(HORA_RESUMEN)) {
@@ -1053,5 +1071,5 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     return { fecha: hoy, hora, acciones };
   }
 
-  return { recibirPlan, avisarFalloDelPlan, manejarActualizacion, aprobarDesdeJuego, confirmarDesdeJuego, sugerirCambio, cambiarSinFila, editarDesdeJuego, adjuntarDesdeJuego, quitarArchivosDesdeJuego, conversarDesdeJuego, charla, tick, enviarResumenDiario: () => enviarResumenDiario(ahora().fecha) };
+  return { recibirPlan, avisarFalloDelPlan, manejarActualizacion, aprobarDesdeJuego, confirmarDesdeJuego, sugerirCambio, cambiarSinFila, editarDesdeJuego, adjuntarDesdeJuego, quitarArchivosDesdeJuego, conversarDesdeJuego, charla, tick, recuperarActualizaciones, enviarResumenDiario: () => enviarResumenDiario(ahora().fecha) };
 }

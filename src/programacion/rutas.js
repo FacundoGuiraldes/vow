@@ -71,12 +71,16 @@ export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOfic
     try {
       if (!secretoWebhook || !iguales(req.headers["x-telegram-bot-api-secret-token"] ?? "", secretoWebhook)) return res.sendStatus(401);
       const actualizacion = req.body;
-      // Telegram reenvía lo que no contestamos a tiempo: un update_id ya visto no se vuelve a procesar
-      const ultimo = Number(await repo.leerEstado("ultimo_update")) || 0;
-      if (!Number.isInteger(actualizacion?.update_id) || actualizacion.update_id <= ultimo) return res.sendStatus(200);
-      await repo.guardarEstado("ultimo_update", actualizacion.update_id);
+      if (!Number.isInteger(actualizacion?.update_id)) return res.sendStatus(200);
+      // Primero se GUARDA el mensaje y recién después se le contesta OK a Telegram: si el servicio se cae a mitad de camino,
+      // el mensaje queda pendiente y se recupera solo (servicio.recuperarActualizaciones). Un update_id ya visto no se repite.
+      if (!(await repo.registrarActualizacion(actualizacion.update_id, actualizacion))) return res.sendStatus(200);
       res.sendStatus(200); // se contesta ya: editar con la IA puede tardar más de lo que Telegram espera
-      const trabajo = servicio.manejarActualizacion(actualizacion).catch((error) => console.error(`Error en el bot de Telegram: ${error.message}`));
+      const trabajo = servicio
+        .manejarActualizacion(actualizacion)
+        // solo se marca si terminó bien: si falló, queda pendiente y se reintenta (hasta 3 veces)
+        .then(() => repo.marcarActualizacionProcesada(actualizacion.update_id))
+        .catch((error) => console.error(`Error en el bot de Telegram (queda pendiente): ${error.message}`));
       pendientes.add(trabajo);
       trabajo.finally(() => pendientes.delete(trabajo));
     } catch (error) {
