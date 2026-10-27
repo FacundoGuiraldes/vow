@@ -22,7 +22,7 @@ La parte difícil de usar IA en serio no es llamarla, es **poder confiar en lo q
 
 - **Reglas que se pueden probar:** la marca tiene un manual (`docs/marca/cerebro-de-marca.md`) y sus reglas están en código, no solo en un prompt. Frenan datos inventados, frases fuera de tono y ganchos repetidos.
 - **Evals con un número:** hay casos fijos que corren gratis en cada cambio y una corrida con la IA real que mide qué porcentaje de planes cumple las reglas y cuánto cuesta cada uno.
-- **Tests que prueban a los tests:** cada cambio pasa por mutation testing (se rompe el código a propósito y se comprueba que algún test lo detecte).
+- **Tests que prueban a los tests:** el mutation testing (romper el código a propósito y comprobar que algún test lo detecte) se aplicó a mano en las partes críticas, como las reglas de marca (ver `evals/README.md`). No corre automáticamente en el CI: ahí solo corre `npm test`.
 - **Control del gasto:** tope por corrida, tope mensual y modo simulado que prueba todo el flujo sin gastar.
 - **La IA propone, una persona decide:** ningún agente publica nada.
 
@@ -181,7 +181,7 @@ Un sistema con IA no se prueba mirando una vez la salida. Hay tres capas:
 2. **Evals offline** (`npm run evals`, gratis, en el CI): 121 casos fijos. Incluyen los falsos positivos reales que ya se corrigieron, para que no vuelvan, y una frase por cada palabra de cada regla de marca. Si una regla no tiene ningún caso que la dispare, el test falla.
 3. **Evals online** (`npm run evals:online`, con la IA real): pide al Estratega seis pedidos distintos (con y sin producto, con y sin gente, distintas fases), mide el porcentaje que cumple las reglas, el costo por plan y qué reglas rechazan más, y lo compara con una línea base guardada. Última línea base: **6 de 6 aprobados, unos US$ 0,08 por plan.**
 
-Además, cada cambio pasa por **mutation testing**: se rompe el código de a una cosa y se comprueba que algún test falle. Los que no fallan se corrigen o se documentan como equivalentes.
+Además, en las partes críticas (reglas de marca) se aplicó **mutation testing** a mano: se rompe el código de a una cosa y se comprueba que algún test falle; los que no fallan se corrigen o se documentan como equivalentes. No está automatizado en el CI, que solo corre `npm test`.
 
 Un ejemplo de cómo se ve en la práctica: una corrida online rechazó planes por la cifra "6". Con los errores que muestran la frase se vio que era "carrusel de 6 láminas", una medida de armado y no un dato inventado. La regla estaba siendo demasiado estricta; se corrigió solo para el guion, con tests que prueban que "3 días" o "5 straps" siguen siendo rechazados, y una nueva corrida dio 6 de 6. Los detalles de las evals están en [`evals/README.md`](evals/README.md).
 

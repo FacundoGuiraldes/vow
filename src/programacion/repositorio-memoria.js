@@ -9,6 +9,7 @@ export function crearRepositorioMemoria() {
   let medios = [];
   let recordatorios = [];
   const estado = new Map();
+  const bandeja = new Map(); // mensajes de Telegram recibidos: id → { cuerpo, intento_en, intentos, procesada }
   let novedades = [];
   const ids = { pieza: 1, medio: 1, recordatorio: 1, novedad: 1 };
 
@@ -16,6 +17,8 @@ export function crearRepositorioMemoria() {
 
   return {
     async crearPiezas(semana, nuevas) {
+      // Igual que en Postgres: si algo no es válido no se toca nada (todo o nada)
+      for (const { fecha } of nuevas) if (!/^\d{4}-\d{2}-\d{2}$/.test(String(fecha)) || Number.isNaN(Date.parse(`${fecha}T00:00:00Z`))) throw new Error(`Fecha inválida: ${fecha}`);
       for (const p of piezas) if (p.semana === semana && ["propuesta", "aprobada"].includes(p.estado)) p.estado = "cancelada";
       return nuevas.map(({ fecha, hora, pieza }) => {
         const fila = {
@@ -82,6 +85,23 @@ export function crearRepositorioMemoria() {
     async marcarRecordatorioEnviado(id) { const r = recordatorios.find((x) => x.id === id); if (r) r.enviado = true; },
     async borrarRecordatoriosPendientes(piezaId) { recordatorios = recordatorios.filter((r) => r.pieza_id !== piezaId || r.enviado); },
     async leerEstado(clave) { return estado.has(clave) ? copiar(estado.get(clave)) : null; },
+    async registrarActualizacion(id, cuerpo) {
+      if (bandeja.has(id)) return false;
+      bandeja.set(id, { cuerpo: copiar(cuerpo), intento_en: Date.now(), intentos: 1, procesada: null });
+      return true;
+    },
+    async marcarActualizacionProcesada(id) { const f = bandeja.get(id); if (f) f.procesada = Date.now(); },
+    async reclamarActualizacionesPendientes({ antesDe, maximo = 3 }) {
+      const limite = new Date(antesDe).getTime(), salida = [];
+      for (const [id, f] of bandeja) {
+        if (f.procesada === null && f.intento_en < limite && f.intentos < maximo) { f.intento_en = Date.now(); f.intentos += 1; salida.push({ id, cuerpo: copiar(f.cuerpo) }); }
+      }
+      return salida;
+    },
+    async borrarActualizacionesViejas(antesDe) {
+      const limite = new Date(antesDe).getTime();
+      for (const [id, f] of bandeja) if (f.procesada !== null && f.procesada < limite) bandeja.delete(id);
+    },
     async guardarEstado(clave, valor) { estado.set(clave, copiar(valor)); },
     async tomarEstado(clave, valor) {
       if (estado.has(clave) && JSON.stringify(estado.get(clave)) === JSON.stringify(valor)) return false;

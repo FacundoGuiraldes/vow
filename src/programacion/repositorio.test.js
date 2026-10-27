@@ -40,6 +40,29 @@ function contrato(nombre, crear, { saltear = false, alTerminar = async () => {} 
       assert.equal(await repo.obtenerPieza(999_999_999), null);
     });
 
+    test("reemplazar un plan es todo o nada: si una pieza falla, no se cancela ni se crea nada", async () => {
+      const [previa] = await repo.crearPiezas("2099-02-09", [{ ...pieza(), fecha: "2099-02-11" }]);
+      await assert.rejects(() => repo.crearPiezas("2099-02-09", [{ ...pieza(), fecha: "2099-02-12" }, { ...pieza(), fecha: "no-es-fecha" }]));
+      assert.equal((await repo.obtenerPieza(previa.id)).estado, "propuesta");
+      assert.deepEqual((await repo.piezasDeSemana("2099-02-09")).map((f) => f.id), [previa.id]);
+    });
+
+    test("la bandeja de Telegram guarda cada actualización una vez y permite recuperar las que no se terminaron", async () => {
+      const id = 900_000_000 + (process.pid % 1000);
+      assert.equal(await repo.registrarActualizacion(id, { update_id: id, message: { text: "a" } }), true);
+      assert.equal(await repo.registrarActualizacion(id, { update_id: id }), false);
+      const futuro = new Date(Date.now() + 3_600_000);
+      // recién registrada: todavía no toca reintentarla
+      assert.equal((await repo.reclamarActualizacionesPendientes({ antesDe: new Date(Date.now() - 3_600_000) })).filter((x) => x.id === id).length, 0);
+      const primera = await repo.reclamarActualizacionesPendientes({ antesDe: futuro });
+      assert.deepEqual(primera.filter((x) => x.id === id).map((x) => x.cuerpo.message.text), ["a"]);
+      // reclamarla la marca como "en intento": otro reclamo inmediato no la devuelve de nuevo
+      assert.equal((await repo.reclamarActualizacionesPendientes({ antesDe: new Date(Date.now() - 3_600_000) })).filter((x) => x.id === id).length, 0);
+      await repo.marcarActualizacionProcesada(id);
+      assert.equal((await repo.reclamarActualizacionesPendientes({ antesDe: new Date(Date.now() + 3_600_000) })).filter((x) => x.id === id).length, 0);
+      await repo.borrarActualizacionesViejas(new Date(Date.now() + 3_600_000));
+    });
+
     test("un plan nuevo de la misma semana cancela lo que estaba sin aprobar, y las canceladas no aparecen por día", async () => {
       const [vieja] = await repo.crearPiezas("2099-02-02", [{ ...pieza(), fecha: "2099-02-04" }]);
       const [nueva] = await repo.crearPiezas("2099-02-02", [{ ...pieza(), fecha: "2099-02-04" }]);
@@ -177,6 +200,7 @@ contrato(
       if (!pool) return;
       await pool.query("DELETE FROM piezas_programadas WHERE semana BETWEEN '2099-01-01' AND '2099-12-31'");
       await pool.query("DELETE FROM bot_estado WHERE clave LIKE $1", [`${prefijo}%`]);
+      await pool.query("DELETE FROM telegram_pendientes WHERE clave LIKE '%tg:9000%'");
       await pool.query("DELETE FROM novedades WHERE texto LIKE $1", [`${prefijo}%`]);
       await pool.end();
     },

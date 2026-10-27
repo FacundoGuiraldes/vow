@@ -64,6 +64,14 @@ const SENTENCIAS = [
     valor JSONB NOT NULL,
     actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()
   )`,
+  `CREATE TABLE IF NOT EXISTS telegram_pendientes (
+    clave TEXT PRIMARY KEY,
+    cuerpo JSONB NOT NULL,
+    recibido_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+    intento_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+    intentos INTEGER NOT NULL DEFAULT 1,
+    procesada_en TIMESTAMPTZ
+  )`,
   `CREATE TABLE IF NOT EXISTS novedades (
     id SERIAL PRIMARY KEY,
     texto TEXT NOT NULL,
