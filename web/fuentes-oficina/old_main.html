@@ -1604,7 +1604,7 @@ function textoVisible(p){
 /* junta lo que dicen los documentos con lo que dice la base (la base manda en el estado) */
 function armarD(){
   var d=JSON.parse(JSON.stringify(DOCS.D||{})),v=VIVO,piezas=(d.piezas||[]).slice(),agenda=(d.agenda||[]).slice(),pend=(d.pendientes||[]).slice();
-  MEDIOS_VIVOS={};
+  MEDIOS_VIVOS={};MEDIOS_ID={};
   if(v){
     (v.piezas||[]).forEach(function(p){
       if(p.estado==='cancelada')return;
@@ -1614,7 +1614,7 @@ function armarD(){
       if(ex){ex.epigrafe=textoVisible(p);ex._epi=(p.pieza&&p.pieza.epigrafe)||'';ex.titulo=titulo;ex.texto=textoPieza(p);ex.formato=fm;ex._fmt=p.formato;ex.estado=est;ex._id=p.id;ex._est=p.estado;ex._hora=p.hora;ex.nota=nota;ex.fecha=p.fecha;if(p.permalink)ex.permalink=p.permalink}
       else piezas.push({fecha:p.fecha,formato:fm,titulo:titulo,estado:est,nota:nota,texto:textoPieza(p),epigrafe:textoVisible(p),_epi:(p.pieza&&p.pieza.epigrafe)||'',_id:p.id,_fmt:p.formato,_est:p.estado,_hora:p.hora,permalink:p.permalink||null,_vivo:true});
       var k=p.fecha+'_'+fm;
-      if(p.medios&&p.medios.length){MEDIOS_VIVOS[k]={imgs:p.medios.filter(function(m){return m.tipo==='imagen'}).map(function(m){return API+'/api/programacion/medios/'+m.token}),vid:(p.medios.filter(function(m){return m.tipo==='video'})[0]||{}).token?API+'/api/programacion/medios/'+p.medios.filter(function(m){return m.tipo==='video'})[0].token:undefined}}
+      if(p.medios&&p.medios.length){MEDIOS_VIVOS[k]={imgs:p.medios.filter(function(m){return m.tipo==='imagen'}).map(function(m){return API+'/api/programacion/medios/'+m.token}),vid:(p.medios.filter(function(m){return m.tipo==='video'})[0]||{}).token?API+'/api/programacion/medios/'+p.medios.filter(function(m){return m.tipo==='video'})[0].token:undefined};MEDIOS_ID[p.id]=MEDIOS_VIVOS[k]}
       var tt=ex?ex.titulo:titulo;
       if(p.estado==='propuesta')pend.push({sala:'diseno',t:'Aprobar «'+tt+'» del '+ddf(p.fecha)});
       if(p.estado==='fallida')pend.push({sala:'bot',t:'Revisar la publicación fallida del '+ddf(p.fecha)+(p.error?': '+p.error:'')});
@@ -1643,7 +1643,7 @@ function armarD(){
   d.sistema={tests:CI.tests||'sin datos todavía',evals:CI.evals||'sin datos todavía'};
   return d;
 }
-var MEDIOS_VIVOS={};
+var MEDIOS_VIVOS={},MEDIOS_ID={};
 function ddf(f){var p=String(f||'').split('-');return p.length===3?p[2]+'/'+p[1]:f}
 function armarMED(){
   var m=JSON.parse(JSON.stringify(DOCS.MED||{piezas:{}}));m.piezas=m.piezas||{};

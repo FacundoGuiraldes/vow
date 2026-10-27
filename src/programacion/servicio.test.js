@@ -420,17 +420,40 @@ describe("publicación a la hora", () => {
     assert.match(e.telegram.ultimo().texto, /cupo/);
   });
 
-  test("las stories no se publican solas: a la hora avisa para publicarla a mano", async () => {
+  test("una historia con foto se publica sola a la hora, sin epígrafe", async () => {
     const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00" });
     const fila = await e.cargarPieza({ formato: "story", pilar: "proceso", epigrafe: "", material_a_producir: [] });
     await e.mandar(e.actualizacion.boton(`aprobar:${fila.id}`));
     await e.mandar(e.actualizacion.boton(`confirmar:${fila.id}`));
-    assert.match(e.telegram.ultimo().texto, /Las stories todavía las publicás vos/);
+    assert.match(e.telegram.ultimo().texto, /No se puede confirmar todavía/);
+    assert.match(e.telegram.ultimo().texto, /Falta la foto o el video de la historia/);
+    await e.servicio.adjuntarDesdeJuego(fila.id, { mime: "image/jpeg", datos: Buffer.from("foto") });
+    await e.mandar(e.actualizacion.boton(`confirmar:${fila.id}`));
+    assert.match(e.telegram.ultimo().texto, /Se publica hoy a las/);
+    e.mover("18:50");
+    await e.servicio.tick();
+    const [, parametros] = e.meta.llamadas.find(([n]) => n === "crearContenedor");
+    assert.equal(parametros.media_type, "STORIES");
+    assert.ok(parametros.image_url);
+    assert.equal(parametros.caption, undefined);
     e.mover("19:00");
     await e.servicio.tick();
-    assert.equal(e.meta.llamadas.length, 0);
-    assert.match(e.telegram.ultimo().texto, /publicar tu story/);
-    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "manual");
+    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "publicada");
+    assert.equal(e.meta.veces("publicar"), 1);
+  });
+
+  test("una historia con video usa video_url", async () => {
+    const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00" });
+    const fila = await e.cargarPieza({ formato: "story", pilar: "proceso", epigrafe: "", material_a_producir: [] });
+    await e.servicio.adjuntarDesdeJuego(fila.id, { mime: "video/mp4", datos: Buffer.from("video") });
+    await e.mandar(e.actualizacion.boton(`aprobar:${fila.id}`));
+    await e.mandar(e.actualizacion.boton(`confirmar:${fila.id}`));
+    e.mover("18:50");
+    await e.servicio.tick();
+    const [, parametros] = e.meta.llamadas.find(([n]) => n === "crearContenedor");
+    assert.equal(parametros.media_type, "STORIES");
+    assert.ok(parametros.video_url);
+    assert.equal(parametros.image_url, undefined);
   });
 });
 
@@ -529,7 +552,9 @@ describe("archivos", () => {
     assert.match(faltaArchivo(fila, [{ tipo: "imagen" }]), /Faltan fotos: tengo 1/);
     assert.equal(faltaArchivo(fila, [{ tipo: "imagen" }, { tipo: "imagen" }]), null);
     assert.match(faltaArchivo({ pieza: { formato: "reel" } }, [{ tipo: "imagen" }]), /no son del tipo/);
-    assert.equal(faltaArchivo({ pieza: { formato: "story" } }, []), null);
+    assert.match(faltaArchivo({ pieza: { formato: "story" } }, []), /foto o el video de la historia/);
+    assert.equal(faltaArchivo({ pieza: { formato: "story" } }, [{ tipo: "video" }]), null);
+    assert.equal(faltaArchivo({ pieza: { formato: "story" } }, [{ tipo: "imagen" }]), null);
   });
 });
 
