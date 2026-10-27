@@ -405,13 +405,14 @@ function previaInstagram(e,m){
   tit.appendChild(document.createTextNode('Así queda en Instagram'));tit.appendChild(el('span',null,(hora?'hoy a las '+hora+' · ':'')+({imagen:'publicación',carrusel:'carrusel',reel:'reel',story:'historia'}[fmt]||fmt)));raiz.appendChild(tit);
   var tel=el('div','ig-tel '+(fmt==='reel'||fmt==='story'?'vert':'feed')),pant=el('div','ig-pant'+(fmt==='reel'||fmt==='story'?' osc':''));tel.appendChild(pant);raiz.appendChild(tel);
   var chk=el('ul','ig-chk');raiz.appendChild(chk);
+  if(fmt==='story'){var bz=el('button','ck sec ig-bz','Mostrar lo que Instagram tapa');bz.type='button';bz.addEventListener('click',function(){var on=pant.classList.toggle('ver-zonas');bz.textContent=on?'Ocultar zonas':'Mostrar lo que Instagram tapa'});raiz.insertBefore(bz,chk)}
   function punto(ok,txt){var li=el('li',ok===true?'ok':ok===false?'mal':'aviso');li.appendChild(el('b',null,ok===true?'✓':ok===false?'✕':'!'));li.appendChild(document.createTextNode(' '+txt));chk.appendChild(li);return li}
   var falta=(fmt==='reel'&&!vid)||(fmt==='story'&&!vid&&!imgs.length)||((fmt==='imagen'||fmt==='carrusel')&&!imgs.length);
   var tipos={imagen:'Foto',carrusel:'Fotos',reel:'Video',story:'Foto o video'};
   if(falta)punto(false,tipos[fmt]+' sin cargar: la pieza no se puede publicar así.');
   else if(fmt==='carrusel'&&imgs.length<2)punto(false,'Un carrusel necesita al menos 2 fotos (tiene '+imgs.length+').');
   else punto(true,fmt==='carrusel'?imgs.length+' fotos cargadas':(vid&&fmt!=='imagen'?'Video cargado':'Archivo cargado'));
-  if(fmt==='story'){punto(true,'Una historia no lleva epígrafe')}
+  if(fmt==='story'){punto(true,'Una historia no lleva epígrafe');punto('a','Dejá libre el borde de arriba y de abajo (≈14 %): Instagram pone ahí tu perfil y «Enviar mensaje»')}
   else if(!epi)punto(false,'Falta el epígrafe');
   else{var hs=(epi.match(/#[\p{L}\p{N}_]+/gu)||[]).length;punto(epi.length<=2200&&hs<=30,'Epígrafe de '+epi.length+' caracteres'+(hs?' y '+hs+' hashtags':'')+(epi.length>2200?' (Instagram admite hasta 2200)':''))}
   function proporcion(w,h){
@@ -481,6 +482,7 @@ function igStory(pant,imgs,vid,falta){
     }
   }
   pant.appendChild(md);
+  var zs=el('div','ig-zonas');zs.appendChild(el('span','arr','Arriba: perfil y barra de progreso'));zs.appendChild(el('span','aba','Abajo: «Enviar mensaje»'));md.appendChild(zs);pant.classList.add('ig-conzonas');
   var pr=el('div','ig-prog'),bar=el('i');pr.appendChild(bar);pant.appendChild(pr);
   var h=el('div','ig-sh');h.appendChild(igAvatar(30));h.appendChild(el('b',null,'vow_ar'));h.appendChild(el('span','ig-ah','Ahora'));var r=el('span','ig-der2');r.appendChild(igIco('mas',20,3));r.appendChild(igIco('cerrar',22,2));h.appendChild(r);pant.appendChild(h);
   var pie=el('div','ig-sp');pie.appendChild(el('span','ig-msg','Enviar mensaje'));pie.appendChild(igIco('corazon',26,1.8));pie.appendChild(igIco('enviar',26,1.8));pant.appendChild(pie);
