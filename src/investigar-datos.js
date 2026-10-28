@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import { descargarCuenta, LIMITE_POR_DEFECTO } from "./agents/instagram.js";
 import { resumirCuenta } from "./agents/metricas.js";
+import { calcularPatrones, patronesAMarkdown } from "./agents/patrones.js";
 
 // Uso:
 //   npm run investigar                       (baja las cuentas de docs/marca/cuentas-referencia.json)
@@ -44,7 +45,7 @@ if (!values.simulado && (!token || !idCuentaPropia)) {
 
 const resultados = [];
 const fallas = [];
-for (const { usuario, marca, pais } of cuentas) {
+for (const { usuario, marca, pais, grupo = null } of cuentas) {
   try {
     const cuenta = await descargarCuenta(usuario, {
       token: values.simulado ? "simulado" : token,
@@ -52,7 +53,7 @@ for (const { usuario, marca, pais } of cuentas) {
       limite: Number(values.limite),
       fetchFn: values.simulado ? fetchSimulado : fetch,
     });
-    resultados.push({ marca, pais, ...resumirCuenta(cuenta) });
+    resultados.push({ marca, pais, grupo, ...resumirCuenta(cuenta) });
     console.log(`✓ ${marca} (@${usuario}): ${cuenta.publicaciones.length} publicaciones, ${cuenta.seguidores?.toLocaleString("es-AR")} seguidores`);
   } catch (error) {
     fallas.push({ marca, usuario, motivo: error.message });
@@ -66,4 +67,10 @@ await mkdir(carpeta, { recursive: true });
 const archivo = new URL(`datos-${fecha}${values.simulado ? "-simulado" : ""}.json`, carpeta);
 await writeFile(archivo, JSON.stringify({ fecha, simulado: values.simulado, cuentas: resultados, fallas }, null, 2) + "\n");
 console.log(`\nDatos guardados en docs/investigacion/${archivo.pathname.split("/").pop()} (no se sube a GitHub).`);
+// Los patrones de éxito se calculan con código, sin IA y sin gastar: el Estratega los lee al planificar
+const patrones = patronesAMarkdown(calcularPatrones({ fecha, cuentas: resultados }));
+if (patrones && !values.simulado) {
+  await writeFile(new URL(`patrones-${fecha}.md`, carpeta), patrones);
+  console.log(`Patrones de éxito guardados en docs/investigacion/patrones-${fecha}.md`);
+}
 if (fallas.length > 0) process.exitCode = 1;

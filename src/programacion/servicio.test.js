@@ -943,7 +943,7 @@ describe("chat con la IA", () => {
   test("modificar_pieza respeta las reglas de marca: si las rompe, no guarda nada y explica por qué", async () => {
     let resultado;
     const { e, fila } = await escenarioChat(async ({ ejecutar }) => {
-      resultado = await ejecutar("modificar_pieza", { id: 1, cambios: { epigrafe: "Entrená con mancuernas y barras todos los días." }, que_cambio: "x" });
+      resultado = await ejecutar("modificar_pieza", { id: 1, cambios: { epigrafe: "Entrená y quemá grasa todos los días." }, que_cambio: "x" });
       return "No se pudo.";
     });
     await escribir(e, "poné mancuernas en el epígrafe");

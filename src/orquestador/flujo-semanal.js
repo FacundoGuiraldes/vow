@@ -13,7 +13,7 @@ export function armarPasos({ opciones, cliente, leer, listar, escribir, sufijo =
     {
       nombre: "planificar",
       correr: async () => {
-        const r = await planificarSemana({ semanaInicio: semana, fase, recursos, notas, piezas }, { cliente, leer, listar });
+        const r = await planificarSemana({ semanaInicio: semana, fase, recursos, notas, piezas }, { cliente, leer, listar, criticar: true });
         return { ok: r.ok, salida: r.plan, uso: r.uso, errores: r.errores };
       },
     },

@@ -12,6 +12,6 @@ export async function revisarPlan(plan, { semanaInicio, recursos = {}, piezas, l
   const { conocidos: ganchosConocidos } = extraerGanchosConocidos(cerebro);
   // Si no se indica cuántas piezas se pidieron, se toma la cantidad que trae el plan
   const cantidad = piezas ?? (Array.isArray(plan?.piezas) ? plan.piezas.length : PIEZAS_POR_DEFECTO);
-  const { ok, errores } = validarPlan(plan, { semanaInicio, recursos, piezas: cantidad, ganchosConocidos, piezasDefinidas });
-  return { aprobada: ok, problemas: errores };
+  const { ok, errores, advertencias } = validarPlan(plan, { semanaInicio, recursos, piezas: cantidad, ganchosConocidos, piezasDefinidas });
+  return { aprobada: ok, problemas: errores, advertencias: advertencias ?? [] };
 }

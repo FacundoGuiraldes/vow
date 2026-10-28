@@ -33,10 +33,10 @@ test("un plan que cumple las reglas se aprueba", async () => {
 });
 
 test("un plan editado a mano con una palabra prohibida se rechaza y dice cuál", async () => {
-  const editado = plan([pieza({ gancho: "Dominá la barra." })]);
+  const editado = plan([pieza({ gancho: "Quemá grasa." })]);
   const r = await revisarPlan(editado, { semanaInicio: SEMANA, ...contexto() });
   assert.equal(r.aprobada, false);
-  assert.ok(r.problemas.some((p) => p.includes("barra")), r.problemas.join(" | "));
+  assert.ok(r.problemas.some((p) => p.includes("resultados físicos")), r.problemas.join(" | "));
 });
 
 test("una pieza ya definida que apareció después choca con el plan (mismo formato y pilar en la semana)", async () => {

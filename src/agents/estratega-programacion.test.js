@@ -79,7 +79,7 @@ test("'produccion' solo acepta propio, ia o mixto", () => {
 });
 
 test("la indicación para la IA también respeta las reglas de marca", () => {
-  const { ok, errores } = validar(crearPieza({ produccion: "ia", instrucciones_ia: `${INDICACION} Mostrá unas mancuernas sobre un banco.` }));
+  const { ok, errores } = validar(crearPieza({ produccion: "ia", instrucciones_ia: `${INDICACION} Mostrá un cuerpo soñado, cuerpo soñado en cada plano.` }));
   assert.equal(ok, false);
   assert.match(errores.join(" "), /instrucciones para la IA/);
 });

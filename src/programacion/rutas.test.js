@@ -184,6 +184,14 @@ describe("rutas de la publicación programada", () => {
     assert.ok((await r.json()).novedades.some((n) => n.texto === "Llegaron las gorras"));
   });
 
+  test("/novedades también trae el foco de la semana que fijó Facundo", async () => {
+    await repo.guardarEstado("operacion", { campos: { "estrategia.foco": "Suspenso del Drop 00" } });
+    const datos = await (await pedir("/novedades", { clave: CLAVE })).json();
+    assert.equal(datos.foco, "Suspenso del Drop 00");
+    assert.equal(datos.notas_estrategia, "");
+    await repo.guardarEstado("operacion", null);
+  });
+
   describe("archivos para Meta", () => {
     let token;
     before(async () => {

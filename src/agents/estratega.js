@@ -1,4 +1,5 @@
 import { readdir, readFile } from "node:fs/promises";
+import { criticarPlan, pedidoDeMejora } from "./critico.js";
 import { leerPiezasDefinidas, diasEntre } from "./piezas-definidas.js";
 import { revisarReglas, revisarGuion, revisarTextoAlPublico, cifrasNoPermitidas, contextoDeCifra, CIFRAS_PERMITIDAS } from "./reglas-marca.js";
 
@@ -27,7 +28,10 @@ export const esHoraDePublicacion = (valor) =>
   typeof valor === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(valor) && valor >= HORA_MINIMA_PUBLICACION && valor <= HORA_MAXIMA_PUBLICACION;
 // Ganchos que suenan a tutorial o a lista de consejos (descartado por Facundo)
 const TONO_TUTORIAL = /^\s*(c[oó]mo|tips?\b|consejos?\b|pasos?\b|gu[ií]a\b|\d+\s+(cosas|tips|pasos|razones|formas|ideas))/i;
+// Una story de encuesta o de pregunta pide una interacción en vez de pedir anotarse
+export const CTA_DE_INTERACCION = /(?<!\p{L})(vot[aá]\w*|eleg[ií]\w*|respond[eé]\w*|contest[aá]\w*|cont[aá]\w*|dec[ií]\w*|mand[aá]\w*|compart[ií]\w*|deslizá|arrastrá|tocá)(?!\p{L})/iu;
 const RUTA_CEREBRO = new URL("../../docs/marca/cerebro-de-marca.md", import.meta.url);
+const RUTA_BANCO = new URL("../../docs/marca/banco-de-contenido.md", import.meta.url);
 const RUTA_REFERENCIAS = new URL("../../docs/marca/referencias.md", import.meta.url);
 const RUTA_INVESTIGACION = new URL("../../docs/investigacion/", import.meta.url);
 const RUTA_RENDIMIENTO = new URL("../../docs/rendimiento/", import.meta.url);
@@ -69,7 +73,7 @@ export const HERRAMIENTA_PLAN = {
             texto_en_pantalla: { type: "array", items: { type: "string" } },
             epigrafe: { type: "string", description: "Texto que acompaña la publicación: dos a cuatro frases en lenguaje cotidiano, en párrafos cortos separados por una línea en blanco (\\n\\n); la acción final va en su propia línea. En una story va vacío: las stories no llevan epígrafe." },
             palabras_clave: { type: "array", items: { type: "string" } },
-            cta: { type: "string", description: "Una sola acción: anotarse en la lista de espera." },
+            cta: { type: "string", description: "Una sola acción: anotarse en la lista de espera. En una story de encuesta o de pregunta, la acción es la propia interacción (\"Votá\", \"Contanos\", \"Respondé\")." },
             recursos: { type: "array", items: { type: "string" }, description: "Qué hace falta tener para hacerla." },
             material_a_producir: {
               type: "array",
@@ -143,15 +147,15 @@ export function extraerGanchosConocidos(textoCerebro) {
 }
 
 // Reglas que tiene que cumplir cualquier gancho, principal o alternativo
-function revisarGancho(gancho, etiqueta, { reglas = true } = {}) {
+function revisarGancho(gancho, etiqueta, { reglas = true, advertencias = [] } = {}) {
   const errores = [];
   const palabras = gancho.trim().split(/\s+/).length;
   if (palabras > PALABRAS_MAXIMAS_GANCHO) errores.push(`${etiqueta}: tiene ${palabras} palabras (máximo ${PALABRAS_MAXIMAS_GANCHO}).`);
   if (gancho.length > LARGO_MAXIMO_GANCHO) errores.push(`${etiqueta}: supera ${LARGO_MAXIMO_GANCHO} caracteres.`);
-  if (TONO_TUTORIAL.test(gancho)) errores.push(`${etiqueta}: suena a tutorial o consejo ("${gancho}").`);
+  if (TONO_TUTORIAL.test(gancho)) advertencias.push(`${etiqueta}: suena a tutorial o consejo ("${gancho}").`);
   // El gancho principal ya pasa por las reglas de marca junto con el resto de los textos de la pieza
   if (reglas) {
-    for (const { regla, fragmento } of revisarReglas(gancho)) errores.push(`${etiqueta}: ${regla} ("${fragmento}").`);
+    for (const { regla, fragmento } of revisarReglas(gancho, { soloDuras: true })) errores.push(`${etiqueta}: ${regla} ("${fragmento}").`);
     for (const cifra of cifrasNoPermitidas(gancho)) errores.push(`${etiqueta}: la cifra "${cifra}" no está en los datos cargados ("${contextoDeCifra(gancho, cifra)}").`);
   }
   return errores;
@@ -161,6 +165,7 @@ function revisarGancho(gancho, etiqueta, { reglas = true } = {}) {
 // Devuelve { ok, errores }. Si hay algún error, el plan se descarta (no se guarda).
 export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitidas = CIFRAS_PERMITIDAS, piezas = PIEZAS_POR_DEFECTO, ganchosConocidos = [], piezasDefinidas = [] } = {}) {
   const errores = [];
+  const advertencias = []; // reglas de estilo de la marca: avisan, no rechazan
   const conocidos = new Set(ganchosConocidos.map(normalizar));
   const frasesUsadas = new Set(piezasDefinidas.flatMap((p) => p.frases ?? []).map(normalizar));
   if (!plan || typeof plan !== "object") return { ok: false, errores: ["El plan no es un objeto."] };
@@ -205,7 +210,7 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
         errores.push(`${etiqueta}: material_a_producir tiene que ser una lista de textos.`);
       } else {
         for (const item of pieza.material_a_producir) {
-          for (const { regla, fragmento } of revisarReglas(item)) errores.push(`${etiqueta}: ${regla} en el material a producir ("${fragmento}").`);
+          for (const { regla, fragmento } of revisarReglas(item, { soloDuras: true })) errores.push(`${etiqueta}: ${regla} en el material a producir ("${fragmento}").`);
         }
       }
     }
@@ -216,10 +221,10 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
       if (typeof pieza.instrucciones_ia !== "string" || pieza.instrucciones_ia.trim().length < LARGO_MINIMO_INSTRUCCIONES_IA) {
         errores.push(`${etiqueta}: si se hace con IA, instrucciones_ia tiene que ser una indicación completa (qué mostrar, encuadre y colores, al menos ${LARGO_MINIMO_INSTRUCCIONES_IA} caracteres).`);
       } else {
-        for (const { regla, fragmento } of revisarReglas(pieza.instrucciones_ia)) errores.push(`${etiqueta}: ${regla} en las instrucciones para la IA ("${fragmento}").`);
+        for (const { regla, fragmento } of revisarReglas(pieza.instrucciones_ia, { soloDuras: true })) errores.push(`${etiqueta}: ${regla} en las instrucciones para la IA ("${fragmento}").`);
       }
     }
-    if (typeof pieza.gancho === "string" && pieza.gancho.trim() !== "") errores.push(...revisarGancho(pieza.gancho, `${etiqueta}: el gancho`, { reglas: false }));
+    if (typeof pieza.gancho === "string" && pieza.gancho.trim() !== "") errores.push(...revisarGancho(pieza.gancho, `${etiqueta}: el gancho`, { reglas: false, advertencias }));
     // Ganchos alternativos: tienen que ser nuevos, distintos entre sí y cumplir las mismas reglas
     if (!Array.isArray(pieza.ganchos_alternativos) || pieza.ganchos_alternativos.length < ALTERNATIVAS_MINIMAS) {
       errores.push(`${etiqueta}: tiene que traer al menos ${ALTERNATIVAS_MINIMAS} ganchos alternativos.`);
@@ -231,7 +236,7 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
         if (conocidos.has(normalizar(alternativo))) errores.push(`${nombre}: copia un ejemplo del cerebro de marca ("${alternativo}").`);
         if (vistos.has(normalizar(alternativo))) errores.push(`${nombre}: está repetido.`);
         vistos.add(normalizar(alternativo));
-        errores.push(...revisarGancho(alternativo, nombre));
+        errores.push(...revisarGancho(alternativo, nombre, { advertencias }));
       });
     }
     // No repetir lo que ya está decidido: ni sus frases ni su formato y pilar en fechas cercanas
@@ -244,7 +249,9 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
       }
     }
     // Una sola acción: anotarse en la lista de espera
-    if (typeof pieza.cta === "string" && !/lista/i.test(pieza.cta)) errores.push(`${etiqueta}: la acción final tiene que ser anotarse en la lista.`);
+    // (una story puede cerrar con su propia interacción: votar, responder, contar)
+    const cierraConInteraccion = pieza.formato === "story" && CTA_DE_INTERACCION.test(pieza.cta ?? "");
+    if (typeof pieza.cta === "string" && !/lista/i.test(pieza.cta) && !cierraConInteraccion) errores.push(`${etiqueta}: la acción final tiene que ser anotarse en la lista${pieza.formato === "story" ? " (o, en una story, votar o responder)" : ""}.`);
 
     // No se puede mostrar lo que todavía no existe
     if (pieza.pilar === "producto en uso" && !recursos.producto) errores.push(`${etiqueta}: pide "producto en uso" pero todavía no hay producto.`);
@@ -255,11 +262,13 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
     }
     // Los recursos también pueden pedir papel y lapicera
     for (const recurso of Array.isArray(pieza.recursos) ? pieza.recursos : []) {
-      for (const { regla, fragmento } of revisarReglas(recurso)) errores.push(`${etiqueta}: ${regla} en los recursos ("${fragmento}").`);
+      for (const { regla, fragmento } of revisarReglas(recurso, { soloDuras: true })) errores.push(`${etiqueta}: ${regla} en los recursos ("${fragmento}").`);
     }
     for (const [campo, texto] of textosDeLaPieza(pieza)) {
       const revisar = campo === "guion" ? revisarGuion : revisarReglas;
-      for (const { regla, fragmento } of revisar(texto)) errores.push(`${etiqueta} (${campo}): ${regla} ("${fragmento}").`);
+      for (const { regla, fragmento } of revisar(texto, { soloDuras: true })) errores.push(`${etiqueta} (${campo}): ${regla} ("${fragmento}").`);
+      // Las reglas de estilo no rechazan la pieza: quedan como advertencias para el editor crítico
+      for (const { regla, fragmento } of revisar(texto, { soloBlandas: true })) advertencias.push(`${etiqueta} (${campo}): ${regla} ("${fragmento}").`);
       for (const cifra of cifrasNoPermitidas(texto, cifrasPermitidas, { produccion: campo === "guion" })) errores.push(`${etiqueta} (${campo}): la cifra "${cifra}" no está en los datos cargados ("${contextoDeCifra(texto, cifra)}").`);
     }
   });
@@ -275,7 +284,7 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
     if (cantidad > maximoPorPilar) errores.push(`El pilar "${pilar}" aparece ${cantidad} veces: tiene que haber variedad entre piezas.`);
   }
 
-  return { ok: errores.length === 0, errores };
+  return { ok: errores.length === 0, errores, advertencias };
 }
 
 // Último archivo de una carpeta cuyo nombre cumple `patron` (los nombres llevan la fecha, así que el último ordenado es el más nuevo).
@@ -294,14 +303,19 @@ async function leerUltimo(carpeta, patron, { leer = (ruta) => readFile(ruta, "ut
 // Último informe del Investigador (docs/investigacion/informe-AAAA-MM-DD.md), si hay uno.
 export const leerUltimoInforme = (opciones) => leerUltimo(RUTA_INVESTIGACION, /^informe-\d{4}-\d{2}-\d{2}\.md$/, opciones);
 
+// Últimos patrones de éxito de las cuentas de referencia (docs/investigacion/patrones-AAAA-MM-DD.md), calculados con código.
+export const leerUltimosPatrones = (opciones) => leerUltimo(RUTA_INVESTIGACION, /^patrones-\d{4}-\d{2}-\d{2}\.md$/, opciones);
+
 // Último informe de rendimiento de la cuenta propia (docs/rendimiento/rendimiento-AAAA-MM-DD.md), si hay uno.
 export const leerUltimoRendimiento = (opciones) => leerUltimo(RUTA_RENDIMIENTO, /^rendimiento-\d{4}-\d{2}-\d{2}\.md$/, opciones);
 
 export async function construirSistema(leer = (ruta) => readFile(ruta, "utf8"), { listar } = {}) {
-  const [cerebro, referencias, informe, rendimiento, piezas] = await Promise.all([
+  const [cerebro, banco, referencias, informe, patrones, rendimiento, piezas] = await Promise.all([
     leer(RUTA_CEREBRO),
+    leer(RUTA_BANCO).catch(() => ""),
     leer(RUTA_REFERENCIAS),
     leerUltimoInforme({ leer, listar }),
+    leerUltimosPatrones({ leer, listar }),
     leerUltimoRendimiento({ leer, listar }),
     leerPiezasDefinidas({ leer, listar }),
   ]);
@@ -310,6 +324,12 @@ export async function construirSistema(leer = (ruta) => readFile(ruta, "utf8"), 
 
 === INVESTIGACIÓN DE MERCADO (${informe.nombre}) ===
 ${informe.texto}`
+    : "";
+  const bloquePatrones = patrones
+    ? `
+
+=== QUÉ FUNCIONÓ EN EL MERCADO: DATOS REALES (${patrones.nombre}) ===
+${patrones.texto}`
     : "";
   const bloqueRendimiento = rendimiento
     ? `
@@ -327,8 +347,10 @@ ${piezas.map((p) => p.texto.trim()).join("\n\n---\n\n")}`
 
 Reglas:
 - Todo lo que escribas sigue el cerebro de marca de abajo. Si algo lo contradice, gana el cerebro de marca.
-- Hablás en voseo rioplatense. Cada pieza termina con una sola acción: anotarse en la lista de espera.
-- Nunca inventes cifras, pruebas, stock, fechas ni opiniones. No uses números en los textos salvo "01" de "Drop 01" con su año "2027", y "00" de "Drop 00" con su año "2026". Los años van sin mes ni día. Al Drop 00 solo lo nombrás como adelanto y solo si Facundo lo pidió o está en las novedades: sin productos, precios, cantidades ni stock.
+- Hablás en voseo rioplatense. Cada pieza de feed termina con una sola acción: anotarse en la lista de espera. Una story de encuesta o de pregunta puede cerrar con su propia interacción ("Votá", "Contanos") y no necesita pedir la lista.
+- MÉTODO (seguilo en este orden antes de llamar a la herramienta): 1) Leé el BANCO DE CONTENIDO y las notas: si hay un FOCO DE LA SEMANA de Facundo, el plan gira alrededor de ese foco. 2) Para cada pieza elegí primero el trabajo (mostrar, preguntar o sumar) y el dato visible concreto (qué se ve en el primer segundo), y recién después escribí el gancho. 3) Pensá tres enfoques distintos para cada pieza y quedate con el más concreto, el que se pueda filmar o hacer esta semana. 4) Pasá cada frase por la prueba del amigo; si suena a póster, reescribila diciendo la cosa concreta. 5) Mezclá formatos: las stories (y secuencias de stories) son el canal diario y barato; sumá 1 o 2 piezas de feed. No hagas todas las piezas de frases sobre la promesa: como mucho una.
+- Cada pieza tiene que mostrar o preguntar algo concreto (una decisión real, un detalle de una prenda, un color sobre una tela, una pregunta con opciones). En guion y texto_en_pantalla nombrá lo que se ve, no el concepto.
+- Nunca inventes cifras, pruebas, stock, fechas ni opiniones. No uses números en los textos salvo "01" de "Drop 01" con su año "2027", y "00" de "Drop 00" con su año "2026". Los años van sin mes ni día. Al Drop 00 solo lo nombrás como adelanto y solo si Facundo lo pidió, está en las novedades o es el foco de la semana: sin precios, cantidades ni stock; podés mostrar indicios concretos (un bordado de cerca, el color de un hilo, el borde de una media) cuando el foco lo pide.
 - Solo podés proponer piezas que se puedan hacer con los recursos disponibles que te indican. Si no hay producto, no propongas mostrar producto.
 - Cada pieza lleva su hora de publicación (hora de Argentina, entre ${HORA_MINIMA_PUBLICACION} y ${HORA_MAXIMA_PUBLICACION}). Si hay un RENDIMIENTO de @vow_ar, elegí la hora con esos datos; si no, una hora de buena actividad como 19:00. Nunca inventes que una hora "rinde mejor" sin datos.
 - En material_a_producir listá, una toma por ítem, lo que Facundo tiene que filmar o fotografiar él mismo. Si la pieza sale de material que ya existe o se genera con código, dejá la lista vacía. Facundo recibe el plan el lunes y se le recuerda 3 días antes de publicar: ubicá las piezas que necesitan filmación de jueves en adelante.
@@ -337,11 +359,12 @@ Reglas:
 - Las piezas se publican solas por la API de Instagram, que no permite agregar música de la biblioteca de Instagram: no la pidas en los recursos. Si una pieza lleva sonido, tiene que venir en el propio archivo (por ejemplo, el sonido ambiente real).
 - Las referencias son inspiración, no datos para citar. No copies sus textos ni sus ideas al pie de la letra.
 - Los ganchos tienen que ser claros, simples y verdaderos, como pide la sección 8 del cerebro de marca: de 3 a 8 palabras, con palabras de todos los días. Pueden ser una afirmación que compromete, una observación concreta de lo que le pasa a quien entrena o una pregunta simple. Un gancho normal y verdadero vale más que uno que suena a póster. Nunca tono de tutorial, de consejo ni de lo que falta.
+- BLOQUEOS Y GUÍA: lo que bloquea un plan es lo que es falso o dañino (cifras inventadas, promesas de resultados físicos, urgencia o escasez falsa, no usar voseo, mostrar producto o gente que no hay). Lo de estilo (teasers, elementos del gimnasio, "no es X, es Y", exclamaciones, inglés) es guía: respetala cuando no le saque fuerza a la pieza, pero no sacrifiques una pieza que los datos respaldan por una cuestión de estilo. Priorizá el equilibrio entre el estilo de VOW y lo que los datos muestran que se comparte y se guarda.
 - CALIDAD DEL TEXTO (sección "Calidad del texto" del cerebro de marca): antes de escribir cada frase hacete la prueba: ¿se lo dirías en voz alta a un amigo que entrena sin sentir vergüenza?, ¿se entiende sola en tres segundos? Si suena a eslogan, a póster de gimnasio, a anuncio o a película, reescribila con palabras simples o sacala. Prohibido: teasers que anuncian que "algo llega" sin decir qué, sentencias pseudo-profundas, "no es X, es Y", listas de tres fragmentos con ritmo de publicidad y frases de coaching. Una idea por pieza y la palabra "promesa" no más de una vez.
-- Si no tenés algo concreto y verdadero para decir, proponé menos piezas o una pieza más simple: nunca rellenes con frases bonitas. Una story necesita una razón concreta (mostrar algo real o invitar a anotarse con un motivo claro); no hagas stories de intriga ni de "generar expectativa".
+- Si no tenés algo concreto y verdadero para decir, proponé una pieza más simple: nunca rellenes con frases bonitas. Una story necesita una razón concreta: mostrar algo real, hacer una pregunta o una encuesta con una decisión real, o invitar a anotarse con un motivo claro. Nada de stories de intriga ni de "generar expectativa" sin un dato a la vista.
 - El epígrafe son dos a cuatro frases en lenguaje cotidiano, escritas como las diría una persona, en párrafos cortos separados por una línea en blanco. No repite el gancho: lo completa o dice algo que la pieza no dice. La acción final va en su propia línea.
 - Los ganchos de la sección 8 son ejemplos de estilo. A lo sumo UNO de los ganchos principales del plan puede ser uno de los aprobados; todos los demás tienen que ser creados por vos. Los ganchos alternativos son siempre nuevos: ni copias ni paráfrasis de los ejemplos.
-- Cada pieza trae un gancho principal y 4 alternativos distintos entre sí. Las piezas de una misma semana tienen que ser de pilares distintos.
+- Cada pieza trae un gancho principal y 4 alternativos distintos entre sí. Las piezas de una misma semana no pueden repetir el mismo pilar más de dos veces (y variá formatos).
 - La promesa es algo que una persona se hace a sí misma y cumple. No es un texto escrito: nunca propongas escribirla a mano ni mostrar papel, lapicera o cartulina.
 - Nunca nombres elementos del gimnasio (barras, mancuernas, pesas, discos, kettlebells, fierros). Suenan forzados. El producto (grips, straps, prendas) sí se puede nombrar cuando hay producto.
 - Cada pieza le habla a quien la mira y le da algo: una idea, un gesto, una razón para sumarse. No explica la marca por dentro (paleta, tipografías, manual de marca). Si una pieza de diseño o de proceso solo sirve para un diseñador, no la propongas.
@@ -352,13 +375,16 @@ Reglas:
 
 === CEREBRO DE MARCA ===
 ${cerebro}
-
+${banco ? `
+=== BANCO DE CONTENIDO (de qué hablar y cómo bajarlo a algo que se ve) ===
+${banco}
+` : ""}
 === MARCAS DE REFERENCIA ===
-${referencias}${bloqueInvestigacion}${bloqueRendimiento}${bloquePiezas}` };
+${referencias}${bloqueInvestigacion}${bloquePatrones}${bloqueRendimiento}${bloquePiezas}` };
 }
 
 // Pide el plan de una semana. `cliente` se inyecta para poder probar sin gastar plata.
-export async function planificarSemana({ semanaInicio, fase, recursos = {}, notas = "", piezas = PIEZAS_POR_DEFECTO }, { cliente, modelo = MODELO_ESTRATEGA, leer, listar } = {}) {
+export async function planificarSemana({ semanaInicio, fase, recursos = {}, notas = "", piezas = PIEZAS_POR_DEFECTO }, { cliente, modelo = MODELO_ESTRATEGA, leer, listar, criticar = false } = {}) {
   if (!esFechaISO(semanaInicio)) throw new Error("semanaInicio tiene que ser AAAA-MM-DD.");
   if (!cliente) throw new Error("Falta el cliente de Anthropic.");
 
@@ -371,7 +397,7 @@ export async function planificarSemana({ semanaInicio, fase, recursos = {}, nota
     `Fase del proyecto: ${fase}.`,
     definidasEnLaSemana.length ? `Esa semana ya hay definidas: ${definidasEnLaSemana.map((p) => `${p.formato} del ${p.fecha} (pilar ${p.pilar})`).join("; ")}. No las repitas.` : "",
     `Recursos disponibles: producto físico: ${recursos.producto ? "sí" : "no"}; personas que entrenan confirmadas: ${recursos.gente ? "sí" : "no"}.`,
-    `Cantidad de piezas: ${piezas}. Pocas y fuertes: si no hay material real, es mejor menos piezas que rellenar.`,
+    `Cantidad de piezas: ${piezas}. Mezclá stories y piezas de feed; cada una con algo concreto para mostrar o preguntar (ver el método).`,
     notas ? `Notas: ${notas}` : "",
   ].filter(Boolean).join("\n");
 
@@ -416,6 +442,49 @@ export async function planificarSemana({ semanaInicio, fase, recursos = {}, nota
     return { ok: false, plan: null, errores: [motivo], uso, intentos };
   }
 
-  const { ok, errores } = validarPlan(bloque.input, { semanaInicio, recursos, piezas, ganchosConocidos, piezasDefinidas });
-  return { ok, plan: ok ? bloque.input : null, errores, uso, propuesta: bloque.input, intentos };
+  const opcionesValidacion = { semanaInicio, recursos, piezas, ganchosConocidos, piezasDefinidas };
+  const { ok, errores, advertencias } = validarPlan(bloque.input, opcionesValidacion);
+  if (!ok || !criticar) return { ok, plan: ok ? bloque.input : null, errores, uso, propuesta: bloque.input, intentos };
+
+  // Generar, criticar, mejorar: un editor crítico puntúa el plan y, si hay piezas flojas, el Estratega las reescribe una vez.
+  // Si la versión mejorada no pasa las reglas o no mejora el promedio, se queda la primera: la crítica nunca empeora un plan válido.
+  let plan = bloque.input;
+  let critica = null;
+  try {
+    critica = await criticarPlan(plan, { cliente, modelo, contexto: `semana del ${semanaInicio}; ${pedido.split("\n").find((l) => l.startsWith("Recursos")) ?? ""}${advertencias?.length ? `\nAdvertencias de estilo de marca (no bloquean, pero pesá si molestan): ${advertencias.slice(0, 8).join(" | ")}` : ""}` });
+    uso.entrada += critica.uso.entrada;
+    uso.salida += critica.uso.salida;
+    critica.mejorada = false;
+    if (critica.ok && critica.flojas.length > 0) {
+      const respuesta = await cliente.messages.create({
+        model: modelo,
+        max_tokens: maxTokens,
+        system,
+        messages: [...mensajes, { role: "assistant", content: [{ type: "tool_use", id: bloque.id, name: HERRAMIENTA_PLAN.name, input: plan }] }, { role: "user", content: [{ type: "tool_result", tool_use_id: bloque.id, content: pedidoDeMejora(critica) }] }],
+        tools: [HERRAMIENTA_PLAN],
+        tool_choice: { type: "auto" },
+      });
+      uso.entrada += respuesta.usage?.input_tokens ?? 0;
+      uso.salida += respuesta.usage?.output_tokens ?? 0;
+      const mejorado = respuesta.stop_reason === "max_tokens" ? null : respuesta.content?.find((b) => b.type === "tool_use" && b.name === HERRAMIENTA_PLAN.name);
+      if (mejorado && validarPlan(mejorado.input, opcionesValidacion).ok) {
+        const segunda = await criticarPlan(mejorado.input, { cliente, modelo });
+        uso.entrada += segunda.uso.entrada;
+        uso.salida += segunda.uso.salida;
+        const antes = critica.piezas.reduce((a, p) => a + p.promedio, 0) / critica.piezas.length;
+        const despues = segunda.ok ? segunda.piezas.reduce((a, p) => a + p.promedio, 0) / segunda.piezas.length : -1;
+        // Si la segunda crítica falla no se puede comparar: se queda el plan original
+        if (segunda.ok && despues > antes) {
+          plan = mejorado.input;
+          critica = { ...segunda, mejorada: true, antes: Number(antes.toFixed(2)), despues: Number(despues.toFixed(2)) };
+        } else {
+          critica = { ...critica, mejorada: false };
+        }
+      }
+    }
+  } catch (error) {
+    // La crítica es un extra: si falla (red, crédito), el plan válido sigue su camino
+    critica = { ok: false, error: error.message, piezas: [], flojas: [] };
+  }
+  return { ok: true, plan, errores: [], uso, propuesta: plan, intentos, critica };
 }

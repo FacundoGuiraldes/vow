@@ -197,3 +197,9 @@ test("depurarEnlaces no toca nada si todos los enlaces existen", () => {
   assert.deepEqual(quitados, []);
   assert.deepEqual(informe, informeValido());
 });
+
+test("el grupo de cada cuenta (argentina, global, chica) llega al Investigador y el pedido pide comparar por grupo", () => {
+  const datos = { fecha: "2026-10-28", cuentas: [{ marca: "Fuark", pais: "Argentina", grupo: "argentina", usuario: "fuarkok", seguidores: 100, porTipo: {}, publicaciones: [] }] };
+  assert.equal(prepararDatos(datos).cuentas[0].grupo, "argentina");
+  assert.match(armarPedido({ datos, hipotesis: [] }), /COMPARÁ POR GRUPO/);
+});

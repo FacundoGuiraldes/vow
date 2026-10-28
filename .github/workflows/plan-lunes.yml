@@ -21,11 +21,13 @@ on:
         description: "Cantidad de piezas de la semana"
         required: true
         type: choice
-        default: "2"
+        default: "4"
         options:
           - "1"
           - "2"
           - "3"
+          - "4"
+          - "5"
       producto:
         description: "Ya hay producto físico para mostrar"
         required: true
@@ -63,7 +65,7 @@ jobs:
       PROGRAMACION_SECRETO: ${{ secrets.PROGRAMACION_SECRETO }}
       # Lo que escribe una persona pasa por variables de entorno, no dentro del script
       SEMANA: ${{ inputs.semana }}
-      PIEZAS: ${{ inputs.piezas || '2' }}
+      PIEZAS: ${{ inputs.piezas || '4' }}
       PRODUCTO: ${{ inputs.producto || 'false' }}
       GENTE: ${{ inputs.gente || 'false' }}
       NOTAS: ${{ inputs.notas }}
@@ -85,6 +87,12 @@ jobs:
               exit 1
             fi
           done
+
+      # Cada lunes se estudian las cuentas de referencia con datos reales (solo lectura, gratis): el plan se apoya en lo que mejor rindió
+      - name: Estudiar las cuentas de referencia
+        if: env.INSTAGRAM_TOKEN != '' && env.INSTAGRAM_USER_ID != ''
+        continue-on-error: true
+        run: npm run investigar -- --limite 25
 
       # Los datos de la cuenta propia mejoran el plan, pero si Instagram no responde el plan sale igual
       - name: Medir el rendimiento de @vow_ar

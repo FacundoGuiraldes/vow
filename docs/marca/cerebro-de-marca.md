@@ -8,7 +8,7 @@ Este archivo es la fuente única de cómo habla y cómo se ve VOW. Todo contenid
 - Idea central: **la promesa**. Algo que te prometés a vos mismo y cumplís. Es un compromiso con uno mismo, no un texto: no se muestra escrita en papel ni se propone un ritual de escribirla.
 - Sobre la palabra "voto": es el nombre interno de la idea (así se llamó al principio y aparece en el manifiesto de la landing), pero se evita en la comunicación porque suena a elecciones. Se dice "promesa".
 - Lanzamiento: el Drop 01 sale en **2027** (definido por Facundo) y el Drop 00 en **2026** (también definido por Facundo, ver abajo). Son las únicas fechas públicas, se pueden decir en las piezas y en el Instagram, y no se agregan meses ni días.
-- **Drop 00** (definido por Facundo): una tanda chica de accesorios hechos en Argentina (gorras, medias y shakers) que se vende por Instagram antes del Drop 01. El detalle está en `docs/productos/stock-inicial.md`. Ya se anuncia como adelanto: se puede nombrar "Drop 00" con su año, **2026**, y nada más. No se publican productos, precios, cantidades ni stock del Drop 00, ni meses o días, hasta que Facundo defina cómo se comunica. El Estratega solo lo nombra si Facundo lo pide o está en las novedades.
+- **Drop 00** (definido por Facundo): una tanda chica de accesorios hechos en Argentina (gorras, medias y shakers) que se vende por Instagram antes del Drop 01. El detalle está en `docs/productos/stock-inicial.md`. Ya se anuncia como adelanto: se puede nombrar "Drop 00" con su año, **2026**, y nada más. No se publican productos, precios, cantidades ni stock del Drop 00, ni meses o días, hasta que Facundo defina cómo se comunica. El Estratega solo lo nombra si Facundo lo pide, está en las novedades o es el foco de la semana; en ese caso puede mostrar indicios concretos (un bordado de cerca, el color de un hilo) sin precios, cantidades ni stock.
 - Bio de Instagram (@vow_ar), definida por Facundo: **"Una promesa con vos. Indumentaria y accesorios fitness. Lista de espera"**. Se dice "con vos" y no "para vos": la promesa la hace uno consigo mismo, la marca no se la hace a nadie.
 - En una frase: **simplicidad estética para quienes disfrutan entrenar y verse bien haciéndolo, sin dejar de ser simples.**
 
@@ -53,7 +53,7 @@ El problema de las sugerencias de la IA no son las reglas duras, es el tono: fra
 
 **La prueba:** ¿se lo dirías en voz alta a un amigo que entrena, sin sentir vergüenza? ¿Se entiende sola, sin contexto, en tres segundos? Si la respuesta es no, se reescribe o no se publica.
 
-**Cosas que dan cringe (no usarlas):**
+**Cosas que dan cringe (evitarlas; son guía de estilo, no un bloqueo: si una pieza respaldada por datos de lo que funciona las necesita, gana la pieza y el editor lo anota. Lo que sí bloquea es lo falso: cifras, promesas de resultados físicos, escasez falsa, no hablar en voseo):**
 - **Teasers vacíos:** "Algo llega", "Mirá bien", "Hay un antes", "Pronto", "Se viene", "Prepárate". Anuncian que hay algo sin decir qué. La intriga sin dato parece humo.
 - **Sentencias pseudo-profundas:** frases que suenan a verdad universal pero no dicen nada ("Lo demás, en silencio", "Lo importante no se ve").
 - **"No es X, es Y"** ("No es moda, es compromiso") y las listas de tres fragmentos con ritmo de publicidad.

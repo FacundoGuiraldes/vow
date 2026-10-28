@@ -66,6 +66,7 @@ export function prepararDatos(datos) {
     cuentas: (datos.cuentas ?? []).map((c) => ({
       marca: c.marca,
       pais: c.pais,
+      grupo: c.grupo ?? null,
       usuario: c.usuario,
       seguidores: c.seguidores,
       porTipo: Object.fromEntries(
@@ -185,7 +186,9 @@ export function armarPedido({ datos, hipotesis }) {
     "Estas son las ideas de formatos que hay que poner a prueba. Respondé CADA una, con su id:",
     JSON.stringify(hipotesis),
     "",
-    "Además, buscá patrones propios en los datos: qué tipo de publicación rinde mejor según la cuenta, qué estilo de primera línea de texto aparece en lo que mejor rinde, y qué difiere entre la cuenta argentina y las del exterior.",
+    "Además, buscá patrones propios en los datos: qué tipo de publicación rinde mejor según la cuenta y qué estilo de primera línea de texto aparece en lo que mejor rinde.",
+    "COMPARÁ POR GRUPO (campo grupo): \"argentina\" (tono y mercado local), \"global\" (marcas grandes: formato y estética) y \"chica\" (marcas chicas: la comparación más justa para @vow_ar, que tiene pocos seguidores). Decí qué hacen distinto las argentinas de las globales en tipo de publicación, largo y estilo del texto, uso de emojis y hashtags y frecuencia. Una marca grande rinde con presupuesto y alcance pago que VOW no tiene: pesá más a las argentinas y a las chicas. Si un grupo tiene una sola cuenta o ninguna, decilo en los límites y bajá la confianza.",
+    "Cerrá con 3 o 5 recomendaciones concretas y probables de medir en @vow_ar (qué publicar, en qué formato y cómo medir si funcionó con compartidos, guardados y comentarios), no consejos generales.",
     "Respondé llamando a la herramienta entregar_informe. No escribas nada fuera de la herramienta.",
   ].join("\n");
 }

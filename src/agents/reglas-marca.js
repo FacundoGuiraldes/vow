@@ -1,9 +1,11 @@
 // Reglas duras de la marca, en código. Salen de docs/marca/cerebro-de-marca.md.
 // Si una pieza rompe una regla, el plan se rechaza: no dependemos de que la IA "se acuerde".
 
+// Cada regla es "dura" (verdad, ley, voseo: el plan se rechaza si la rompe) o "blanda" (estilo de marca: se avisa al editor crítico
+// y al revisor, pero no frena una pieza que los datos respaldan). La marca pone el tono; los datos ponen el formato.
 const REGLAS = [
   // Motivación vacía
-  { regla: "motivación vacía", patron: /sin excusas|tu mejor versi[oó]n|la mejor versi[oó]n de vos|nada es imposible/i },
+  { regla: "motivación vacía", blanda: true, patron: /sin excusas|tu mejor versi[oó]n|la mejor versi[oó]n de vos|nada es imposible/i },
   // Promesas de resultados físicos o de salud
   {
     regla: "promesa de resultados físicos",
@@ -12,9 +14,9 @@ const REGLAS = [
   // Urgencia o escasez falsa
   { regla: "urgencia falsa", patron: /[uú]ltimas unidades|solo hoy|no te lo pierdas|[uú]ltima chance|se agota ya/i },
   // Presumir
-  { regla: "presumir", patron: /mostr[aá] tu f[ií]sico|modo bestia|\bcrack\b|\bbestia\b/i },
+  { regla: "presumir", blanda: true, patron: /mostr[aá] tu f[ií]sico|modo bestia|\bcrack\b|\bbestia\b/i },
   // Inglés innecesario ("Drop" solo vale como "Drop 01", se revisa aparte)
-  { regla: "inglés innecesario", patron: /\bgains?\b|\bgrind\b|no pain,? no gain|\baesthetic\b/i },
+  { regla: "inglés innecesario", blanda: true, patron: /\bgains?\b|\bgrind\b|no pain,? no gain|\baesthetic\b/i },
   // Voz que no es de vos: tú/usted y conjugaciones de "tú". Se usan límites con \p{L} porque \b
   // no reconoce letras con tilde (ú, é).
   {
@@ -22,22 +24,22 @@ const REGLAS = [
     patron: /(?<!\p{L})(tú|usted|ustedes|ud|tienes|puedes|eres|quieres|debes|hazlo)(?!\p{L})/iu,
   },
   // Anunciar lo que falta (descartado por Facundo): una marca no muestra que no tiene producto
-  { regla: "anuncia lo que falta", patron: /todav[ií]a no (hay|tenemos|llega|lleg[oó]|existe)|no hay (prenda|producto|stock)\b/i },
+  { regla: "anuncia lo que falta", blanda: true, patron: /todav[ií]a no (hay|tenemos|llega|lleg[oó]|existe)|no hay (prenda|producto|stock)\b/i },
   // Elementos del gimnasio (descartado por Facundo): nombrarlos suena forzado. Grips y straps son el producto y sí se pueden nombrar. "pesa" (el verbo) no se marca: solo "pesas".
   {
-    regla: "nombra elementos del gimnasio",
+    regla: "nombra elementos del gimnasio", blanda: true,
     patron: /(?<!\p{L})(barras?|mancuernas?|pesas|kettlebells?|fierros?|hierros?|discos? de peso)(?!\p{L})/iu,
   },
   // La promesa es de uno consigo mismo, no un papel (corregido por Facundo)
-  { regla: "promesa en papel", patron: /\ba mano\b|lapicera|birome|l[aá]piz|cartulina/i },
+  { regla: "promesa en papel", blanda: true, patron: /\ba mano\b|lapicera|birome|l[aá]piz|cartulina/i },
   // Tono de eslogan o de teaser (el cerebro de marca, "Calidad del texto"): intriga sin dato, coaching, "no es X, es Y"
   {
-    regla: "teaser vacío o frase de eslogan",
+    regla: "teaser vacío o frase de eslogan", blanda: true,
     patron:
       /algo (llega|se viene|viene)|muy pronto|pr[oó]ximamente|(?<!\p{L})pronto(?!\p{L})|hay un antes|mir[aá] bien|prep[aá]rate|ya falta poco|cuenta regresiva|lo dem[aá]s,? en silencio|cada (d[ií]a|paso|rep\w*) (cuenta|suma)|un paso a la vez|tu (viaje|historia)(?!\p{L})|el camino(?!\p{L})|no te rindas|nunca te rindas|(?<!\p{L})no es [^.,;!?\n]{1,40}[,;.]\s*es (?=\p{L})/iu,
   },
   // Cadenas de signos de exclamación
-  { regla: "exceso de exclamaciones", patron: /!{2,}/ },
+  { regla: "exceso de exclamaciones", blanda: true, patron: /!{2,}/ },
   // "Drop" suelto: solo se acepta "Drop 01"
   { regla: '"drop" fuera de "Drop 01"', patron: /\bdrops?\b(?!\s*0?1\b)/i },
 ];
@@ -59,18 +61,20 @@ export function revisarTextoAlPublico(texto) {
 }
 
 // Devuelve una lista de problemas (vacía si el texto cumple las reglas).
-export function revisarReglas(texto) {
+// `soloDuras: true` deja afuera las reglas de estilo (blandas); `soloBlandas: true` devuelve solo esas.
+export function revisarReglas(texto, { soloDuras = false, soloBlandas = false } = {}) {
   const problemas = [];
   if (typeof texto !== "string") return problemas;
 
-  for (const { regla, patron } of REGLAS) {
+  for (const { regla, patron, blanda = false } of REGLAS) {
+    if ((soloDuras && blanda) || (soloBlandas && !blanda)) continue;
     const coincidencia = texto.match(patron);
-    if (coincidencia) problemas.push({ regla, fragmento: coincidencia[0] });
+    if (coincidencia) problemas.push({ regla, fragmento: coincidencia[0], blanda });
   }
 
   const emojis = texto.match(/\p{Extended_Pictographic}/gu) ?? [];
-  if (emojis.length > MAXIMO_EMOJIS) {
-    problemas.push({ regla: "demasiados emojis", fragmento: emojis.join("") });
+  if (emojis.length > MAXIMO_EMOJIS && !soloDuras) {
+    problemas.push({ regla: "demasiados emojis", fragmento: emojis.join(""), blanda: true });
   }
   return problemas;
 }
@@ -129,6 +133,6 @@ function oracionNegada(texto, fragmento) {
   return NEGACION.test(oracion.replace(new RegExp(fragmento.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"), ""));
 }
 
-export function revisarGuion(texto) {
-  return revisarReglas(texto).filter((p) => !(REGLAS_PERDONABLES_EN_GUION.has(p.regla) && oracionNegada(texto, p.fragmento)));
+export function revisarGuion(texto, opciones) {
+  return revisarReglas(texto, opciones).filter((p) => !(REGLAS_PERDONABLES_EN_GUION.has(p.regla) && oracionNegada(texto, p.fragmento)));
 }

@@ -14,14 +14,15 @@ import { ejecutarFlujo, registroNuevo } from "../orquestador/orquestador.js";
 import { armarPasos } from "../orquestador/flujo-semanal.js";
 import { ahoraArgentina, esFechaISO, lunesDe } from "./fechas.js";
 
-export function opcionesDelPlan({ valores, hoy, novedades = [] }) {
+export function opcionesDelPlan({ valores, hoy, novedades = [], foco = "", notasEstrategia = "" }) {
   const semana = valores.semana ?? lunesDe(hoy, { siguiente: true });
   const notasDeNovedades = novedades.length ? `Novedades que Facundo te pasó por Telegram (tomalas como ciertas): ${novedades.map((n) => n.texto).join(" | ")}` : "";
+  const notasDelJuego = [foco && `FOCO DE LA SEMANA que fijó Facundo (el plan gira alrededor de esto): ${foco}`, notasEstrategia && `Notas de estrategia de Facundo: ${notasEstrategia}`].filter(Boolean).join("\n");
   return {
     semana,
     fase: valores.fase,
     recursos: { producto: valores.producto, gente: valores.gente },
-    notas: [valores.notas, notasDeNovedades].filter(Boolean).join("\n"),
+    notas: [valores.notas, notasDelJuego, notasDeNovedades].filter(Boolean).join("\n"),
     piezas: Number(valores.piezas),
   };
 }
@@ -64,11 +65,16 @@ export async function correrPlanDelLunes({
   const valores = pedidos.simulado ? { ...pedidos, "sin-enviar": true } : pedidos;
   const puedeHablarConElServicio = Boolean(env.URL_PUBLICA && env.PROGRAMACION_SECRETO) && !valores.simulado;
   let novedades = [];
+  let foco = "";
+  let notasEstrategia = "";
   if (puedeHablarConElServicio) {
-    novedades = (await llamarServicio("novedades", { env, fetchFn })).novedades ?? [];
-    log(`Novedades de VOW para el Estratega: ${novedades.length}`);
+    const datos = await llamarServicio("novedades", { env, fetchFn });
+    novedades = datos.novedades ?? [];
+    foco = datos.foco ?? "";
+    notasEstrategia = datos.notas_estrategia ?? "";
+    log(`Novedades de VOW para el Estratega: ${novedades.length}${foco ? " (con foco de la semana)" : ""}`);
   }
-  const opciones = opcionesDelPlan({ valores, hoy, novedades });
+  const opciones = opcionesDelPlan({ valores, hoy, novedades, foco, notasEstrategia });
   if (!esFechaISO(opciones.semana)) throw new Error("--semana tiene que ser AAAA-MM-DD.");
 
   let cliente = crearClienteSimulado(opciones.semana);
@@ -113,7 +119,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       producto: { type: "boolean", default: false },
       gente: { type: "boolean", default: false },
       notas: { type: "string", default: "" },
-      piezas: { type: "string", default: "2" },
+      piezas: { type: "string", default: "4" },
       simulado: { type: "boolean", default: false },
       "sin-enviar": { type: "boolean", default: false },
     },

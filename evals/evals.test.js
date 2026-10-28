@@ -22,8 +22,8 @@ test("hay casos que aprueban y casos que rechazan (no solo un lado)", async () =
 
 test("el ejecutor detecta un caso mal esperado (si no, las evals no servirían)", async () => {
   const conjunto = await leerConjunto();
-  const caso = conjunto.casos.find((c) => c.id === "elementos-del-gimnasio");
-  // Decimos que se aprueba, pero tiene "barra": tiene que marcarlo como fallido
+  const caso = conjunto.casos.find((c) => c.id === "resultado-fisico");
+  // Decimos que se aprueba, pero promete un resultado físico: tiene que marcarlo como fallido
   assert.equal((await ejecutarCaso(conjunto, { ...caso, esperado: { aprobada: true, problemas_contienen: [] } })).ok, false);
   // Decimos que se rechaza por otro motivo: también
   assert.equal((await ejecutarCaso(conjunto, { ...caso, esperado: { aprobada: false, problemas_contienen: ["urgencia falsa"] } })).ok, false);
@@ -35,7 +35,7 @@ test("el ejecutor detecta un caso mal esperado (si no, las evals no servirían)"
 test("reglasSinCaso avisa cuando una regla no tiene caso", async () => {
   const conjunto = await leerConjunto();
   // Sacamos todos los casos que apuntan a esa regla
-  const sinPapel = { ...conjunto, casos: conjunto.casos.filter((c) => !c.esperado.problemas_contienen.includes("promesa en papel")) };
+  const sinPapel = { ...conjunto, casos: conjunto.casos.filter((c) => ![...c.esperado.problemas_contienen, ...(c.esperado.avisos_contienen ?? [])].includes("promesa en papel")) };
   assert.deepEqual(reglasSinCaso(sinPapel), ["promesa en papel"]);
 });
 

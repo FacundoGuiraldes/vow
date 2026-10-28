@@ -122,7 +122,6 @@ test("rechaza una pieza que rompe las reglas de marca", () => {
     { semanaInicio: SEMANA }
   );
   assert.equal(ok, false);
-  assert.match(errores.join(" "), /motivación vacía/);
   assert.match(errores.join(" "), /promesa de resultados físicos/);
   assert.match(errores.join(" "), /anotarse en la lista/);
 });
@@ -161,12 +160,12 @@ test("rechaza más de 5 piezas en la semana", () => {
 });
 
 test("un plan inválido devuelve los errores y no entrega el plan", async () => {
-  const cliente = clienteFalso(planValido([piezaValida({ gancho: "Sin excusas" })]));
+  const cliente = clienteFalso(planValido([piezaValida({ gancho: "Quemá grasa hoy" })]));
   const r = await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
   assert.equal(r.ok, false);
   assert.equal(r.plan, null);
   assert.ok(r.propuesta, "se conserva la propuesta para poder mirarla");
-  assert.match(r.errores.join(" "), /motivación vacía/);
+  assert.match(r.errores.join(" "), /promesa de resultados físicos/);
 });
 
 test("exige una fecha de inicio válida y un cliente", async () => {
@@ -179,19 +178,24 @@ test("acepta el gancho aprobado por Facundo", () => {
   assert.equal(r.ok, true, r.errores.join(" | "));
 });
 
-test("rechaza los ganchos que Facundo descartó (tutorial y anunciar lo que falta)", () => {
+test("los ganchos que Facundo descartó (tutorial y anunciar lo que falta) ya no bloquean: quedan como advertencias de estilo", () => {
   const tutorial = validarPlan(planValido([piezaValida({ gancho: "Cómo escribir una promesa que puedas cumplir." })]), { semanaInicio: SEMANA });
-  assert.match(tutorial.errores.join(" "), /suena a tutorial/);
+  assert.equal(tutorial.ok, true, tutorial.errores.join(" | "));
+  assert.match(tutorial.advertencias.join(" "), /suena a tutorial/);
 
-  const falta = validarPlan(planValido([piezaValida({ gancho: "Todavía no hay prenda para mostrarte. Hay una idea." })]), { semanaInicio: SEMANA });
-  assert.match(falta.errores.join(" "), /anuncia lo que falta/);
+  const falta = validarPlan(planValido([piezaValida({ gancho: "Todavía no hay prenda para mostrarte. Hay una idea.", texto_en_pantalla: ["Todavía no hay prenda para mostrarte."] })]), { semanaInicio: SEMANA });
+  assert.equal(falta.ok, true, falta.errores.join(" | "));
+  assert.match(falta.advertencias.join(" "), /anuncia lo que falta/);
 });
 
-test("rechaza ganchos con tono de lista de consejos", () => {
-  for (const gancho of ["5 tips para entrenar", "Tips para empezar", "Guía para tu promesa"]) {
+test("los ganchos con tono de lista de consejos avisan (y una cifra inventada sigue bloqueando)", () => {
+  for (const gancho of ["Tips para empezar", "Guía para tu promesa"]) {
     const r = validarPlan(planValido([piezaValida({ gancho })]), { semanaInicio: SEMANA });
-    assert.match(r.errores.join(" "), /suena a tutorial|cifra/, gancho);
+    assert.match(r.advertencias.join(" "), /suena a tutorial/, gancho);
   }
+  const conCifra = validarPlan(planValido([piezaValida({ gancho: "5 tips para entrenar" })]), { semanaInicio: SEMANA });
+  assert.equal(conCifra.ok, false);
+  assert.match(conCifra.errores.join(" "), /cifra/);
 });
 
 test("un gancho largo no es un gancho fuerte: máximo 12 palabras", () => {
@@ -268,9 +272,9 @@ test("pide al menos 3 alternativos, sin repetidos y que cumplan las reglas", () 
   const repetido = validarPlan(planValido([piezaValida({ ganchos_alternativos: ["Tu firma no se negocia.", "tu firma no se negocia", "Lo escrito se cumple."] })]), { semanaInicio: SEMANA });
   assert.match(repetido.errores.join(" "), /repetido/);
 
-  const malo = validarPlan(planValido([piezaValida({ ganchos_alternativos: ["Sin excusas, a entrenar", "Cómo cumplir una promesa", "Lo escrito se cumple."] })]), { semanaInicio: SEMANA });
-  assert.match(malo.errores.join(" "), /motivación vacía/);
-  assert.match(malo.errores.join(" "), /suena a tutorial/);
+  const malo = validarPlan(planValido([piezaValida({ ganchos_alternativos: ["Quemá grasa a entrenar", "Cómo cumplir una promesa", "Lo escrito se cumple."] })]), { semanaInicio: SEMANA });
+  assert.match(malo.errores.join(" "), /promesa de resultados físicos/);
+  assert.match(malo.advertencias.join(" "), /suena a tutorial/);
 });
 
 test("el gancho principal puede ser uno aprobado, pero no más de uno por plan", async () => {
@@ -309,11 +313,11 @@ test("rechaza piezas que explican la marca por dentro, pero lo deja en el guion"
   assert.equal(enGuion.ok, true, enGuion.errores.join(" | "));
 });
 
-test("rechaza ganchos alternativos con elementos del gimnasio y recursos de papel y lapicera", () => {
+test("ganchos alternativos con elementos del gimnasio y recursos de papel avisan pero no bloquean", () => {
   const gym = validarPlan(planValido([piezaValida({ ganchos_alternativos: ["Prometé poco. Cumplí todo.", "Tu palabra. Después la barra.", "Una línea. Un compromiso.", "Lo escrito se cumple."] })]), { semanaInicio: SEMANA });
-  assert.ok(gym.errores.some((e) => e.includes("nombra elementos del gimnasio")));
+  assert.equal(gym.errores.some((e) => e.includes("nombra elementos del gimnasio")), false);
   const papel = validarPlan(planValido([piezaValida({ recursos: ["Lapicera negra", "Cartulina beige"] })]), { semanaInicio: SEMANA });
-  assert.ok(papel.errores.some((e) => e.includes("promesa en papel en los recursos")));
+  assert.equal(papel.errores.some((e) => e.includes("promesa en papel")), false);
 });
 
 test("las instrucciones dicen que la promesa es de uno mismo y que no se nombran elementos del gym", async () => {
@@ -323,11 +327,11 @@ test("las instrucciones dicen que la promesa es de uno mismo y que no se nombran
   assert.match(texto, /le habla a quien la mira/i);
 });
 
-test("un guion que aclara qué no aparece se acepta; uno que lo pide se rechaza", () => {
+test("un guion que aclara qué no aparece se acepta; uno que lo pide queda como advertencia", () => {
   const bien = validarPlan(planValido([piezaValida({ guion: "Solo texto sobre fondo hueso. No aparece papel ni lapicera, y no se habla de lo que todavía no hay." })]), { semanaInicio: SEMANA });
   assert.equal(bien.ok, true, bien.errores.join(" | "));
   const mal = validarPlan(planValido([piezaValida({ guion: "Unas manos escriben con lapicera sobre papel." })]), { semanaInicio: SEMANA });
-  assert.ok(mal.errores.some((e) => e.includes("promesa en papel")));
+  assert.ok(mal.advertencias.some((e) => e.includes("promesa en papel")));
 });
 
 test("un guion que numera las láminas no se rechaza por cifras", () => {
@@ -498,11 +502,11 @@ test("el motivo del fallo es el del último intento: cortada una vez y después 
 });
 
 test("los errores de reglas y cifras dicen en qué campo de la pieza está el problema", () => {
-  const plan = planValido([piezaValida({ guion: "Texto del 27/10 sobre fondo hueso.", epigrafe: "Somos 500. Anotate en la lista: link en la bio.", texto_en_pantalla: ["Dominá la barra.", "Sin apuro."] })]);
+  const plan = planValido([piezaValida({ guion: "Texto del 27/10 sobre fondo hueso.", epigrafe: "Somos 500. Anotate en la lista: link en la bio.", texto_en_pantalla: ["Quemá grasa.", "Sin apuro."] })]);
   const { errores } = validarPlan(plan, { semanaInicio: SEMANA, piezas: 1 });
   assert.ok(errores.some((e) => e.includes("Pieza 1 (guion): la cifra \"27\"")), errores.join(" | "));
   assert.ok(errores.some((e) => e.includes("Pieza 1 (epigrafe): la cifra \"500\"")), errores.join(" | "));
-  assert.ok(errores.some((e) => e.includes("Pieza 1 (texto_en_pantalla): nombra elementos del gimnasio")), errores.join(" | "));
+  assert.ok(errores.some((e) => e.includes("Pieza 1 (texto_en_pantalla): promesa de resultados físicos")), errores.join(" | "));
 });
 
 test("un guion con un papel negado se perdona pero el mismo texto en el epígrafe no, aunque sean iguales", () => {
@@ -510,7 +514,7 @@ test("un guion con un papel negado se perdona pero el mismo texto en el epígraf
   const enGuion = validarPlan(planValido([piezaValida({ guion: frase })]), { semanaInicio: SEMANA, piezas: 1 });
   assert.equal(enGuion.errores.filter((e) => e.includes("promesa en papel")).length, 0);
   const enEpigrafe = validarPlan(planValido([piezaValida({ guion: frase, epigrafe: `${frase} Anotate en la lista: link en la bio.` })]), { semanaInicio: SEMANA, piezas: 1 });
-  assert.ok(enEpigrafe.errores.some((e) => e.includes("(epigrafe): promesa en papel")), enEpigrafe.errores.join(" | "));
+  assert.ok(enEpigrafe.advertencias.some((e) => e.includes("(epigrafe): promesa en papel")), enEpigrafe.advertencias.join(" | "));
 });
 
 test("distingue un plan sin la lista de piezas de uno con la lista vacía", () => {
@@ -584,4 +588,107 @@ test("una story puede venir sin epígrafe; el resto de los formatos no", () => {
   }
   // una story sin epígrafe igual tiene que tener gancho y acción
   assert.ok(story({ epigrafe: "", cta: "" }).errores.includes("Pieza 1: falta cta."));
+});
+
+test("una story de encuesta puede cerrar con su interacción, pero un reel tiene que pedir la lista", () => {
+  const story = piezaValida({ formato: "story", epigrafe: "", cta: "Votá en la encuesta.", gancho: "El short, en dos largos. ¿Cuál?" });
+  assert.equal(validarPlan(planValido([story]), { semanaInicio: SEMANA }).ok, true);
+  const reel = piezaValida({ cta: "Votá en la encuesta." });
+  const { ok, errores } = validarPlan(planValido([reel]), { semanaInicio: SEMANA });
+  assert.equal(ok, false);
+  assert.match(errores.join(" "), /anotarse en la lista/);
+  const storyVacia = piezaValida({ formato: "story", epigrafe: "", cta: "Mirá el short." });
+  assert.equal(validarPlan(planValido([storyVacia]), { semanaInicio: SEMANA }).ok, false);
+});
+
+test("el sistema del Estratega incluye el banco de contenido y el método", async () => {
+  const leer = async (ruta) => (String(ruta).includes("banco") ? "BANCO-DE-PRUEBA" : "TEXTO");
+  const { texto } = await construirSistema(leer, { listar: async () => [] });
+  assert.match(texto, /BANCO DE CONTENIDO/);
+  assert.match(texto, /BANCO-DE-PRUEBA/);
+  assert.match(texto, /FOCO DE LA SEMANA/);
+});
+
+test("sin el archivo del banco de contenido el Estratega sigue funcionando", async () => {
+  const leer = async (ruta) => {
+    if (String(ruta).includes("banco")) throw new Error("no existe");
+    return "TEXTO";
+  };
+  const { texto } = await construirSistema(leer, { listar: async () => [] });
+  assert.doesNotMatch(texto, /BANCO DE CONTENIDO \(/);
+});
+
+// Cliente que responde distinto según la herramienta que se le ofrece (plan o crítica)
+const clienteConCritica = ({ planes, criticas }) => {
+  const pedidos = [];
+  let p = 0;
+  let c = 0;
+  return {
+    pedidos,
+    messages: {
+      create: async (pedido) => {
+        pedidos.push(pedido);
+        const esCritica = pedido.tools?.[0]?.name === "evaluar_plan";
+        const input = esCritica ? criticas[Math.min(c++, criticas.length - 1)] : planes[Math.min(p++, planes.length - 1)];
+        return { content: [{ type: "tool_use", id: `t${pedidos.length}`, name: esCritica ? "evaluar_plan" : "proponer_plan", input }], usage: { input_tokens: 100, output_tokens: 50 } };
+      },
+    },
+  };
+};
+const notas = (n, mejora = "") => ({ concrecion: n, compartible: n, gancho: n, hacer_posible: n, marca: n, mejora });
+
+test("con crítica: un plan flojo se reescribe una vez y se queda la versión mejor", async () => {
+  const mejor = planValido([piezaValida({ gancho: "El short, en dos largos. ¿Cuál?", texto_en_pantalla: ["¿Cuál va?"] })]);
+  const cliente = clienteConCritica({ planes: [planValido(), mejor], criticas: [{ piezas: [notas(2, "Mostrá algo concreto")] }, { piezas: [notas(4)] }] });
+  const r = await planificarSemana({ ...pedido, piezas: 1 }, { cliente, leer: leerFalso, listar: async () => [], criticar: true });
+  assert.equal(r.ok, true);
+  assert.equal(r.plan.piezas[0].gancho, "El short, en dos largos. ¿Cuál?");
+  assert.equal(r.critica.mejorada, true);
+  assert.ok(r.critica.despues > r.critica.antes);
+  assert.equal(cliente.pedidos.length, 4);
+});
+
+test("con crítica: si la versión mejorada no mejora o no pasa las reglas, se queda el plan original", async () => {
+  const peor = planValido([piezaValida({ gancho: "Sin excusas, entrená" })]);
+  const cliente = clienteConCritica({ planes: [planValido(), peor], criticas: [{ piezas: [notas(2, "x")] }] });
+  const r = await planificarSemana({ ...pedido, piezas: 1 }, { cliente, leer: leerFalso, listar: async () => [], criticar: true });
+  assert.equal(r.ok, true);
+  assert.equal(r.plan.piezas[0].gancho, "Una promesa para vos.");
+  assert.equal(r.critica.mejorada, false);
+});
+
+test("con crítica: un plan bueno no se toca y una crítica rota no frena el plan", async () => {
+  const bueno = clienteConCritica({ planes: [planValido()], criticas: [{ piezas: [notas(5)] }] });
+  const r1 = await planificarSemana({ ...pedido, piezas: 1 }, { cliente: bueno, leer: leerFalso, listar: async () => [], criticar: true });
+  assert.equal(r1.ok, true);
+  assert.equal(bueno.pedidos.length, 2);
+  const roto = clienteConCritica({ planes: [planValido()], criticas: [{ piezas: [{ concrecion: 9 }] }] });
+  const r2 = await planificarSemana({ ...pedido, piezas: 1 }, { cliente: roto, leer: leerFalso, listar: async () => [], criticar: true });
+  assert.equal(r2.ok, true);
+  assert.equal(r2.critica.ok, false);
+});
+
+test("sin criticar (por defecto) no se hace ninguna llamada extra", async () => {
+  const cliente = clienteFalso(planValido());
+  await planificarSemana({ ...pedido, piezas: 1 }, { cliente, leer: leerFalso, listar: async () => [] });
+  assert.equal(cliente.pedidos.length, 1);
+});
+
+test("los patrones de éxito de las cuentas de referencia entran al sistema con su enlace y se pide equilibrar marca y datos", async () => {
+  const listar = async () => ["patrones-2026-10-20.md", "patrones-2026-10-27.md"];
+  const leer = async (ruta) => (String(ruta).includes("patrones-2026-10-27") ? "PATRONES-ULTIMOS" : "TEXTO");
+  const { texto } = await construirSistema(leer, { listar });
+  assert.match(texto, /QUÉ FUNCIONÓ EN EL MERCADO/);
+  assert.match(texto, /PATRONES-ULTIMOS/);
+  assert.doesNotMatch(texto, /patrones-2026-10-20/);
+  assert.match(texto, /equilibrio entre el estilo de VOW/);
+});
+
+test("el estilo de marca avisa pero no bloquea; la verdad y la ley siguen bloqueando", () => {
+  const estilo = validarPlan(planValido([piezaValida({ gancho: "Algo se viene.", texto_en_pantalla: ["Algo llega pronto."] })]), { semanaInicio: SEMANA });
+  assert.equal(estilo.ok, true, estilo.errores.join(" | "));
+  assert.match(estilo.advertencias.join(" "), /teaser vacío/);
+  const verdad = validarPlan(planValido([piezaValida({ epigrafe: "Últimas unidades. Anotate en la lista." })]), { semanaInicio: SEMANA });
+  assert.equal(verdad.ok, false);
+  assert.match(verdad.errores.join(" "), /urgencia falsa/);
 });
