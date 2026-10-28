@@ -533,6 +533,14 @@ function tarjetaPieza(e){
     });
     r2.appendChild(si);r2.appendChild(no);q.appendChild(r2);f.appendChild(q);
   }));
+  if(!e._id&&e.estado!=='publicado')a.appendChild(botonIco('borrador','Quitar','ck sec',function(){
+    if(f.querySelector('.elim'))return;
+    var q=el('div','nota elim');q.appendChild(el('p',null,'Esta pieza solo está en los documentos, no en el bot. ¿Quitarla del juego? No cambia nada en Instagram.'));
+    var r2=el('div','fil2'),si=el('button','ck si','Sí, quitar'),no=el('button','ck sec','No, dejarla');si.type='button';no.type='button';
+    no.addEventListener('click',function(){q.remove()});
+    si.addEventListener('click',function(){si.disabled=true;enviarOp({tipo:'pieza_ocultar',fecha:e.fecha,formato:e.formato},'Pieza quitada del juego').then(function(ok){if(ok)abrirEdif(panelAbierto,true);else si.disabled=false})});
+    r2.appendChild(si);r2.appendChild(no);q.appendChild(r2);f.appendChild(q);
+  }));
   if(a.children.length)f.appendChild(a);
   return f;
 }

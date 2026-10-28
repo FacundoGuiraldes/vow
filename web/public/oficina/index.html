@@ -1759,6 +1759,14 @@ function tarjetaPieza(e){
     });
     r2.appendChild(si);r2.appendChild(no);q.appendChild(r2);f.appendChild(q);
   }));
+  if(!e._id&&e.estado!=='publicado')a.appendChild(botonIco('borrador','Quitar','ck sec',function(){
+    if(f.querySelector('.elim'))return;
+    var q=el('div','nota elim');q.appendChild(el('p',null,'Esta pieza solo está en los documentos, no en el bot. ¿Quitarla del juego? No cambia nada en Instagram.'));
+    var r2=el('div','fil2'),si=el('button','ck si','Sí, quitar'),no=el('button','ck sec','No, dejarla');si.type='button';no.type='button';
+    no.addEventListener('click',function(){q.remove()});
+    si.addEventListener('click',function(){si.disabled=true;enviarOp({tipo:'pieza_ocultar',fecha:e.fecha,formato:e.formato},'Pieza quitada del juego').then(function(ok){if(ok)abrirEdif(panelAbierto,true);else si.disabled=false})});
+    r2.appendChild(si);r2.appendChild(no);q.appendChild(r2);f.appendChild(q);
+  }));
   if(a.children.length)f.appendChild(a);
   return f;
 }
@@ -2184,7 +2192,7 @@ function armarD(){
     d.rendimiento=v.rendimiento||null;d.actualizado=(v.generado||'').slice(0,10)||d.actualizado;
   }
   /* los "por aprobar" de los documentos que todavía no están en la base también piden tu OK */
-  piezas.forEach(function(p){if(p.estado==='por aprobar'&&!p._id){var t='Aprobar «'+p.titulo+'» del '+ddf(p.fecha);if(!pend.some(function(x){return x.t===t}))pend.push({sala:'diseno',t:t})}});
+  var po=((v&&v.operacion&&v.operacion.piezasOcultas)||[]);piezas=piezas.filter(function(p){return p._id||po.indexOf(p.fecha+'|'+String(p.formato||'').toLowerCase())<0});piezas.forEach(function(p){if(p.estado==='por aprobar'&&!p._id){var t='Aprobar «'+p.titulo+'» del '+ddf(p.fecha);if(!pend.some(function(x){return x.t===t}))pend.push({sala:'diseno',t:t})}});
   /* lunes 8:00: el plan semanal se arma solo */
   var h=new Date(),i;for(i=0;i<8;i++){var x=new Date(h.getFullYear(),h.getMonth(),h.getDate()+i);if(x.getDay()===1&&(i>0||h.getHours()<8)){agenda.push({f:x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'),h:'08:00',sala:'bot',t:'Plan semanal automático'});break}}
   var op=(v&&v.operacion)||null;d._op=op;d.inv=(v&&v.inventario)||null;d.estr=(v&&v.estrategia_semana)||null;

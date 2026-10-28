@@ -1627,7 +1627,7 @@ function armarD(){
     d.rendimiento=v.rendimiento||null;d.actualizado=(v.generado||'').slice(0,10)||d.actualizado;
   }
   /* los "por aprobar" de los documentos que todavía no están en la base también piden tu OK */
-  piezas.forEach(function(p){if(p.estado==='por aprobar'&&!p._id){var t='Aprobar «'+p.titulo+'» del '+ddf(p.fecha);if(!pend.some(function(x){return x.t===t}))pend.push({sala:'diseno',t:t})}});
+  var po=((v&&v.operacion&&v.operacion.piezasOcultas)||[]);piezas=piezas.filter(function(p){return p._id||po.indexOf(p.fecha+'|'+String(p.formato||'').toLowerCase())<0});piezas.forEach(function(p){if(p.estado==='por aprobar'&&!p._id){var t='Aprobar «'+p.titulo+'» del '+ddf(p.fecha);if(!pend.some(function(x){return x.t===t}))pend.push({sala:'diseno',t:t})}});
   /* lunes 8:00: el plan semanal se arma solo */
   var h=new Date(),i;for(i=0;i<8;i++){var x=new Date(h.getFullYear(),h.getMonth(),h.getDate()+i);if(x.getDay()===1&&(i>0||h.getHours()<8)){agenda.push({f:x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'),h:'08:00',sala:'bot',t:'Plan semanal automático'});break}}
   var op=(v&&v.operacion)||null;d._op=op;d.inv=(v&&v.inventario)||null;d.estr=(v&&v.estrategia_semana)||null;

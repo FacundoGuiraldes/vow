@@ -116,6 +116,11 @@ export const HERRAMIENTAS_CHAT = [
     },
   },
   { name: "quitar_agenda", description: "Quita un evento de la agenda que se agregó antes (usá el id que devuelve ver_operacion).", parameters: { type: "OBJECT", properties: { id: { type: "STRING" } }, required: ["id"] } },
+  {
+    name: "quitar_pieza_del_juego",
+    description: "Quita del juego VOW HQ una pieza que aparece en el Taller de diseño pero NO existe en el bot (ver_semana no la muestra): viene solo de los documentos. No sirve para piezas del bot: esas se cancelan con pedir_cancelacion.",
+    parameters: { type: "OBJECT", properties: { fecha: { type: "STRING", description: "AAAA-MM-DD de la pieza." }, formato: { type: "STRING", description: "carrusel, reel, historia o imagen." } }, required: ["fecha", "formato"] },
+  },
   { name: "aprobar_pieza", description: "Aprueba una pieza propuesta para la semana. No la publica ni la confirma.", parameters: { type: "OBJECT", properties: { id }, required: ["id"] } },
   {
     name: "pedir_confirmacion",
