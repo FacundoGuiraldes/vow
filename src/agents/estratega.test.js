@@ -613,3 +613,59 @@ test("sin el archivo del banco de contenido el Estratega sigue funcionando", asy
   const { texto } = await construirSistema(leer, { listar: async () => [] });
   assert.doesNotMatch(texto, /BANCO DE CONTENIDO \(/);
 });
+
+// Cliente que responde distinto según la herramienta que se le ofrece (plan o crítica)
+const clienteConCritica = ({ planes, criticas }) => {
+  const pedidos = [];
+  let p = 0;
+  let c = 0;
+  return {
+    pedidos,
+    messages: {
+      create: async (pedido) => {
+        pedidos.push(pedido);
+        const esCritica = pedido.tools?.[0]?.name === "evaluar_plan";
+        const input = esCritica ? criticas[Math.min(c++, criticas.length - 1)] : planes[Math.min(p++, planes.length - 1)];
+        return { content: [{ type: "tool_use", id: `t${pedidos.length}`, name: esCritica ? "evaluar_plan" : "proponer_plan", input }], usage: { input_tokens: 100, output_tokens: 50 } };
+      },
+    },
+  };
+};
+const notas = (n, mejora = "") => ({ concrecion: n, compartible: n, gancho: n, hacer_posible: n, marca: n, mejora });
+
+test("con crítica: un plan flojo se reescribe una vez y se queda la versión mejor", async () => {
+  const mejor = planValido([piezaValida({ gancho: "El short, en dos largos. ¿Cuál?", texto_en_pantalla: ["¿Cuál va?"] })]);
+  const cliente = clienteConCritica({ planes: [planValido(), mejor], criticas: [{ piezas: [notas(2, "Mostrá algo concreto")] }, { piezas: [notas(4)] }] });
+  const r = await planificarSemana({ ...pedido, piezas: 1 }, { cliente, leer: leerFalso, listar: async () => [], criticar: true });
+  assert.equal(r.ok, true);
+  assert.equal(r.plan.piezas[0].gancho, "El short, en dos largos. ¿Cuál?");
+  assert.equal(r.critica.mejorada, true);
+  assert.ok(r.critica.despues > r.critica.antes);
+  assert.equal(cliente.pedidos.length, 4);
+});
+
+test("con crítica: si la versión mejorada no mejora o no pasa las reglas, se queda el plan original", async () => {
+  const peor = planValido([piezaValida({ gancho: "Sin excusas, entrená" })]);
+  const cliente = clienteConCritica({ planes: [planValido(), peor], criticas: [{ piezas: [notas(2, "x")] }] });
+  const r = await planificarSemana({ ...pedido, piezas: 1 }, { cliente, leer: leerFalso, listar: async () => [], criticar: true });
+  assert.equal(r.ok, true);
+  assert.equal(r.plan.piezas[0].gancho, "Una promesa para vos.");
+  assert.equal(r.critica.mejorada, false);
+});
+
+test("con crítica: un plan bueno no se toca y una crítica rota no frena el plan", async () => {
+  const bueno = clienteConCritica({ planes: [planValido()], criticas: [{ piezas: [notas(5)] }] });
+  const r1 = await planificarSemana({ ...pedido, piezas: 1 }, { cliente: bueno, leer: leerFalso, listar: async () => [], criticar: true });
+  assert.equal(r1.ok, true);
+  assert.equal(bueno.pedidos.length, 2);
+  const roto = clienteConCritica({ planes: [planValido()], criticas: [{ piezas: [{ concrecion: 9 }] }] });
+  const r2 = await planificarSemana({ ...pedido, piezas: 1 }, { cliente: roto, leer: leerFalso, listar: async () => [], criticar: true });
+  assert.equal(r2.ok, true);
+  assert.equal(r2.critica.ok, false);
+});
+
+test("sin criticar (por defecto) no se hace ninguna llamada extra", async () => {
+  const cliente = clienteFalso(planValido());
+  await planificarSemana({ ...pedido, piezas: 1 }, { cliente, leer: leerFalso, listar: async () => [] });
+  assert.equal(cliente.pedidos.length, 1);
+});

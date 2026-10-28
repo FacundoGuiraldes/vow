@@ -47,7 +47,7 @@ const resultado = await corteLimpio(
       notas: values.notas,
       piezas: Number(values.piezas),
     },
-    { cliente }
+    { cliente, criticar: true }
   )
 );
 

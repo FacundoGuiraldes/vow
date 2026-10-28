@@ -1,4 +1,5 @@
 import { readdir, readFile } from "node:fs/promises";
+import { criticarPlan, pedidoDeMejora } from "./critico.js";
 import { leerPiezasDefinidas, diasEntre } from "./piezas-definidas.js";
 import { revisarReglas, revisarGuion, revisarTextoAlPublico, cifrasNoPermitidas, contextoDeCifra, CIFRAS_PERMITIDAS } from "./reglas-marca.js";
 
@@ -369,7 +370,7 @@ ${referencias}${bloqueInvestigacion}${bloqueRendimiento}${bloquePiezas}` };
 }
 
 // Pide el plan de una semana. `cliente` se inyecta para poder probar sin gastar plata.
-export async function planificarSemana({ semanaInicio, fase, recursos = {}, notas = "", piezas = PIEZAS_POR_DEFECTO }, { cliente, modelo = MODELO_ESTRATEGA, leer, listar } = {}) {
+export async function planificarSemana({ semanaInicio, fase, recursos = {}, notas = "", piezas = PIEZAS_POR_DEFECTO }, { cliente, modelo = MODELO_ESTRATEGA, leer, listar, criticar = false } = {}) {
   if (!esFechaISO(semanaInicio)) throw new Error("semanaInicio tiene que ser AAAA-MM-DD.");
   if (!cliente) throw new Error("Falta el cliente de Anthropic.");
 
@@ -427,6 +428,49 @@ export async function planificarSemana({ semanaInicio, fase, recursos = {}, nota
     return { ok: false, plan: null, errores: [motivo], uso, intentos };
   }
 
-  const { ok, errores } = validarPlan(bloque.input, { semanaInicio, recursos, piezas, ganchosConocidos, piezasDefinidas });
-  return { ok, plan: ok ? bloque.input : null, errores, uso, propuesta: bloque.input, intentos };
+  const opcionesValidacion = { semanaInicio, recursos, piezas, ganchosConocidos, piezasDefinidas };
+  const { ok, errores } = validarPlan(bloque.input, opcionesValidacion);
+  if (!ok || !criticar) return { ok, plan: ok ? bloque.input : null, errores, uso, propuesta: bloque.input, intentos };
+
+  // Generar, criticar, mejorar: un editor crítico puntúa el plan y, si hay piezas flojas, el Estratega las reescribe una vez.
+  // Si la versión mejorada no pasa las reglas o no mejora el promedio, se queda la primera: la crítica nunca empeora un plan válido.
+  let plan = bloque.input;
+  let critica = null;
+  try {
+    critica = await criticarPlan(plan, { cliente, modelo, contexto: `semana del ${semanaInicio}; ${pedido.split("\n").find((l) => l.startsWith("Recursos")) ?? ""}` });
+    uso.entrada += critica.uso.entrada;
+    uso.salida += critica.uso.salida;
+    critica.mejorada = false;
+    if (critica.ok && critica.flojas.length > 0) {
+      const respuesta = await cliente.messages.create({
+        model: modelo,
+        max_tokens: maxTokens,
+        system,
+        messages: [...mensajes, { role: "assistant", content: [{ type: "tool_use", id: bloque.id, name: HERRAMIENTA_PLAN.name, input: plan }] }, { role: "user", content: [{ type: "tool_result", tool_use_id: bloque.id, content: pedidoDeMejora(critica) }] }],
+        tools: [HERRAMIENTA_PLAN],
+        tool_choice: { type: "auto" },
+      });
+      uso.entrada += respuesta.usage?.input_tokens ?? 0;
+      uso.salida += respuesta.usage?.output_tokens ?? 0;
+      const mejorado = respuesta.stop_reason === "max_tokens" ? null : respuesta.content?.find((b) => b.type === "tool_use" && b.name === HERRAMIENTA_PLAN.name);
+      if (mejorado && validarPlan(mejorado.input, opcionesValidacion).ok) {
+        const segunda = await criticarPlan(mejorado.input, { cliente, modelo });
+        uso.entrada += segunda.uso.entrada;
+        uso.salida += segunda.uso.salida;
+        const antes = critica.piezas.reduce((a, p) => a + p.promedio, 0) / critica.piezas.length;
+        const despues = segunda.ok ? segunda.piezas.reduce((a, p) => a + p.promedio, 0) / segunda.piezas.length : -1;
+        // Si la segunda crítica falla no se puede comparar: se queda el plan original
+        if (segunda.ok && despues > antes) {
+          plan = mejorado.input;
+          critica = { ...segunda, mejorada: true, antes: Number(antes.toFixed(2)), despues: Number(despues.toFixed(2)) };
+        } else {
+          critica = { ...critica, mejorada: false };
+        }
+      }
+    }
+  } catch (error) {
+    // La crítica es un extra: si falla (red, crédito), el plan válido sigue su camino
+    critica = { ok: false, error: error.message, piezas: [], flojas: [] };
+  }
+  return { ok: true, plan, errores: [], uso, propuesta: plan, intentos, critica };
 }

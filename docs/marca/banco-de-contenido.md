@@ -31,6 +31,15 @@ Cada uno tiene **un trabajo** (mostrar, preguntar, sumar). Pensá siempre el tra
 
 Las stories son el canal barato y diario: conviene que la mayoría de las piezas de la semana sean stories o secuencias de stories, y que haya 1 o 2 piezas de feed (carrusel o reel).
 
+## Qué premia Instagram (guías del sector 2026, no datos oficiales: tomarlo como hipótesis para medir)
+
+- **Compartidos y guardados** pesan mucho más que los likes para llegar a gente que no te sigue. Pregunta de diseño para cada pieza: ¿alguien se la mandaría a un amigo o la guardaría? Una decisión real (A o B), un detalle útil o una frase que alguien se reconozca diciendo, sí. Una frase vaga, no.
+- **Retención:** en reels, los primeros 1 a 3 segundos deciden. Mostrar la cosa en el primer plano, sin intro ni logo. Mejor corto y completo que largo.
+- **Carruseles:** retienen y se vuelven a mostrar a quien no los vio entero; funcionan para detalles y decisiones.
+- **Constancia sobre volumen:** mejor 2 piezas de feed y varias stories por semana, todas semanas seguidas, que una ráfaga.
+- **Nicho claro:** palabras clave reales en el epígrafe (ropa para entrenar, oversize, musculosa, short) ayudan a que la cuenta se ubique.
+- **Marcas argentinas del rubro:** el patrón común es crecer con producto real en uso, drops cortos con stock real y comunidad (clientes que piden y opinan). VOW todavía no tiene eso: lo que sí puede hacer desde ya es mostrar el proceso y dejar que la comunidad participe de decisiones.
+
 ## Reglas de concreción (la prueba de cada pieza)
 
 1. **Un dato visible.** Si no se puede decir qué se ve en el primer segundo (un color, una costura, una mano, una muestra, una pregunta con dos opciones), la pieza es humo: se reescribe.

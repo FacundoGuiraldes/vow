@@ -44,7 +44,7 @@ if (!values.simulado && (!token || !idCuentaPropia)) {
 
 const resultados = [];
 const fallas = [];
-for (const { usuario, marca, pais } of cuentas) {
+for (const { usuario, marca, pais, grupo = null } of cuentas) {
   try {
     const cuenta = await descargarCuenta(usuario, {
       token: values.simulado ? "simulado" : token,
@@ -52,7 +52,7 @@ for (const { usuario, marca, pais } of cuentas) {
       limite: Number(values.limite),
       fetchFn: values.simulado ? fetchSimulado : fetch,
     });
-    resultados.push({ marca, pais, ...resumirCuenta(cuenta) });
+    resultados.push({ marca, pais, grupo, ...resumirCuenta(cuenta) });
     console.log(`✓ ${marca} (@${usuario}): ${cuenta.publicaciones.length} publicaciones, ${cuenta.seguidores?.toLocaleString("es-AR")} seguidores`);
   } catch (error) {
     fallas.push({ marca, usuario, motivo: error.message });
