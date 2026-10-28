@@ -27,7 +27,10 @@ export const esHoraDePublicacion = (valor) =>
   typeof valor === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(valor) && valor >= HORA_MINIMA_PUBLICACION && valor <= HORA_MAXIMA_PUBLICACION;
 // Ganchos que suenan a tutorial o a lista de consejos (descartado por Facundo)
 const TONO_TUTORIAL = /^\s*(c[oó]mo|tips?\b|consejos?\b|pasos?\b|gu[ií]a\b|\d+\s+(cosas|tips|pasos|razones|formas|ideas))/i;
+// Una story de encuesta o de pregunta pide una interacción en vez de pedir anotarse
+export const CTA_DE_INTERACCION = /(?<!\p{L})(vot[aá]\w*|eleg[ií]\w*|respond[eé]\w*|contest[aá]\w*|cont[aá]\w*|dec[ií]\w*|mand[aá]\w*|compart[ií]\w*|deslizá|arrastrá|tocá)(?!\p{L})/iu;
 const RUTA_CEREBRO = new URL("../../docs/marca/cerebro-de-marca.md", import.meta.url);
+const RUTA_BANCO = new URL("../../docs/marca/banco-de-contenido.md", import.meta.url);
 const RUTA_REFERENCIAS = new URL("../../docs/marca/referencias.md", import.meta.url);
 const RUTA_INVESTIGACION = new URL("../../docs/investigacion/", import.meta.url);
 const RUTA_RENDIMIENTO = new URL("../../docs/rendimiento/", import.meta.url);
@@ -69,7 +72,7 @@ export const HERRAMIENTA_PLAN = {
             texto_en_pantalla: { type: "array", items: { type: "string" } },
             epigrafe: { type: "string", description: "Texto que acompaña la publicación: dos a cuatro frases en lenguaje cotidiano, en párrafos cortos separados por una línea en blanco (\\n\\n); la acción final va en su propia línea. En una story va vacío: las stories no llevan epígrafe." },
             palabras_clave: { type: "array", items: { type: "string" } },
-            cta: { type: "string", description: "Una sola acción: anotarse en la lista de espera." },
+            cta: { type: "string", description: "Una sola acción: anotarse en la lista de espera. En una story de encuesta o de pregunta, la acción es la propia interacción (\"Votá\", \"Contanos\", \"Respondé\")." },
             recursos: { type: "array", items: { type: "string" }, description: "Qué hace falta tener para hacerla." },
             material_a_producir: {
               type: "array",
@@ -244,7 +247,9 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
       }
     }
     // Una sola acción: anotarse en la lista de espera
-    if (typeof pieza.cta === "string" && !/lista/i.test(pieza.cta)) errores.push(`${etiqueta}: la acción final tiene que ser anotarse en la lista.`);
+    // (una story puede cerrar con su propia interacción: votar, responder, contar)
+    const cierraConInteraccion = pieza.formato === "story" && CTA_DE_INTERACCION.test(pieza.cta ?? "");
+    if (typeof pieza.cta === "string" && !/lista/i.test(pieza.cta) && !cierraConInteraccion) errores.push(`${etiqueta}: la acción final tiene que ser anotarse en la lista${pieza.formato === "story" ? " (o, en una story, votar o responder)" : ""}.`);
 
     // No se puede mostrar lo que todavía no existe
     if (pieza.pilar === "producto en uso" && !recursos.producto) errores.push(`${etiqueta}: pide "producto en uso" pero todavía no hay producto.`);
@@ -298,8 +303,9 @@ export const leerUltimoInforme = (opciones) => leerUltimo(RUTA_INVESTIGACION, /^
 export const leerUltimoRendimiento = (opciones) => leerUltimo(RUTA_RENDIMIENTO, /^rendimiento-\d{4}-\d{2}-\d{2}\.md$/, opciones);
 
 export async function construirSistema(leer = (ruta) => readFile(ruta, "utf8"), { listar } = {}) {
-  const [cerebro, referencias, informe, rendimiento, piezas] = await Promise.all([
+  const [cerebro, banco, referencias, informe, rendimiento, piezas] = await Promise.all([
     leer(RUTA_CEREBRO),
+    leer(RUTA_BANCO).catch(() => ""),
     leer(RUTA_REFERENCIAS),
     leerUltimoInforme({ leer, listar }),
     leerUltimoRendimiento({ leer, listar }),
@@ -327,8 +333,10 @@ ${piezas.map((p) => p.texto.trim()).join("\n\n---\n\n")}`
 
 Reglas:
 - Todo lo que escribas sigue el cerebro de marca de abajo. Si algo lo contradice, gana el cerebro de marca.
-- Hablás en voseo rioplatense. Cada pieza termina con una sola acción: anotarse en la lista de espera.
-- Nunca inventes cifras, pruebas, stock, fechas ni opiniones. No uses números en los textos salvo "01" de "Drop 01" con su año "2027", y "00" de "Drop 00" con su año "2026". Los años van sin mes ni día. Al Drop 00 solo lo nombrás como adelanto y solo si Facundo lo pidió o está en las novedades: sin productos, precios, cantidades ni stock.
+- Hablás en voseo rioplatense. Cada pieza de feed termina con una sola acción: anotarse en la lista de espera. Una story de encuesta o de pregunta puede cerrar con su propia interacción ("Votá", "Contanos") y no necesita pedir la lista.
+- MÉTODO (seguilo en este orden antes de llamar a la herramienta): 1) Leé el BANCO DE CONTENIDO y las notas: si hay un FOCO DE LA SEMANA de Facundo, el plan gira alrededor de ese foco. 2) Para cada pieza elegí primero el trabajo (mostrar, preguntar o sumar) y el dato visible concreto (qué se ve en el primer segundo), y recién después escribí el gancho. 3) Pensá tres enfoques distintos para cada pieza y quedate con el más concreto, el que se pueda filmar o hacer esta semana. 4) Pasá cada frase por la prueba del amigo; si suena a póster, reescribila diciendo la cosa concreta. 5) Mezclá formatos: las stories (y secuencias de stories) son el canal diario y barato; sumá 1 o 2 piezas de feed. No hagas todas las piezas de frases sobre la promesa: como mucho una.
+- Cada pieza tiene que mostrar o preguntar algo concreto (una decisión real, un detalle de una prenda, un color sobre una tela, una pregunta con opciones). En guion y texto_en_pantalla nombrá lo que se ve, no el concepto.
+- Nunca inventes cifras, pruebas, stock, fechas ni opiniones. No uses números en los textos salvo "01" de "Drop 01" con su año "2027", y "00" de "Drop 00" con su año "2026". Los años van sin mes ni día. Al Drop 00 solo lo nombrás como adelanto y solo si Facundo lo pidió, está en las novedades o es el foco de la semana: sin precios, cantidades ni stock; podés mostrar indicios concretos (un bordado de cerca, el color de un hilo, el borde de una media) cuando el foco lo pide.
 - Solo podés proponer piezas que se puedan hacer con los recursos disponibles que te indican. Si no hay producto, no propongas mostrar producto.
 - Cada pieza lleva su hora de publicación (hora de Argentina, entre ${HORA_MINIMA_PUBLICACION} y ${HORA_MAXIMA_PUBLICACION}). Si hay un RENDIMIENTO de @vow_ar, elegí la hora con esos datos; si no, una hora de buena actividad como 19:00. Nunca inventes que una hora "rinde mejor" sin datos.
 - En material_a_producir listá, una toma por ítem, lo que Facundo tiene que filmar o fotografiar él mismo. Si la pieza sale de material que ya existe o se genera con código, dejá la lista vacía. Facundo recibe el plan el lunes y se le recuerda 3 días antes de publicar: ubicá las piezas que necesitan filmación de jueves en adelante.
@@ -338,10 +346,10 @@ Reglas:
 - Las referencias son inspiración, no datos para citar. No copies sus textos ni sus ideas al pie de la letra.
 - Los ganchos tienen que ser claros, simples y verdaderos, como pide la sección 8 del cerebro de marca: de 3 a 8 palabras, con palabras de todos los días. Pueden ser una afirmación que compromete, una observación concreta de lo que le pasa a quien entrena o una pregunta simple. Un gancho normal y verdadero vale más que uno que suena a póster. Nunca tono de tutorial, de consejo ni de lo que falta.
 - CALIDAD DEL TEXTO (sección "Calidad del texto" del cerebro de marca): antes de escribir cada frase hacete la prueba: ¿se lo dirías en voz alta a un amigo que entrena sin sentir vergüenza?, ¿se entiende sola en tres segundos? Si suena a eslogan, a póster de gimnasio, a anuncio o a película, reescribila con palabras simples o sacala. Prohibido: teasers que anuncian que "algo llega" sin decir qué, sentencias pseudo-profundas, "no es X, es Y", listas de tres fragmentos con ritmo de publicidad y frases de coaching. Una idea por pieza y la palabra "promesa" no más de una vez.
-- Si no tenés algo concreto y verdadero para decir, proponé menos piezas o una pieza más simple: nunca rellenes con frases bonitas. Una story necesita una razón concreta (mostrar algo real o invitar a anotarse con un motivo claro); no hagas stories de intriga ni de "generar expectativa".
+- Si no tenés algo concreto y verdadero para decir, proponé una pieza más simple: nunca rellenes con frases bonitas. Una story necesita una razón concreta: mostrar algo real, hacer una pregunta o una encuesta con una decisión real, o invitar a anotarse con un motivo claro. Nada de stories de intriga ni de "generar expectativa" sin un dato a la vista.
 - El epígrafe son dos a cuatro frases en lenguaje cotidiano, escritas como las diría una persona, en párrafos cortos separados por una línea en blanco. No repite el gancho: lo completa o dice algo que la pieza no dice. La acción final va en su propia línea.
 - Los ganchos de la sección 8 son ejemplos de estilo. A lo sumo UNO de los ganchos principales del plan puede ser uno de los aprobados; todos los demás tienen que ser creados por vos. Los ganchos alternativos son siempre nuevos: ni copias ni paráfrasis de los ejemplos.
-- Cada pieza trae un gancho principal y 4 alternativos distintos entre sí. Las piezas de una misma semana tienen que ser de pilares distintos.
+- Cada pieza trae un gancho principal y 4 alternativos distintos entre sí. Las piezas de una misma semana no pueden repetir el mismo pilar más de dos veces (y variá formatos).
 - La promesa es algo que una persona se hace a sí misma y cumple. No es un texto escrito: nunca propongas escribirla a mano ni mostrar papel, lapicera o cartulina.
 - Nunca nombres elementos del gimnasio (barras, mancuernas, pesas, discos, kettlebells, fierros). Suenan forzados. El producto (grips, straps, prendas) sí se puede nombrar cuando hay producto.
 - Cada pieza le habla a quien la mira y le da algo: una idea, un gesto, una razón para sumarse. No explica la marca por dentro (paleta, tipografías, manual de marca). Si una pieza de diseño o de proceso solo sirve para un diseñador, no la propongas.
@@ -352,7 +360,10 @@ Reglas:
 
 === CEREBRO DE MARCA ===
 ${cerebro}
-
+${banco ? `
+=== BANCO DE CONTENIDO (de qué hablar y cómo bajarlo a algo que se ve) ===
+${banco}
+` : ""}
 === MARCAS DE REFERENCIA ===
 ${referencias}${bloqueInvestigacion}${bloqueRendimiento}${bloquePiezas}` };
 }
@@ -371,7 +382,7 @@ export async function planificarSemana({ semanaInicio, fase, recursos = {}, nota
     `Fase del proyecto: ${fase}.`,
     definidasEnLaSemana.length ? `Esa semana ya hay definidas: ${definidasEnLaSemana.map((p) => `${p.formato} del ${p.fecha} (pilar ${p.pilar})`).join("; ")}. No las repitas.` : "",
     `Recursos disponibles: producto físico: ${recursos.producto ? "sí" : "no"}; personas que entrenan confirmadas: ${recursos.gente ? "sí" : "no"}.`,
-    `Cantidad de piezas: ${piezas}. Pocas y fuertes: si no hay material real, es mejor menos piezas que rellenar.`,
+    `Cantidad de piezas: ${piezas}. Mezclá stories y piezas de feed; cada una con algo concreto para mostrar o preguntar (ver el método).`,
     notas ? `Notas: ${notas}` : "",
   ].filter(Boolean).join("\n");
 

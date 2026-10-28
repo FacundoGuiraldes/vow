@@ -106,3 +106,10 @@ test("un error del servicio (400) no se reintenta; uno de servidor (500) sí", a
   );
   assert.equal(intentos400, 1);
 });
+
+test("el foco y las notas de estrategia del juego llegan al Estratega como notas", () => {
+  const o = opcionesDelPlan({ valores: VALORES, hoy: "2026-10-26", foco: "Suspenso del Drop 00", notasEstrategia: "Más stories" });
+  assert.match(o.notas, /FOCO DE LA SEMANA.*Suspenso del Drop 00/);
+  assert.match(o.notas, /Más stories/);
+  assert.equal(opcionesDelPlan({ valores: VALORES, hoy: "2026-10-26" }).notas, VALORES.notas ?? "");
+});

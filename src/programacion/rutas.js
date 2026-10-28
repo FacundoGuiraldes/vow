@@ -11,6 +11,7 @@ import { Router, json, raw } from "express";
 import { rateLimit } from "express-rate-limit";
 import { esFechaISO, esHoraValida } from "./fechas.js";
 import { ErrorAccion, aplicarAccion, armarEstadoOficina } from "./oficina.js";
+import { leerOperacion } from "./operacion.js";
 
 const FORMATO_TOKEN = /^[a-f0-9]{48}$/;
 const LIMITE_PIEZAS = 5;
@@ -114,7 +115,9 @@ export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOfic
 
   router.get("/novedades", conClave, async (req, res, siguiente) => {
     try {
-      res.json({ novedades: await repo.novedadesPendientes() });
+      // El foco y las notas de estrategia que Facundo fijó en el juego o con el bot también son para el Estratega
+      const { campos } = await leerOperacion(repo);
+      res.json({ novedades: await repo.novedadesPendientes(), foco: campos["estrategia.foco"] ?? "", notas_estrategia: campos["estrategia.notas"] ?? "" });
     } catch (error) {
       siguiente(error);
     }

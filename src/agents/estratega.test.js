@@ -585,3 +585,31 @@ test("una story puede venir sin epígrafe; el resto de los formatos no", () => {
   // una story sin epígrafe igual tiene que tener gancho y acción
   assert.ok(story({ epigrafe: "", cta: "" }).errores.includes("Pieza 1: falta cta."));
 });
+
+test("una story de encuesta puede cerrar con su interacción, pero un reel tiene que pedir la lista", () => {
+  const story = piezaValida({ formato: "story", epigrafe: "", cta: "Votá en la encuesta.", gancho: "El short, en dos largos. ¿Cuál?" });
+  assert.equal(validarPlan(planValido([story]), { semanaInicio: SEMANA }).ok, true);
+  const reel = piezaValida({ cta: "Votá en la encuesta." });
+  const { ok, errores } = validarPlan(planValido([reel]), { semanaInicio: SEMANA });
+  assert.equal(ok, false);
+  assert.match(errores.join(" "), /anotarse en la lista/);
+  const storyVacia = piezaValida({ formato: "story", epigrafe: "", cta: "Mirá el short." });
+  assert.equal(validarPlan(planValido([storyVacia]), { semanaInicio: SEMANA }).ok, false);
+});
+
+test("el sistema del Estratega incluye el banco de contenido y el método", async () => {
+  const leer = async (ruta) => (String(ruta).includes("banco") ? "BANCO-DE-PRUEBA" : "TEXTO");
+  const { texto } = await construirSistema(leer, { listar: async () => [] });
+  assert.match(texto, /BANCO DE CONTENIDO/);
+  assert.match(texto, /BANCO-DE-PRUEBA/);
+  assert.match(texto, /FOCO DE LA SEMANA/);
+});
+
+test("sin el archivo del banco de contenido el Estratega sigue funcionando", async () => {
+  const leer = async (ruta) => {
+    if (String(ruta).includes("banco")) throw new Error("no existe");
+    return "TEXTO";
+  };
+  const { texto } = await construirSistema(leer, { listar: async () => [] });
+  assert.doesNotMatch(texto, /BANCO DE CONTENIDO \(/);
+});

@@ -21,11 +21,13 @@ on:
         description: "Cantidad de piezas de la semana"
         required: true
         type: choice
-        default: "2"
+        default: "4"
         options:
           - "1"
           - "2"
           - "3"
+          - "4"
+          - "5"
       producto:
         description: "Ya hay producto físico para mostrar"
         required: true
@@ -63,7 +65,7 @@ jobs:
       PROGRAMACION_SECRETO: ${{ secrets.PROGRAMACION_SECRETO }}
       # Lo que escribe una persona pasa por variables de entorno, no dentro del script
       SEMANA: ${{ inputs.semana }}
-      PIEZAS: ${{ inputs.piezas || '2' }}
+      PIEZAS: ${{ inputs.piezas || '4' }}
       PRODUCTO: ${{ inputs.producto || 'false' }}
       GENTE: ${{ inputs.gente || 'false' }}
       NOTAS: ${{ inputs.notas }}
