@@ -174,11 +174,12 @@ Cómo trabajás:
 - texto_en_pantalla es el texto que se escribe DENTRO del video. Si la pieza ya tiene el video cargado, ese texto ya está hecho en el archivo: no lo muestres ni propongas cambiarlo salvo que Facundo lo pida. No lo rellenes copiando el epígrafe. Si te pide cambiar el texto de la publicación, es el epígrafe (y el gancho si él lo pide).
 - Si te pide algo que no podés hacer con tus herramientas (por ejemplo generar un video), decíselo con honestidad y proponé lo que sí se puede.
 - Nunca digas que hiciste algo si la herramienta devolvió un error.
+- Para sacar una pieza que ya no va: si existe en el bot (ver_semana la muestra), pedir_cancelacion; si aparece en el juego pero ver_semana no la muestra (viene solo de los documentos), quitar_pieza_del_juego. Nunca digas «la borré» o «la quité» si no llamaste a una de esas herramientas y devolvió ok.
 - Un cambio en una pieza existe SOLO si modificar_pieza devolvió ok en este mismo mensaje. Si acuerdan un texto (un epígrafe, un gancho, una hora), llamá a modificar_pieza en ese turno: ponerse de acuerdo en la charla no guarda nada. No digas «guardado», «cambiado» ni «listo» antes de ver el resultado. Cuando guardes, repetile el texto exacto que quedó. El sistema revisa tus respuestas: si decís que guardaste algo y no llamaste a modificar_pieza, le avisa a Facundo que no se guardó.`;
 }
 
 // ¿La respuesta de la IA dice que ya cambió o guardó algo? Se usa para avisar si lo dijo sin haberlo hecho de verdad.
-const AFIRMA_CAMBIO = /(?<![\p{L}])(guard(é|ado|ada|amos)|(cambi|modifiqu|actualic|apliqu|program|arm)(é|ado|ada)|(qued[oó]|dej[eé]) (guardad|cambiad|actualizad|programad|list)\p{L}*|ya (lo |la )?(cambi|actualic|guard|modifiqu|program|arm)\p{L}*)(?![\p{L}])/iu;
+const AFIRMA_CAMBIO = /(?<![\p{L}])(guard(é|ado|ada|amos)|(cambi|modifiqu|actualic|apliqu|program|arm|borr|elimin|quit|ocult)(é|ado|ada)|(qued[oó]|dej[eé]) (guardad|cambiad|actualizad|programad|borrad|eliminad|quitad|ocultad|list)\p{L}*|ya (lo |la )?(cambi|actualic|guard|modifiqu|program|arm|borr|elimin|quit|ocult)\p{L}*)(?![\p{L}])/iu;
 export const afirmaCambio = (texto) => AFIRMA_CAMBIO.test(String(texto ?? ""));
 
 // La charla que se recuerda entre mensajes: solo el texto, sin los pasos internos de las herramientas
