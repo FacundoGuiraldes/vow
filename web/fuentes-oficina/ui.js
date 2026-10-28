@@ -399,10 +399,12 @@ function igEstado(hora){
 }
 /* medidas reales del archivo, para avisar si Instagram lo va a recortar o a dejarle bandas */
 function medirImagen(src,cb){var im=new Image();im.onload=function(){cb(im.naturalWidth,im.naturalHeight)};im.onerror=function(){cb(0,0)};im.src=src}
+/* «hoy», «mañana» o la fecha: la previa no puede decir hoy si la pieza sale otro día */
+function cuandoSale(e){var d=pd(e.fecha);if(!d)return 'hoy';var n=dias(d);return n===0?'hoy':n===1?'mañana':n===-1?'ayer':'el '+dd(d)}
 function previaInstagram(e,m){
   var fmt=normFmt(e._fmt||e.formato),hora=e._hora||e.hora||'',imgs=(m&&m.imgs)||[],vid=m&&m.vid,epi=String(epigrafeDe(e,m)||'').trim();
   var raiz=el('div','ig-raiz'),tit=el('div','ig-tit');
-  tit.appendChild(document.createTextNode('Así queda en Instagram'));tit.appendChild(el('span',null,(hora?'hoy a las '+hora+' · ':'')+({imagen:'publicación',carrusel:'carrusel',reel:'reel',story:'historia'}[fmt]||fmt)));raiz.appendChild(tit);
+  tit.appendChild(document.createTextNode('Así queda en Instagram'));tit.appendChild(el('span',null,(hora?cuandoSale(e)+' a las '+hora+' · ':'')+({imagen:'publicación',carrusel:'carrusel',reel:'reel',story:'historia'}[fmt]||fmt)));raiz.appendChild(tit);
   var tel=el('div','ig-tel '+(fmt==='reel'||fmt==='story'?'vert':'feed')),pant=el('div','ig-pant'+(fmt==='reel'||fmt==='story'?' osc':''));tel.appendChild(pant);raiz.appendChild(tel);
   var chk=el('ul','ig-chk');raiz.appendChild(chk);
   if(fmt==='story'){var bz=el('button','ck sec ig-bz','Mostrar lo que Instagram tapa');bz.type='button';bz.addEventListener('click',function(){var on=pant.classList.toggle('ver-zonas');bz.textContent=on?'Ocultar zonas':'Mostrar lo que Instagram tapa'});raiz.insertBefore(bz,chk)}
@@ -519,6 +521,18 @@ function tarjetaPieza(e){
     if(CFABRE[kc])setTimeout(function(){if(!cf)abrirForm(false)},0);
     if(EDABRE[kc])setTimeout(function(){if(!fe)abrirEditar(false)},0);
   }
+  if(e._id&&e.estado!=='publicado'&&!cambiandoAhora(e))a.appendChild(botonIco('borrador','Eliminar','ck sec',function(){
+    if(f.querySelector('.elim'))return;
+    var q=el('div','nota elim');q.appendChild(el('p',null,'¿Eliminar esta publicación? No se publica y se borran sus archivos.'));
+    var r2=el('div','fil2'),si=el('button','ck si','Sí, eliminar'),no=el('button','ck sec','No, dejarla');si.type='button';no.type='button';
+    no.addEventListener('click',function(){q.remove()});
+    si.addEventListener('click',function(){
+      if(conectado!=='vivo'){aviso('Sin conexión con el bot: no se pudo eliminar.',6000);return}
+      si.disabled=true;
+      api('/oficina/accion',{body:{accion:'eliminar_pieza',id:e._id}}).then(function(){aviso('Publicación eliminada');return leerVivo(true)}).then(function(){abrirEdif(panelAbierto,true)}).catch(function(x){si.disabled=false;aviso(x.estado===409?x.message:'No se pudo eliminar: '+(x.message||'error'));if(x.estado===401)pedirClave('La clave no es válida.')});
+    });
+    r2.appendChild(si);r2.appendChild(no);q.appendChild(r2);f.appendChild(q);
+  }));
   if(a.children.length)f.appendChild(a);
   return f;
 }

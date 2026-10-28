@@ -1607,7 +1607,7 @@ function armarD(){
   MEDIOS_VIVOS={};MEDIOS_ID={};
   if(v){
     (v.piezas||[]).forEach(function(p){
-      if(p.estado==='cancelada')return;
+      if(p.estado==='cancelada'){piezas=piezas.filter(function(x){return x._id||!(x.fecha===p.fecha&&(x.formato===p.formato||x.formato==='carrusel'&&p.formato==='imagen'))});return}
       var est=ESTADO_MAP[p.estado]||p.estado,titulo=p.gancho||('Pieza del '+p.fecha),fm=(p.formato||'')==='imagen'?'carrusel':(p.formato||'pieza');
       var ex=piezas.filter(function(x){return x.fecha===p.fecha&&(x.formato===p.formato||x.formato===fm)&&!x._id})[0]||(function(){var u=piezas.filter(function(x){return x.fecha===p.fecha&&!x._id});return u.length===1?u[0]:undefined})();
       var nota=(ESTADO_TXT[p.estado]||p.estado)+(p.hora?' · '+p.hora:'')+(p.error?' · '+p.error:'');
