@@ -323,6 +323,17 @@ describe("eliminar una publicación desde el juego", () => {
   });
 });
 
+describe("quitar del juego una pieza que solo está en los documentos", () => {
+  test("queda guardada como oculta, sin duplicar, y llega al estado del juego", async () => {
+    const e = crearEscenario();
+    await aplicarAccion(e, { accion: "operacion", cambio: { tipo: "pieza_ocultar", fecha: "2026-10-27", formato: "Carrusel" } });
+    await aplicarAccion(e, { accion: "operacion", cambio: { tipo: "pieza_ocultar", fecha: "2026-10-27", formato: "carrusel" } });
+    const estado = await armarEstadoOficina({ repo: e.repo });
+    assert.deepEqual(estado.operacion.piezasOcultas, ["2026-10-27|carrusel"]);
+    await assert.rejects(aplicarAccion(e, { accion: "operacion", cambio: { tipo: "pieza_ocultar", fecha: "mañana", formato: "reel" } }), /AAAA-MM-DD/);
+  });
+});
+
 describe("datos de la operación: ida y vuelta entre el juego y el bot", () => {
   test("lo que se edita en el juego queda en la base, llega al estado y al Estratega como novedad", async () => {
     const e = crearEscenario();

@@ -659,7 +659,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
         herramientas: HERRAMIENTAS_CHAT,
         ejecutar: async (nombre, argumentos) => {
           const resultado = await ejecutarHerramienta(nombre, argumentos, { hoy, hora, canal });
-          if (["modificar_pieza", "programar_pieza", "editar_dato", "agregar_agenda", "quitar_agenda"].includes(nombre)) {
+          if (["modificar_pieza", "programar_pieza", "editar_dato", "agregar_agenda", "quitar_agenda", "quitar_pieza_del_juego"].includes(nombre)) {
             if (resultado?.ok === true) efectos.guardados++;
             else efectos.rechazos.push(resultado?.error ?? (resultado?.errores ?? []).join(" "));
           }
@@ -816,6 +816,15 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
       try {
         const { lineas } = await investigacion();
         const { resumen } = await aplicarOperacion(repo, cambio, { origen: "bot", base: lineas });
+        return { ok: true, nota: `Guardado y visible en el juego: ${resumen}` };
+      } catch (error) {
+        if (error instanceof ErrorOperacion) return { error: error.message };
+        throw error;
+      }
+    }
+    if (nombre === "quitar_pieza_del_juego") {
+      try {
+        const { resumen } = await aplicarOperacion(repo, { tipo: "pieza_ocultar", fecha: argumentos.fecha, formato: argumentos.formato }, { origen: "bot", base: (await investigacion()).lineas });
         return { ok: true, nota: `Guardado y visible en el juego: ${resumen}` };
       } catch (error) {
         if (error instanceof ErrorOperacion) return { error: error.message };
