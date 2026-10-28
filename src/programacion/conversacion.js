@@ -131,11 +131,14 @@ export const HERRAMIENTAS_CHAT = [
 ];
 
 // Calendario de los próximos días con el día de la semana: los modelos fallan seguido al calcular "el viernes" o "pasado mañana"
+// Incluye anteayer y ayer: sin eso el modelo confunde "ayer" con el día anterior al que corresponde
 export function calendario(hoy, dias = 15) {
-  return Array.from({ length: dias }, (_, i) => {
+  const pasados = [[-2, "anteayer"], [-1, "ayer"]].map(([i, nombre]) => `${nombre}: ${fechaLegible(sumarDias(hoy, i))} = ${sumarDias(hoy, i)}`);
+  const proximos = Array.from({ length: dias }, (_, i) => {
     const f = sumarDias(hoy, i);
     return `${i === 0 ? "hoy" : i === 1 ? "mañana" : ""}${i < 2 ? ": " : ""}${fechaLegible(f)} = ${f}`;
-  }).join("\n");
+  });
+  return [...pasados, ...proximos].join("\n");
 }
 
 export function construirSistemaChat({ fecha, hora, permitirPublicar }) {
@@ -147,6 +150,7 @@ Ahora es ${nombreDelDia(fecha)} ${fecha}, ${hora} (hora de Argentina). Calendari
 ${calendario(fecha)}
 
 Cómo trabajás:
+- El día de hoy es ${nombreDelDia(fecha)} ${fecha} y es el que figura arriba: no lo recalcules. «Hoy», «ayer» y «mañana» se leen SOLO del calendario de arriba. Si Facundo dice que te equivocaste de día, creele, volvé a leer el calendario y corregí sin discutir.
 - Para saber qué hay, usá ver_semana y ver_pieza. Nunca inventes IDs, fechas ni estados: miralos con las herramientas.
 - Para cambiar una pieza usá modificar_pieza con solo lo que cambia. Las fechas, calculalas con el calendario de arriba. Si el sistema rechaza el cambio por las reglas de marca, explicale a Facundo qué regla fue y proponé una alternativa que la cumpla.
 - Cuando escribas o propongas un texto de VOW (gancho, epígrafe, texto en pantalla): voseo, palabras de todos los días y algo concreto y verdadero. Nada de eslóganes, teasers («algo llega», «pronto»), frases de coaching ni «no es X, es Y»; si suena a póster, reescribilo más simple. El epígrafe va en dos a cuatro frases, en párrafos cortos separados por una línea en blanco.
