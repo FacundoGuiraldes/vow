@@ -138,10 +138,11 @@
         "epigrafe": "Sin excusas. Anotate en la lista: link en la bio."
       },
       "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
+        "aprobada": true,
+        "avisos_contienen": [
           "motivación vacía"
-        ]
+        ],
+        "problemas_contienen": []
       }
     },
     {
@@ -154,10 +155,11 @@
         ]
       },
       "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
+        "aprobada": true,
+        "avisos_contienen": [
           "motivación vacía"
-        ]
+        ],
+        "problemas_contienen": []
       }
     },
     {
@@ -196,10 +198,11 @@
         ]
       },
       "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
+        "aprobada": true,
+        "avisos_contienen": [
           "presumir"
-        ]
+        ],
+        "problemas_contienen": []
       }
     },
     {
@@ -212,10 +215,11 @@
         ]
       },
       "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
+        "aprobada": true,
+        "avisos_contienen": [
           "inglés innecesario"
-        ]
+        ],
+        "problemas_contienen": []
       }
     },
     {
@@ -238,10 +242,11 @@
         "epigrafe": "Todavía no hay producto. Anotate en la lista: link en la bio."
       },
       "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
+        "aprobada": true,
+        "avisos_contienen": [
           "anuncia lo que falta"
-        ]
+        ],
+        "problemas_contienen": []
       }
     },
     {
@@ -251,10 +256,11 @@
         "epigrafe": "Quedate. Algo llega antes. Anotate en la lista: link en la bio."
       },
       "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
+        "aprobada": true,
+        "avisos_contienen": [
           "teaser vacío o frase de eslogan"
-        ]
+        ],
+        "problemas_contienen": []
       }
     },
     {
@@ -264,10 +270,11 @@
         "gancho": "Dominá la barra."
       },
       "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
+        "aprobada": true,
+        "avisos_contienen": [
           "nombra elementos del gimnasio"
-        ]
+        ],
+        "problemas_contienen": []
       }
     },
     {
@@ -280,10 +287,11 @@
         ]
       },
       "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
+        "aprobada": true,
+        "avisos_contienen": [
           "promesa en papel"
-        ]
+        ],
+        "problemas_contienen": []
       }
     },
     {
@@ -293,10 +301,11 @@
         "epigrafe": "Cumplí!! Anotate en la lista: link en la bio."
       },
       "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
+        "aprobada": true,
+        "avisos_contienen": [
           "exceso de exclamaciones"
-        ]
+        ],
+        "problemas_contienen": []
       }
     },
     {
@@ -306,10 +315,11 @@
         "epigrafe": "Despacio 🔥💪 Anotate en la lista: link en la bio."
       },
       "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
+        "aprobada": true,
+        "avisos_contienen": [
           "demasiados emojis"
-        ]
+        ],
+        "problemas_contienen": []
       }
     },
     {
@@ -374,10 +384,11 @@
         "gancho": "Cómo cumplir lo que prometés."
       },
       "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
+        "aprobada": true,
+        "avisos_contienen": [
           "suena a tutorial"
-        ]
+        ],
+        "problemas_contienen": []
       }
     },
     {
@@ -610,10 +621,11 @@
         ]
       },
       "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
+        "aprobada": true,
+        "avisos_contienen": [
           "presumir"
-        ]
+        ],
+        "problemas_contienen": []
       }
     },
     {
@@ -626,10 +638,11 @@
         ]
       },
       "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
+        "aprobada": true,
+        "avisos_contienen": [
           "presumir"
-        ]
+        ],
+        "problemas_contienen": []
       }
     },
     {
@@ -674,10 +687,11 @@
         ]
       },
       "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
+        "aprobada": true,
+        "avisos_contienen": [
           "promesa en papel"
-        ]
+        ],
+        "problemas_contienen": []
       }
     },
     {
@@ -687,10 +701,11 @@
         "guion": "No usamos barra en el video. Solo texto sobre fondo hueso."
       },
       "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
+        "aprobada": true,
+        "avisos_contienen": [
           "nombra elementos del gimnasio"
-        ]
+        ],
+        "problemas_contienen": []
       }
     },
     {

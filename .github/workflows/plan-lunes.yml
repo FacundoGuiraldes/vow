@@ -88,6 +88,12 @@ jobs:
             fi
           done
 
+      # Cada lunes se estudian las cuentas de referencia con datos reales (solo lectura, gratis): el plan se apoya en lo que mejor rindió
+      - name: Estudiar las cuentas de referencia
+        if: env.INSTAGRAM_TOKEN != '' && env.INSTAGRAM_USER_ID != ''
+        continue-on-error: true
+        run: npm run investigar -- --limite 25
+
       # Los datos de la cuenta propia mejoran el plan, pero si Instagram no responde el plan sale igual
       - name: Medir el rendimiento de @vow_ar
         if: env.INSTAGRAM_TOKEN != '' && env.INSTAGRAM_USER_ID != ''

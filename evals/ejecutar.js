@@ -31,9 +31,11 @@ function contextoDelCaso(conjunto, caso) {
 
 export async function ejecutarCaso(conjunto, caso) {
   const plan = armarPlan(conjunto, caso);
-  const { aprobada, problemas } = await revisarPlan(plan, { semanaInicio: caso.semana ?? conjunto.semana, recursos: caso.recursos ?? {}, ...contextoDelCaso(conjunto, caso) });
+  const { aprobada, problemas, advertencias = [] } = await revisarPlan(plan, { semanaInicio: caso.semana ?? conjunto.semana, recursos: caso.recursos ?? {}, ...contextoDelCaso(conjunto, caso) });
   const faltan = caso.esperado.problemas_contienen.filter((texto) => !problemas.some((p) => p.includes(texto)));
+  const faltanAvisos = (caso.esperado.avisos_contienen ?? []).filter((texto) => !advertencias.some((a) => a.includes(texto)));
   const motivos = [];
+  if (faltanAvisos.length) motivos.push(`no apareció el aviso: ${faltanAvisos.map((f) => `"${f}"`).join(", ")} (avisos: ${advertencias.join(" | ") || "ninguno"})`);
   if (aprobada !== caso.esperado.aprobada) motivos.push(`esperaba ${caso.esperado.aprobada ? "aprobar" : "rechazar"} y ${aprobada ? "aprobó" : "rechazó"}`);
   if (faltan.length) motivos.push(`no apareció: ${faltan.map((f) => `"${f}"`).join(", ")} (problemas: ${problemas.join(" | ") || "ninguno"})`);
   if (caso.esperado.aprobada && problemas.length) motivos.push(`aprobó con problemas: ${problemas.join(" | ")}`);
@@ -42,7 +44,7 @@ export async function ejecutarCaso(conjunto, caso) {
 
 // Cada regla de marca tiene que tener al menos un caso que la dispare; si no, podrían borrarla sin que nada falle.
 export function reglasSinCaso(conjunto) {
-  const buscadas = conjunto.casos.filter((c) => !c.esperado.aprobada).flatMap((c) => c.esperado.problemas_contienen);
+  const buscadas = conjunto.casos.flatMap((c) => [...(c.esperado.aprobada ? [] : c.esperado.problemas_contienen), ...(c.esperado.avisos_contienen ?? [])]);
   return NOMBRES_DE_REGLAS.filter((regla) => !buscadas.some((texto) => texto.includes(regla)));
 }
 

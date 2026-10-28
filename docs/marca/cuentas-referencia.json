@@ -36,6 +36,18 @@
       "marca": "Fitnesas",
       "pais": "Argentina",
       "grupo": "argentina"
+    },
+    {
+      "usuario": "proone_fit",
+      "marca": "PRO ONE",
+      "pais": "Argentina",
+      "grupo": "argentina"
+    },
+    {
+      "usuario": "blat.balance",
+      "marca": "Blat Balance",
+      "pais": "Argentina",
+      "grupo": "argentina"
     }
   ]
 }

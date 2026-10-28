@@ -53,7 +53,7 @@ El problema de las sugerencias de la IA no son las reglas duras, es el tono: fra
 
 **La prueba:** ¿se lo dirías en voz alta a un amigo que entrena, sin sentir vergüenza? ¿Se entiende sola, sin contexto, en tres segundos? Si la respuesta es no, se reescribe o no se publica.
 
-**Cosas que dan cringe (no usarlas):**
+**Cosas que dan cringe (evitarlas; son guía de estilo, no un bloqueo: si una pieza respaldada por datos de lo que funciona las necesita, gana la pieza y el editor lo anota. Lo que sí bloquea es lo falso: cifras, promesas de resultados físicos, escasez falsa, no hablar en voseo):**
 - **Teasers vacíos:** "Algo llega", "Mirá bien", "Hay un antes", "Pronto", "Se viene", "Prepárate". Anuncian que hay algo sin decir qué. La intriga sin dato parece humo.
 - **Sentencias pseudo-profundas:** frases que suenan a verdad universal pero no dicen nada ("Lo demás, en silencio", "Lo importante no se ve").
 - **"No es X, es Y"** ("No es moda, es compromiso") y las listas de tres fragmentos con ritmo de publicidad.
