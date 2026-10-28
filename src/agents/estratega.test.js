@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { planificarSemana, validarPlan, MAX_TOKENS_ESTRATEGA, construirSistema, leerUltimoInforme, leerUltimoRendimiento, extraerGanchosConocidos, HERRAMIENTA_PLAN, PALABRAS_MAXIMAS_GANCHO } from "./estratega.js";
+import { planificarSemana, normalizarSaltos, validarPlan, MAX_TOKENS_ESTRATEGA, construirSistema, leerUltimoInforme, leerUltimoRendimiento, extraerGanchosConocidos, HERRAMIENTA_PLAN, PALABRAS_MAXIMAS_GANCHO } from "./estratega.js";
 import { revisarReglas } from "./reglas-marca.js";
 
 const SEMANA = "2026-10-19";
@@ -691,4 +691,13 @@ test("el estilo de marca avisa pero no bloquea; la verdad y la ley siguen bloque
   const verdad = validarPlan(planValido([piezaValida({ epigrafe: "Últimas unidades. Anotate en la lista." })]), { semanaInicio: SEMANA });
   assert.equal(verdad.ok, false);
   assert.match(verdad.errores.join(" "), /urgencia falsa/);
+});
+
+test("un salto de línea escrito como \\n literal se convierte en un salto real, también en el plan que devuelve la IA", async () => {
+  assert.equal(normalizarSaltos("Uno.\\n\\nDos."), "Uno.\n\nDos.");
+  assert.deepEqual(normalizarSaltos({ a: ["x\\ny"], n: 3 }), { a: ["x\ny"], n: 3 });
+  const cliente = clienteFalso(planValido([piezaValida({ epigrafe: "Es lo que sostiene todo.\\n\\nAnotate en la lista: link en la bio." })]));
+  const r = await planificarSemana({ ...pedido, piezas: 1 }, { cliente, leer: leerFalso, listar: async () => [] });
+  assert.equal(r.ok, true);
+  assert.equal(r.plan.piezas[0].epigrafe, "Es lo que sostiene todo.\n\nAnotate en la lista: link en la bio.");
 });
