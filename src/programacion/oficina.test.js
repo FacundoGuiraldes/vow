@@ -309,6 +309,20 @@ describe("editar una publicación a mano desde el juego", () => {
   });
 });
 
+describe("eliminar una publicación desde el juego", () => {
+  test("queda cancelada, sin archivos ni recordatorios, y no se puede eliminar dos veces", async () => {
+    const e = crearEscenario();
+    const fila = await e.cargarPieza();
+    await e.servicio.adjuntarDesdeJuego(fila.id, { mime: "video/mp4", datos: Buffer.from("video") });
+    const r = await aplicarAccion(e, { accion: "eliminar_pieza", id: fila.id });
+    assert.deepEqual([r.ok, r.estado], [true, "cancelada"]);
+    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "cancelada");
+    assert.equal((await e.repo.mediosDePieza(fila.id)).length, 0);
+    await assert.rejects(aplicarAccion(e, { accion: "eliminar_pieza", id: fila.id }), /no se puede eliminar/);
+    await assert.rejects(aplicarAccion(e, { accion: "eliminar_pieza" }), /Falta el id/);
+  });
+});
+
 describe("datos de la operación: ida y vuelta entre el juego y el bot", () => {
   test("lo que se edita en el juego queda en la base, llega al estado y al Estratega como novedad", async () => {
     const e = crearEscenario();

@@ -214,6 +214,13 @@ export async function aplicarAccion(deps, accion, ahora = Date.now()) {
     return { ok: true, id: resultado.id, estado: resultado.estado };
   }
 
+  if (tipo === "eliminar_pieza") {
+    if (!Number.isInteger(accion.id)) throw new ErrorAccion("Falta el id de la pieza.");
+    const resultado = await servicio.eliminarDesdeJuego(accion.id);
+    if (!resultado.ok) throw new ErrorAccion(resultado.motivo, 409);
+    return { ok: true, estado: resultado.estado };
+  }
+
   if (tipo === "quitar_archivos") {
     const resultado = await servicio.quitarArchivosDesdeJuego(accion.id);
     if (!resultado.ok) throw new ErrorAccion(resultado.motivo, 409);

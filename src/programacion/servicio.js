@@ -569,6 +569,17 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     return { ok: true };
   }
 
+  // Eliminar una publicación desde el juego: lo mismo que el botón "Cancelar" de Telegram (no se publica y se borran sus archivos)
+  async function eliminarDesdeJuego(id) {
+    const fila = Number.isInteger(id) ? await repo.obtenerPieza(id) : null;
+    if (!fila) return { ok: false, motivo: "Esa pieza no existe." };
+    if (!(await repo.reclamar(fila.id, [...VIVAS, "fallida"], "cancelada"))) return { ok: false, motivo: `Esa pieza está ${ESTADOS_LEGIBLES[fila.estado]}: no se puede eliminar.` };
+    await repo.actualizarPieza(fila.id, { confirmada_el: null });
+    await repo.borrarRecordatoriosPendientes(fila.id);
+    await repo.borrarMedios(fila.id);
+    return { ok: true, estado: "cancelada" };
+  }
+
   async function manejarActualizacion(actualizacion) {
     try {
       if (actualizacion.callback_query) return await manejarBoton(actualizacion.callback_query);
@@ -1071,5 +1082,5 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     return { fecha: hoy, hora, acciones };
   }
 
-  return { recibirPlan, avisarFalloDelPlan, manejarActualizacion, aprobarDesdeJuego, confirmarDesdeJuego, sugerirCambio, cambiarSinFila, editarDesdeJuego, adjuntarDesdeJuego, quitarArchivosDesdeJuego, conversarDesdeJuego, charla, tick, recuperarActualizaciones, enviarResumenDiario: () => enviarResumenDiario(ahora().fecha) };
+  return { recibirPlan, avisarFalloDelPlan, manejarActualizacion, aprobarDesdeJuego, confirmarDesdeJuego, sugerirCambio, cambiarSinFila, editarDesdeJuego, adjuntarDesdeJuego, quitarArchivosDesdeJuego, eliminarDesdeJuego, conversarDesdeJuego, charla, tick, recuperarActualizaciones, enviarResumenDiario: () => enviarResumenDiario(ahora().fecha) };
 }
