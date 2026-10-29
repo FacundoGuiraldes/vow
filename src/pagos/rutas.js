@@ -17,7 +17,14 @@ export function crearRutasVentas({ repo, mp, secretoWebhook, ventaAbierta = fals
       if (!ventaAbierta) return res.json({ abierta: false });
       const inv = await leerInventario(repo);
       const disponible = (producto) => CATALOGO[producto].usa.every(([grupo, n]) => Object.entries(inv.stock).filter(([sku]) => sku.startsWith(grupo)).reduce((a, [, c]) => a + c, 0) >= n);
-      return res.json({ abierta: true, envio: Boolean(cotizarEnvio), productos: Object.entries(CATALOGO).map(([id, p]) => ({ id, nombre: p.nombre, precio: p.precio, disponible: disponible(id) })) });
+      const hay = (sku) => inv.stock[sku] > 0;
+      return res.json({
+        abierta: true,
+        envio: Boolean(cotizarEnvio),
+        // Qué colores hay (sí o no, sin cantidades) para cada cosa que pide color
+        colores: { gorra: { negra: hay("gorra-negra"), beige: hay("gorra-beige") }, shaker: { negro: hay("shaker-negro"), claro: hay("shaker-claro") } },
+        productos: Object.entries(CATALOGO).map(([id, p]) => ({ id, nombre: p.nombre, precio: p.precio, pide: p.usa.map(([g]) => g).filter((g) => g !== "medias"), disponible: disponible(id) })),
+      });
     } catch (error) {
       return siguiente(error);
     }

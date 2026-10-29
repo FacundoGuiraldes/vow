@@ -134,6 +134,9 @@ describe("rutas de ventas", () => {
     assert.equal(estado.abierta, true);
     assert.equal(estado.productos.find((p) => p.id === "gorra").precio, 29900);
     assert.ok(!JSON.stringify(estado).includes("stock"));
+    assert.deepEqual(estado.productos.find((p) => p.id === "oath").pide, ["gorra", "shaker"]);
+    assert.deepEqual(estado.colores.gorra, { negra: true, beige: false });
+    assert.deepEqual(estado.colores.shaker, { negro: false, claro: true });
     const r = await fetch(`${url}/pedidos`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: [{ producto: "medias", cantidad: 1 }], comprador: COMPRADOR, entrega: { tipo: "retiro" } }) });
     assert.equal(r.status, 201);
     const pedido = await r.json();

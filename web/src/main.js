@@ -3,6 +3,7 @@ import { content } from './content.js';
 import logoSvg from './assets/logo.svg?raw';
 import Lenis from '@studio-freight/lenis';
 import { gsap } from 'gsap';
+import { iniciarTienda } from './tienda.js';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -384,3 +385,6 @@ form.addEventListener('submit', async e => {
     setLoading(false);
   }
 });
+
+// Tienda del Drop 00: solo se muestra si el servidor tiene la venta abierta
+iniciarTienda(API_URL);
