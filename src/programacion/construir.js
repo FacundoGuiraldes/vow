@@ -6,6 +6,8 @@ import { crearGeneradorImagen } from "./imagen-ia.js";
 import { crearLLMGemini } from "./llm-gemini.js";
 import { crearRepositorio } from "./repositorio.js";
 import { crearRendimientoJuego } from "./rendimiento-juego.js";
+import { crearClienteMercadoPago } from "../pagos/mercadopago.js";
+import { crearRutasVentas } from "../pagos/rutas.js";
 import { crearRutasProgramacion } from "./rutas.js";
 import { crearServicio } from "./servicio.js";
 import { crearClienteTelegram } from "./telegram.js";
@@ -41,7 +43,21 @@ export async function construirProgramacion({ pool, env = process.env, fetchFn =
   const llm = env.GEMINI_API_KEY ? crearLLMGemini({ apiKey: env.GEMINI_API_KEY, modelo: env.GEMINI_MODELO_CHAT || undefined, fetchFn }) : null;
 
   const servicio = crearServicio({ repo, telegram, meta, editor, generadorImagen, llm, validarEdicion: llm ? crearValidadorEdicion() : null, urlPublica: env.URL_PUBLICA, permitirPublicar });
-  const router = crearRutasProgramacion({ servicio, repo, secretoApi: env.PROGRAMACION_SECRETO, secretoOficina: env.OFICINA_SECRETO || null, secretoWebhook: env.TELEGRAM_WEBHOOK_SECRETO, permitirPublicar, rendimiento: meta ? crearRendimientoJuego({ meta }) : null });
+  // Venta propia con Mercado Pago: con las claves puestas se arma, pero no se abre hasta que VENTA_ABIERTA sea "1"
+  let ventas = null;
+  if (env.MERCADOPAGO_ACCESS_TOKEN && env.MERCADOPAGO_WEBHOOK_SECRETO && env.URL_LANDING) {
+    const costoFijo = Number(env.ENVIO_COSTO_FIJO);
+    ventas = crearRutasVentas({
+      repo,
+      mp: crearClienteMercadoPago({ accessToken: env.MERCADOPAGO_ACCESS_TOKEN, fetchFn }),
+      secretoWebhook: env.MERCADOPAGO_WEBHOOK_SECRETO,
+      ventaAbierta: env.VENTA_ABIERTA === "1",
+      cotizarEnvio: Number.isInteger(costoFijo) && costoFijo > 0 ? async () => ({ costo: costoFijo, servicio: "Correo Argentino" }) : null,
+      urlPublica: env.URL_PUBLICA.replace(/\/$/, ""),
+      urlLanding: env.URL_LANDING.replace(/\/$/, ""),
+    });
+  }
+  const router = crearRutasProgramacion({ servicio, repo, ventas, secretoApi: env.PROGRAMACION_SECRETO, secretoOficina: env.OFICINA_SECRETO || null, secretoWebhook: env.TELEGRAM_WEBHOOK_SECRETO, permitirPublicar, rendimiento: meta ? crearRendimientoJuego({ meta }) : null });
   // Al arrancar se revisa la bandeja de Telegram (un poco después, para no pisar a la copia anterior mientras termina de cerrar)
   setTimeout(() => servicio.recuperarActualizaciones().catch((error) => console.error(`No se pudo revisar la bandeja de Telegram: ${error.message}`)), 90_000).unref();
   return { router, servicio, telegram, permitirPublicar, edicionConIA: editor !== null, imagenesConIA: generadorImagen !== null, chatConIA: llm !== null };
