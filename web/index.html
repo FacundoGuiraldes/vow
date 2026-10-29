@@ -126,6 +126,11 @@
         <label>Nombre y apellido<input name="nombre" autocomplete="name" required maxlength="80"></label>
         <label>Email<input name="email" type="email" autocomplete="email" required maxlength="120"></label>
         <label>Teléfono<input name="telefono" type="tel" autocomplete="tel" required maxlength="30"></label>
+        <div class="tienda__codigo" id="tienda-codigo-bloque" hidden>
+          <label>Código de descuento (opcional)<input name="codigo" id="tienda-codigo" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20" placeholder="VOW-XXXXXX"></label>
+          <button type="button" class="tienda__quitar" id="tienda-codigo-aplicar">Aplicar</button>
+          <p class="tienda__nota" id="tienda-codigo-msg" role="status"></p>
+        </div>
         <div id="tienda-envio-datos" hidden>
           <label>Calle<input name="calle" autocomplete="address-line1" maxlength="80"></label>
           <label>Número<input name="numero" maxlength="10"></label>

@@ -2,6 +2,7 @@
 //   crearPedido   valida lo pedido, calcula el total con los precios del sistema, guarda el pedido y arma el link de pago
 //   confirmarPago cuando Mercado Pago avisa que se aprobó, descuenta el stock del Almacén (una sola vez por pedido)
 import { randomBytes } from "node:crypto";
+import { ErrorCodigo } from "../descuentos/codigos.js";
 import { ErrorInventario, PRODUCTOS, aplicarInventario, leerInventario, lineaDeVenta } from "../programacion/inventario.js";
 
 const CLAVE = "pedidos";
@@ -56,7 +57,7 @@ export function validarEntrega(e) {
 }
 
 // cotizarEnvio({ cp, lineas }) → { costo, servicio }. Sin cotizador no se vende con envío: solo retiro.
-export async function crearPedido({ repo, mp, cuerpo, cotizarEnvio = null, urlPublica, urlLanding, ahora = Date.now() }) {
+export async function crearPedido({ repo, mp, cuerpo, cotizarEnvio = null, codigos = null, urlPublica, urlLanding, ahora = Date.now() }) {
   const comprador = validarComprador(cuerpo?.comprador);
   const entrega = validarEntrega(cuerpo?.entrega);
   const crudos = Array.isArray(cuerpo?.items) ? cuerpo.items : [];
@@ -83,30 +84,50 @@ export async function crearPedido({ repo, mp, cuerpo, cotizarEnvio = null, urlPu
     envio = { costo: cotizado.costo, servicio: texto(cotizado.servicio, 60) };
   }
 
-  const subtotal = lineas.reduce((a, l) => a + l.precio * l.cantidad, 0);
   const id = randomBytes(12).toString("hex");
-  const items = lineas.map((l) => ({ title: l.nombre, quantity: l.cantidad, unit_price: l.precio }));
+  // Código de descuento (opcional): se aparta para este pedido mientras se paga. El descuento es solo sobre los productos, no sobre el envío.
+  const codigo = String(cuerpo?.codigo ?? "").trim();
+  let porcentaje = 0;
+  if (codigo) {
+    if (!codigos) throw new ErrorPedido("Los códigos de descuento todavía no están disponibles.", 503);
+    try {
+      ({ porcentaje } = await codigos.reservar(codigo, id));
+    } catch (error) {
+      if (error instanceof ErrorCodigo) throw new ErrorPedido(error.message, error.estado);
+      throw error;
+    }
+  }
+  const precioUnitario = (l) => Math.round(l.precio * (100 - porcentaje) / 100);
+  const subtotal = lineas.reduce((a, l) => a + l.precio * l.cantidad, 0);
+  const subtotalConDescuento = lineas.reduce((a, l) => a + precioUnitario(l) * l.cantidad, 0);
+  const items = lineas.map((l) => ({ title: porcentaje ? `${l.nombre} (${porcentaje}% off)` : l.nombre, quantity: l.cantidad, unit_price: precioUnitario(l) }));
   if (envio.costo > 0) items.push({ title: `Envío (${envio.servicio})`, quantity: 1, unit_price: envio.costo });
-  const preferencia = await mp.crearPreferencia({
-    items,
-    external_reference: id,
-    payer: { name: comprador.nombre, email: comprador.email },
-    back_urls: { success: `${urlLanding}/?pago=ok`, pending: `${urlLanding}/?pago=pendiente`, failure: `${urlLanding}/?pago=error` },
-    auto_return: "approved",
-    notification_url: `${urlPublica}/api/programacion/ventas/mercadopago`,
-    statement_descriptor: "VOW",
-  });
-  const importe = subtotal + envio.costo;
+  let preferencia;
+  try {
+    preferencia = await mp.crearPreferencia({
+      items,
+      external_reference: id,
+      payer: { name: comprador.nombre, email: comprador.email },
+      back_urls: { success: `${urlLanding}/?pago=ok`, pending: `${urlLanding}/?pago=pendiente`, failure: `${urlLanding}/?pago=error` },
+      auto_return: "approved",
+      notification_url: `${urlPublica}/api/programacion/ventas/mercadopago`,
+      statement_descriptor: "VOW",
+    });
+  } catch (error) {
+    if (codigo) await codigos.liberar(codigo, id);
+    throw error;
+  }
+  const importe = subtotalConDescuento + envio.costo;
   await enCola(async () => {
     const pedidos = await leerPedidos(repo);
-    pedidos[id] = { creado: new Date(ahora).toISOString(), estado: "pendiente", comprador, entrega, envio, importe, lineas: crudos.map((c) => ({ producto: c.producto, cantidad: c.cantidad ?? 1, ...(c.gorra ? { gorra: c.gorra } : {}), ...(c.shaker ? { shaker: c.shaker } : {}), ...(c.color ? { color: c.color } : {}) })) };
+    pedidos[id] = { creado: new Date(ahora).toISOString(), estado: "pendiente", comprador, entrega, envio, importe, ...(codigo ? { codigo, descuento: { porcentaje, ahorro: subtotal - subtotalConDescuento } } : {}), lineas: crudos.map((c) => ({ producto: c.producto, cantidad: c.cantidad ?? 1, ...(c.gorra ? { gorra: c.gorra } : {}), ...(c.shaker ? { shaker: c.shaker } : {}), ...(c.color ? { color: c.color } : {}) })) };
     await guardarPedidos(repo, pedidos);
   });
-  return { id, importe, envio, link: preferencia.init_point };
+  return { id, importe, envio, ...(codigo ? { descuento: { porcentaje, ahorro: subtotal - subtotalConDescuento } } : {}), link: preferencia.init_point };
 }
 
 // pago: lo que devuelve GET /v1/payments/{id}. Devuelve un texto de lo que hizo.
-export function confirmarPago({ repo, pago, ahora = Date.now() }) {
+export function confirmarPago({ repo, pago, codigos = null, ahora = Date.now() }) {
   return enCola(async () => {
     const id = String(pago?.external_reference ?? "");
     const pedidos = await leerPedidos(repo);
@@ -117,6 +138,7 @@ export function confirmarPago({ repo, pago, ahora = Date.now() }) {
       if (["rejected", "cancelled"].includes(pago.status)) {
         pedidos[id] = { ...pedido, estado: pago.status === "rejected" ? "rechazado" : "cancelado" };
         await guardarPedidos(repo, pedidos);
+        if (pedido.codigo && codigos) await codigos.liberar(pedido.codigo, id);
       }
       return `pago ${pago.status}`;
     }
@@ -129,12 +151,14 @@ export function confirmarPago({ repo, pago, ahora = Date.now() }) {
       const { id: venta } = await aplicarInventario(repo, { tipo: "venta", items: pedido.lineas, nota }, { origen: "web", ahora });
       pedidos[id] = { ...pedido, estado: "pagado", pago: String(pago.id), venta };
       await guardarPedidos(repo, pedidos);
+      if (pedido.codigo && codigos) await codigos.consumir(pedido.codigo, id);
       return "venta registrada";
     } catch (error) {
       if (!(error instanceof ErrorInventario)) throw error;
       // Cobró alguien que ya no tenía stock: no se descuenta, se avisa para devolver el dinero
       pedidos[id] = { ...pedido, estado: "pagado_sin_stock", pago: String(pago.id) };
       await guardarPedidos(repo, pedidos);
+      if (pedido.codigo && codigos) await codigos.consumir(pedido.codigo, id);
       await repo.agregarNovedad(`Ventas: el pedido ${id.slice(0, 8)} (${pedido.comprador.nombre}, ${pedido.comprador.email}) se pagó (pago ${pago.id}) pero ya no hay stock. Hay que devolverle el dinero desde Mercado Pago.`.slice(0, 1000));
       return "pagado sin stock";
     }

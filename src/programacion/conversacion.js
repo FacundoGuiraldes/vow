@@ -76,6 +76,11 @@ export const HERRAMIENTAS_CHAT = [
     description: "Cambia la estrategia de ESTA semana (sale de la investigación y vale hasta el lunes). accion: agregar una línea nueva (texto), editar una existente (id y texto nuevo), quitar una (id) o restaurar todo a lo que dice la investigación. Los id salen de ver_operacion.",
     parameters: { type: "OBJECT", properties: { accion: { type: "STRING", description: "agregar, editar, quitar o restaurar." }, id: { type: "STRING" }, texto: { type: "STRING", description: "El texto de la línea, corto y claro." } }, required: ["accion"] },
   },
+  {
+    name: "descuento_lista_espera",
+    description: "Beneficio para quienes se anotaron en la lista de espera: un mail con diseño de VOW y un código de descuento único por persona. accion: ver (cuántos anotados, a cuántos falta avisar, cuántos códigos se usaron), prueba (manda el mail de ejemplo a un mail de destino, con un código de muestra que no sirve) o enviar (manda los códigos reales a quienes todavía no recibieron). Antes de enviar SIEMPRE hacé ver, decile a Facundo cuántas personas son y esperá que confirme; en enviar pasá esa cantidad en esperados. Nunca envíes sin que Facundo lo haya pedido y confirmado en este chat.",
+    parameters: { type: "OBJECT", properties: { accion: { type: "STRING", description: "ver, prueba o enviar." }, destino: { type: "STRING", description: "Solo para prueba: el mail donde se recibe el ejemplo." }, esperados: { type: "INTEGER", description: "Solo para enviar: la cantidad de personas por avisar que Facundo confirmó." } }, required: ["accion"] },
+  },
   { name: "ver_stock", description: "Muestra el stock del Almacén (gorras negras y beige, shakers negros y claros, medias), las ventas recientes, los totales y qué se puede vender con su precio." },
   {
     name: "registrar_llegada",
@@ -160,6 +165,7 @@ Cómo trabajás:
 - Para cambiar una pieza usá modificar_pieza con solo lo que cambia. Las fechas, calculalas con el calendario de arriba. Si el sistema rechaza el cambio por las reglas de marca, explicale a Facundo qué regla fue y proponé una alternativa que la cumpla.
 - Cuando escribas o propongas un texto de VOW (gancho, epígrafe, texto en pantalla): voseo, palabras de todos los días y algo concreto y verdadero. Nada de eslóganes, teasers («algo llega», «pronto»), frases de coaching ni «no es X, es Y»; si suena a póster, reescribilo más simple. El epígrafe va en dos a cuatro frases, en párrafos cortos separados por una línea en blanco.
 - Para aprobar una pieza de la semana, aprobar_pieza.
+- Los mails con el código de descuento para la lista de espera se manejan con descuento_lista_espera: primero ver, después una prueba a un mail de Facundo y recién cuando él lo pida y confirme la cantidad, enviar. Nunca muestres códigos de descuento en el chat.
 - Si pide publicar algo un día que no tiene pieza (mirá ver_semana), usá programar_pieza con la fecha exacta, el formato y lo que pidió. Si el día ya tiene una pieza, no armes otra: ofrecé modificarla.
 - El foco de la semana y la agenda se cambian con editar_dato, agregar_agenda y quitar_agenda, y las líneas de la estrategia de la semana con editar_estrategia; el juego los muestra al instante. Antes de decir qué hay cargado, mirá con ver_operacion.
 - El stock y las ventas son del sistema: para saber cuánto hay usá ver_stock, cuando llega mercadería registrar_llegada, y cuando Facundo cuenta que vendió algo registrar_venta (resta el stock solo; los precios los define el sistema y no se cambian; si falta el color de una gorra o un shaker, preguntalo). Nunca digas «anotado» si la herramienta devolvió un error, por ejemplo por falta de stock.

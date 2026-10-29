@@ -6,6 +6,9 @@ import { crearGeneradorImagen } from "./imagen-ia.js";
 import { crearLLMGemini } from "./llm-gemini.js";
 import { crearRepositorio } from "./repositorio.js";
 import { crearRendimientoJuego } from "./rendimiento-juego.js";
+import { crearGestorCodigos } from "../descuentos/codigos.js";
+import { crearTransporteGmail } from "../descuentos/correo.js";
+import { crearEnvioDescuentos } from "../descuentos/lista-espera.js";
 import { crearClienteMercadoPago } from "../pagos/mercadopago.js";
 import { crearRutasVentas } from "../pagos/rutas.js";
 import { crearRutasProgramacion } from "./rutas.js";
@@ -42,7 +45,25 @@ export async function construirProgramacion({ pool, env = process.env, fetchFn =
   // Chat con la IA (Gemini, plan gratis): opcional. Sin la clave, responder a una pieza usa el editor con Claude y lo demás son novedades.
   const llm = env.GEMINI_API_KEY ? crearLLMGemini({ apiKey: env.GEMINI_API_KEY, modelo: env.GEMINI_MODELO_CHAT || undefined, fetchFn }) : null;
 
-  const servicio = crearServicio({ repo, telegram, meta, editor, generadorImagen, llm, validarEdicion: llm ? crearValidadorEdicion() : null, urlPublica: env.URL_PUBLICA, permitirPublicar });
+  // Códigos de descuento para la lista de espera: los códigos funcionan siempre; el envío de mails exige la cuenta de Gmail de VOW
+  const codigos = crearGestorCodigos({ repo });
+  let descuentos = null;
+  if (env.MAIL_USUARIO && env.MAIL_CLAVE_APP && env.URL_LANDING) {
+    const porcentaje = Number(env.DESCUENTO_LISTA_PORCENTAJE || 10);
+    const dias = Number(env.DESCUENTO_LISTA_DIAS || 14);
+    if (Number.isInteger(porcentaje) && porcentaje >= 1 && porcentaje <= 60 && Number.isInteger(dias) && dias >= 1) {
+      descuentos = crearEnvioDescuentos({
+        codigos,
+        listarEmails: async () => (await pool.query("SELECT email FROM lista_espera ORDER BY id")).rows.map((r) => r.email),
+        correo: crearTransporteGmail({ usuario: env.MAIL_USUARIO, clave: env.MAIL_CLAVE_APP }),
+        porcentaje,
+        dias,
+        urlLanding: env.URL_LANDING.replace(/\/$/, ""),
+      });
+    } else console.error("DESCUENTO_LISTA_PORCENTAJE (1 a 60) y DESCUENTO_LISTA_DIAS tienen que ser números enteros: los mails de descuento quedan apagados.");
+  }
+
+  const servicio = crearServicio({ repo, telegram, meta, editor, generadorImagen, llm, validarEdicion: llm ? crearValidadorEdicion() : null, urlPublica: env.URL_PUBLICA, permitirPublicar, descuentos });
   // Venta propia con Mercado Pago: con las claves puestas se arma, pero no se abre hasta que VENTA_ABIERTA sea "1"
   let ventas = null;
   if (env.MERCADOPAGO_ACCESS_TOKEN && env.MERCADOPAGO_WEBHOOK_SECRETO && env.URL_LANDING) {
@@ -52,6 +73,7 @@ export async function construirProgramacion({ pool, env = process.env, fetchFn =
       mp: crearClienteMercadoPago({ accessToken: env.MERCADOPAGO_ACCESS_TOKEN, fetchFn }),
       secretoWebhook: env.MERCADOPAGO_WEBHOOK_SECRETO,
       ventaAbierta: env.VENTA_ABIERTA === "1",
+      codigos,
       cotizarEnvio: Number.isInteger(costoFijo) && costoFijo > 0 ? async () => ({ costo: costoFijo, servicio: "Correo Argentino" }) : null,
       urlPublica: env.URL_PUBLICA.replace(/\/$/, ""),
       urlLanding: env.URL_LANDING.replace(/\/$/, ""),
