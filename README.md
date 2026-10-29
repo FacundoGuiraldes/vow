@@ -8,11 +8,12 @@
 
 ![Landing de VOW: hero con logo, wordmark y botón Unirse](docs/img/landing.png)
 
-VOW es una marca argentina de ropa y accesorios de gym que vende directo al público. Está en construcción, con lanzamiento previsto para 2027.
+VOW es una marca argentina de ropa y accesorios de gym que vende directo al público. Está en construcción: el primer lanzamiento es el **Drop 00** (stock real, venta propia con Mercado Pago, hoy lista pero sin abrir al público) y después viene el **Drop 01**. Todo lo que falta y el orden del día de lanzamiento está en [`docs/lanzamiento.md`](docs/lanzamiento.md).
 
 Este repositorio es la base técnica de la marca:
 
 - **Landing y API** (`web/`, `src/api`): lista de espera y catálogo del Drop 01, publicados y monitoreados.
+- **Tienda propia (Drop 00):** carrito en la landing, pago con Mercado Pago, stock que se descuenta solo y códigos de descuento para la lista de espera. [Ver cómo funciona](#venta-propia-con-mercado-pago).
 - **Un sistema de agentes de IA** que investiga cuentas de referencia y propone el plan de contenido semanal, siempre con reglas de marca, tope de gasto y aprobación de una persona antes de seguir. [Ver cómo funciona](#el-sistema-de-agentes).
 - **Publicación programada de Instagram con un bot de Telegram:** el plan de la semana llega al chat, cada pieza se aprueba, se confirma el mismo día y recién ahí se publica sola. [Ver cómo funciona](#publicación-programada-de-instagram-telegram).
 - **VOW HQ:** el panel de control del sistema, hecho como una aldea isométrica en 3D donde cada edificio es un área real (piezas, bot, estrategia, stock y ventas). [Verlo](#vow-hq-el-sistema-como-un-juego).
@@ -94,6 +95,8 @@ La parte difícil de usar IA en serio no es llamarla, es **poder confiar en lo q
 - **Sección Drop 01 en la landing:** muestra la imagen conceptual del drop y el listado que trae de la API, con avisos mientras el servidor despierta y si la carga falla.
 - **Conexión a PostgreSQL (Neon):** pool de conexiones, script de prueba y migración de las tablas `lista_espera` y `productos`.
 - **Rendimiento propio:** `npm run rendimiento` mide las publicaciones de @vow_ar (alcance, guardados, compartidos) y las compara con las cuentas de referencia, sin IA. El Estratega lee el último informe.
+- **Tienda propia con Mercado Pago:** pedido calculado por el servidor, Checkout Pro, aviso firmado que descuenta el stock una sola vez y reserva del código mientras se paga. Está terminada y probada con un Mercado Pago simulado; la venta sigue cerrada hasta el lanzamiento (`VENTA_ABIERTA`). Detalle en [Venta propia](#venta-propia-con-mercado-pago).
+- **Descuento para la lista de espera:** código único del 10 % por persona y por drop, mail con diseño de VOW desde Gmail, y "Consultá tu código" en la tienda como alternativa si el mail cae en spam.
 - **Publicación programada por Telegram:** el bot manda el plan, recuerda qué filmar, pide la confirmación del día y publica solo lo confirmado (imágenes, carruseles, reels e historias). Detalle en [Publicación programada](#publicación-programada-de-instagram-telegram).
 - **VOW HQ:** el panel de control en forma de juego, con Taller de diseño, previsualización realista de Instagram, Estrategia, Almacén y Caja conectados al bot. Detalle en [VOW HQ](#vow-hq-el-sistema-como-un-juego).
 - **Sistema de agentes:** Investigador, Estratega y Revisor, coordinados por un orquestador que frena donde hace falta una persona. Detalle en [El sistema de agentes](#el-sistema-de-agentes).
@@ -400,6 +403,7 @@ cp .env.example .env
 | `ALLOWED_ORIGINS` | Orígenes que pueden llamar a la API desde el navegador, separados por coma. Hace falta cuando la landing llama a la API en otro dominio o puerto (por ejemplo, si `VITE_API_URL` apunta a `http://localhost:3000`, tiene que incluir la dirección donde corre Vite). Si queda vacía, ningún otro sitio puede llamar a la API. |
 | `VITE_API_URL` | URL base de la API que usa la landing. Si queda vacía, la landing llama a `/api/...` en su mismo dominio; en desarrollo, Vite reenvía esas rutas a la API local en el puerto 3000. |
 | `MAIL_USUARIO`, `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` (o `MAIL_CLAVE_APP`), `DESCUENTO_LISTA_PORCENTAJE`, `DESCUENTO_LISTA_DIAS` | Mails con el código de descuento de la lista de espera (en Render; ver `.env.example`). Sin las dos primeras y `URL_LANDING`, el envío queda apagado. |
+| `DROP_ACTUAL`, `LISTA_CORTE` | Drop al que pertenecen los códigos de descuento (por defecto `00`). Para el `01` en adelante hace falta `LISTA_CORTE`: la fecha de lanzamiento del Drop 00 (por ejemplo `2026-11-14T00:00:00-03:00`); solo reciben código quienes se anotaron antes. |
 | `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRETO`, `URL_LANDING`, `VENTA_ABIERTA`, `ENVIO_COSTO_FIJO` | Venta propia con Mercado Pago (en Render). Con las tres primeras se arma; `VENTA_ABIERTA=1` abre la venta al público. `ENVIO_COSTO_FIJO` es el costo de envío en pesos; vacío, solo retiro. |
 | `VITE_TIENDA_URL` | Dirección https de la tienda. Si está definida, la landing muestra el botón "Ir a la tienda" bajo el botón principal; si queda vacía, el botón no aparece. |
 | `TRUST_PROXY` | Se activa con `1` solo cuando la API corre detrás de un proxy. Así el límite de pedidos usa la IP real del visitante (`X-Forwarded-For`) y no la del proxy. En local se deja vacía. |
@@ -550,6 +554,9 @@ El monitoreo necesita el secreto `API_URL` con la URL base de la API; si falta, 
 - [x] Piezas de Instagram generadas por código (carruseles y reels).
 - [x] Publicación programada por Telegram: plan semanal, confirmación del día y publicación automática (incluye historias).
 - [x] VOW HQ: panel de control en forma de juego, con previsualización realista de Instagram, Estrategia, Almacén y Caja.
+- [x] Tienda propia con Mercado Pago, stock en vivo y códigos de descuento por drop para la lista de espera (cerrada hasta el lanzamiento).
+- [ ] **Lanzamiento del Drop 00:** compra real de punta a punta, textos legales, envío (retiro / costo fijo / MiCorreo), fotos reales, abrir la venta y mandar los códigos en tandas chicas. Lista completa en [`docs/lanzamiento.md`](docs/lanzamiento.md).
+- [ ] **Drop 01:** `DROP_ACTUAL=01` + `LISTA_CORTE` y código de agradecimiento del 10 % para los anotados antes del 00.
 - [ ] Probar una historia real contra la API de Instagram (hasta ahora se probó con un Meta simulado).
 - [ ] Publicar con constancia (una pieza por semana desde el 2/11/2026) y sumar material real filmado.
 - [ ] Medir el rendimiento de @vow_ar con sus propios datos.
