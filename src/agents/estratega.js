@@ -98,6 +98,15 @@ export const HERRAMIENTA_PLAN = {
   },
 };
 
+// A veces la IA escribe el salto de línea como los dos caracteres "\n" en vez de un salto real, y se publicaría tal cual.
+// Se convierte en un salto verdadero en todos los textos de la pieza.
+export function normalizarSaltos(valor) {
+  if (typeof valor === "string") return valor.replace(/\\(?:r\\n|n)/g, "\n");
+  if (Array.isArray(valor)) return valor.map(normalizarSaltos);
+  if (valor && typeof valor === "object") return Object.fromEntries(Object.entries(valor).map(([k, v]) => [k, normalizarSaltos(v)]));
+  return valor;
+}
+
 const sumarDias = (fechaISO, dias) => {
   const fecha = new Date(`${fechaISO}T00:00:00Z`);
   fecha.setUTCDate(fecha.getUTCDate() + dias);
@@ -442,6 +451,7 @@ export async function planificarSemana({ semanaInicio, fase, recursos = {}, nota
     return { ok: false, plan: null, errores: [motivo], uso, intentos };
   }
 
+  bloque = { ...bloque, input: normalizarSaltos(bloque.input) };
   const opcionesValidacion = { semanaInicio, recursos, piezas, ganchosConocidos, piezasDefinidas };
   const { ok, errores, advertencias } = validarPlan(bloque.input, opcionesValidacion);
   if (!ok || !criticar) return { ok, plan: ok ? bloque.input : null, errores, uso, propuesta: bloque.input, intentos };
@@ -467,6 +477,7 @@ export async function planificarSemana({ semanaInicio, fase, recursos = {}, nota
       uso.entrada += respuesta.usage?.input_tokens ?? 0;
       uso.salida += respuesta.usage?.output_tokens ?? 0;
       const mejorado = respuesta.stop_reason === "max_tokens" ? null : respuesta.content?.find((b) => b.type === "tool_use" && b.name === HERRAMIENTA_PLAN.name);
+      if (mejorado) mejorado.input = normalizarSaltos(mejorado.input);
       if (mejorado && validarPlan(mejorado.input, opcionesValidacion).ok) {
         const segunda = await criticarPlan(mejorado.input, { cliente, modelo });
         uso.entrada += segunda.uso.entrada;

@@ -1,7 +1,7 @@
 // Editor de piezas: Facundo responde a una pieza con lo que quiere cambiar ("pasalo al viernes", "otro gancho") y Claude
 // devuelve la pieza completa con ese cambio. Pasa por las mismas reglas de marca que el Estratega (validarPlan):
 // una edición que las rompe se rechaza y no se guarda.
-import { HERRAMIENTA_PLAN, MODELO_ESTRATEGA, construirSistema, extraerGanchosConocidos, validarPlan, HORA_MINIMA_PUBLICACION, HORA_MAXIMA_PUBLICACION } from "../agents/estratega.js";
+import { normalizarSaltos, HERRAMIENTA_PLAN, MODELO_ESTRATEGA, construirSistema, extraerGanchosConocidos, validarPlan, HORA_MINIMA_PUBLICACION, HORA_MAXIMA_PUBLICACION } from "../agents/estratega.js";
 
 const MAX_TOKENS_EDICION = 4096;
 const INTENTOS_MAXIMOS = 2;
@@ -93,7 +93,7 @@ ${nueva
         }
         if (!bloque) return { ok: false, errores: ["La IA no devolvió la pieza en el formato esperado. Probá de nuevo."], uso };
 
-        const { que_cambio: queCambio = "", ...pieza } = bloque.input;
+        const { que_cambio: queCambio = "", ...pieza } = normalizarSaltos(bloque.input);
         const { errores } = validarPlan({ resumen: "edición", piezas: [pieza] }, { piezas: 1, recursos, ganchosConocidos: conocidos });
         if (typeof pieza.fecha === "string" && pieza.fecha < hoy) errores.push(`La fecha ${pieza.fecha} ya pasó.`);
         if (!errores.length) return { ok: true, pieza, hora: pieza.hora ?? fila.hora, queCambio, errores: [], uso };
