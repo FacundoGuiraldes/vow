@@ -75,6 +75,12 @@ export function crearGestorCodigos({ repo, ahora = () => Date.now() }) {
       return { total: lista.length, enviados: lista.filter((c) => c.enviado).length, usados: lista.filter((c) => c.usadoPor).length };
     },
 
+    // Para mostrar el código sin gastarlo: { usado, porcentaje, vence }
+    estadoDe: async (codigo) => {
+      const c = (await leer(repo)).codigos[normalizarCodigo(codigo)];
+      return c ? { usado: Boolean(c.usadoPor), porcentaje: c.porcentaje, vence: c.vence } : { usado: false, porcentaje: 0, vence: null };
+    },
+
     emailsConEnvio: async () => {
       const { codigos } = await leer(repo);
       return new Set(Object.values(codigos).filter((c) => c.enviado).map((c) => c.email));

@@ -455,3 +455,6 @@ footer {
 .tienda__codigo label { flex: 1 1 220px; }
 .tienda__codigo .tienda__nota { flex: 1 1 100%; min-height: 1.2em; }
 .tienda__codigo[hidden] { display: none; }
+.tienda__consulta { flex: 1 1 100%; font-family: var(--font-mono); font-size: 0.8rem; }
+.tienda__consulta summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; text-decoration: underline; }
+.tienda__consulta[hidden] { display: none; }

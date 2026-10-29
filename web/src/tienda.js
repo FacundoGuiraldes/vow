@@ -57,6 +57,8 @@ export async function iniciarTienda(apiUrl) {
 
   if (!estado.envio) opcionEnvio.hidden = true;
   if (estado.codigos) codigoBloque.hidden = false;
+  const consulta = document.getElementById('tienda-consulta');
+  if (estado.consultaCodigo) consulta.hidden = false;
 
   function dibujarCarrito() {
     carritoEl.replaceChildren();
@@ -117,6 +119,22 @@ export async function iniciarTienda(apiUrl) {
       codigoMsg.textContent = 'No pudimos conectar. Probá de nuevo.';
     }
     dibujarCarrito();
+  });
+
+  // "Consultá tu código": quien se anotó ve su código acá mismo y lo aplica con un toque
+  document.getElementById('tienda-consulta-ver').addEventListener('click', async () => {
+    const email = document.getElementById('tienda-consulta-email').value.trim();
+    const msg = document.getElementById('tienda-consulta-msg');
+    if (!email) { msg.textContent = 'Escribí tu mail.'; return; }
+    msg.textContent = 'Buscando…';
+    try {
+      const r = await pedirJson(`${apiUrl}/api/programacion/ventas/mi-codigo`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+      if (!r.ok) { msg.textContent = r.datos.error || 'No pudimos buscar tu código.'; return; }
+      codigoInput.value = r.datos.codigo;
+      msg.textContent = `Tu código es ${r.datos.codigo} (${r.datos.porcentaje}% de descuento). Ya lo pusimos arriba: tocá Aplicar.`;
+    } catch {
+      msg.textContent = 'No pudimos conectar. Probá de nuevo.';
+    }
   });
 
   form.addEventListener('change', () => { bloqueEnvio.hidden = form.elements.entrega.value !== 'envio'; });

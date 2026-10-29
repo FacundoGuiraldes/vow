@@ -130,6 +130,12 @@
           <label>Código de descuento (opcional)<input name="codigo" id="tienda-codigo" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20" placeholder="VOW-XXXXXX"></label>
           <button type="button" class="tienda__quitar" id="tienda-codigo-aplicar">Aplicar</button>
           <p class="tienda__nota" id="tienda-codigo-msg" role="status"></p>
+          <details class="tienda__consulta" id="tienda-consulta" hidden>
+            <summary>¿Te anotaste en la lista de espera? Consultá tu código</summary>
+            <label>Mail con el que te anotaste<input type="email" id="tienda-consulta-email" autocomplete="email" maxlength="120"></label>
+            <button type="button" class="tienda__quitar" id="tienda-consulta-ver">Ver mi código</button>
+            <p class="tienda__nota" id="tienda-consulta-msg" role="status"></p>
+          </details>
         </div>
         <div id="tienda-envio-datos" hidden>
           <label>Calle<input name="calle" autocomplete="address-line1" maxlength="80"></label>

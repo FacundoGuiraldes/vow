@@ -176,3 +176,48 @@ describe("Gmail por API", () => {
     assert.throws(() => crearTransporteGmailApi({ usuario: "v@g.com" }), /Faltan/);
   });
 });
+
+describe("consultá tu código", () => {
+  test("da el código a quien está en la lista, el mismo siempre, y rechaza al resto", async () => {
+    const { crearConsultaCodigo } = await import("./lista-espera.js");
+    const { codigos } = await armar();
+    const lista = new Set(["ana@mail.com"]);
+    const consulta = crearConsultaCodigo({ codigos, existeEmail: async (e) => lista.has(e), porcentaje: 10, dias: 14, ahora });
+    const a = await consulta.consultar("  ANA@mail.com ");
+    assert.match(a.codigo, /^VOW-[A-Z0-9]{6}$/);
+    assert.equal(a.porcentaje, 10);
+    assert.equal((await consulta.consultar("ana@mail.com")).codigo, a.codigo);
+    await assert.rejects(consulta.consultar("otra@mail.com"), (e) => e.estado === 404 && /No encontramos ese mail/.test(e.message));
+    await assert.rejects(consulta.consultar("no-es-mail"), /Escribí el mail/);
+    await codigos.consumir(a.codigo, "pedido-1");
+    await assert.rejects(consulta.consultar("ana@mail.com"), /ya se usó/);
+  });
+
+  test("la ruta solo responde con la venta abierta y limita los intentos", async () => {
+    const express = (await import("express")).default;
+    const { crearRutasVentas } = await import("../pagos/rutas.js");
+    const ctx = await armar();
+    const { crearConsultaCodigo } = await import("./lista-espera.js");
+    const consultaCodigo = crearConsultaCodigo({ codigos: ctx.codigos, existeEmail: async (e) => e === "ana@mail.com", porcentaje: 10, ahora });
+    const levantar = async (ventaAbierta) => {
+      const app = express();
+      app.use(express.json());
+      app.use("/v", crearRutasVentas({ repo: ctx.repo, mp: ctx.mp, secretoWebhook: "s", ventaAbierta, codigos: ctx.codigos, consultaCodigo, ...base }));
+      const servidor = await new Promise((r) => { const i = app.listen(0, "127.0.0.1", () => r(i)); });
+      return { servidor, url: `http://127.0.0.1:${servidor.address().port}/v` };
+    };
+    const post = (url, email) => fetch(`${url}/mi-codigo`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+    const cerrada = await levantar(false);
+    assert.equal((await post(cerrada.url, "ana@mail.com")).status, 503);
+    cerrada.servidor.closeAllConnections(); cerrada.servidor.close();
+    const abierta = await levantar(true);
+    assert.equal((await (await fetch(`${abierta.url}/estado`)).json()).consultaCodigo, true);
+    const ok = await post(abierta.url, "ana@mail.com");
+    assert.equal(ok.status, 200);
+    assert.match((await ok.json()).codigo, /^VOW-/);
+    assert.equal((await post(abierta.url, "x@mail.com")).status, 404);
+    for (let i = 0; i < 4; i++) await post(abierta.url, "x@mail.com");
+    assert.equal((await post(abierta.url, "x@mail.com")).status, 429); // 5 por minuto
+    abierta.servidor.closeAllConnections(); abierta.servidor.close();
+  });
+});

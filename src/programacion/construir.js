@@ -8,7 +8,7 @@ import { crearRepositorio } from "./repositorio.js";
 import { crearRendimientoJuego } from "./rendimiento-juego.js";
 import { crearGestorCodigos } from "../descuentos/codigos.js";
 import { crearTransporteGmail, crearTransporteGmailApi } from "../descuentos/correo.js";
-import { crearEnvioDescuentos } from "../descuentos/lista-espera.js";
+import { crearConsultaCodigo, crearEnvioDescuentos } from "../descuentos/lista-espera.js";
 import { crearClienteMercadoPago } from "../pagos/mercadopago.js";
 import { crearRutasVentas } from "../pagos/rutas.js";
 import { crearRutasProgramacion } from "./rutas.js";
@@ -48,23 +48,28 @@ export async function construirProgramacion({ pool, env = process.env, fetchFn =
   // Códigos de descuento para la lista de espera: los códigos funcionan siempre; el envío de mails exige la cuenta de Gmail de VOW
   const codigos = crearGestorCodigos({ repo });
   let descuentos = null;
+  let consultaCodigo = null;
   const porApi = Boolean(env.GMAIL_CLIENT_ID && env.GMAIL_CLIENT_SECRET && env.GMAIL_REFRESH_TOKEN);
-  if (env.MAIL_USUARIO && (porApi || env.MAIL_CLAVE_APP) && env.URL_LANDING) {
-    const porcentaje = Number(env.DESCUENTO_LISTA_PORCENTAJE || 10);
-    const dias = Number(env.DESCUENTO_LISTA_DIAS || 14);
-    if (Number.isInteger(porcentaje) && porcentaje >= 1 && porcentaje <= 60 && Number.isInteger(dias) && dias >= 1) {
-      descuentos = crearEnvioDescuentos({
-        codigos,
-        listarEmails: async () => (await pool.query("SELECT email FROM lista_espera ORDER BY id")).rows.map((r) => r.email),
-        // Por la API de Google si están las claves (funciona en Render gratis); si no, SMTP con contraseña de aplicación (Render gratis lo bloquea)
-        correo: porApi
-          ? crearTransporteGmailApi({ usuario: env.MAIL_USUARIO, clientId: env.GMAIL_CLIENT_ID, clientSecret: env.GMAIL_CLIENT_SECRET, refreshToken: env.GMAIL_REFRESH_TOKEN, fetchFn })
-          : crearTransporteGmail({ usuario: env.MAIL_USUARIO, clave: env.MAIL_CLAVE_APP }),
-        porcentaje,
-        dias,
-        urlLanding: env.URL_LANDING.replace(/\/$/, ""),
-      });
-    } else console.error("DESCUENTO_LISTA_PORCENTAJE (1 a 60) y DESCUENTO_LISTA_DIAS tienen que ser números enteros: los mails de descuento quedan apagados.");
+  const porcentaje = Number(env.DESCUENTO_LISTA_PORCENTAJE || 10);
+  const dias = Number(env.DESCUENTO_LISTA_DIAS || 14);
+  const configValida = Number.isInteger(porcentaje) && porcentaje >= 1 && porcentaje <= 60 && Number.isInteger(dias) && dias >= 1;
+  if (!configValida) console.error("DESCUENTO_LISTA_PORCENTAJE (1 a 60) y DESCUENTO_LISTA_DIAS tienen que ser números enteros: los códigos de la lista de espera quedan apagados.");
+  if (configValida && pool) {
+    // "Consultá tu código" en la tienda: no necesita mail ni dominio, solo la lista de espera
+    consultaCodigo = crearConsultaCodigo({ codigos, existeEmail: async (email) => (await pool.query("SELECT 1 FROM lista_espera WHERE email = $1", [email])).rowCount > 0, porcentaje, dias });
+  }
+  if (configValida && env.MAIL_USUARIO && (porApi || env.MAIL_CLAVE_APP) && env.URL_LANDING) {
+    descuentos = crearEnvioDescuentos({
+      codigos,
+      listarEmails: async () => (await pool.query("SELECT email FROM lista_espera ORDER BY id")).rows.map((r) => r.email),
+      // Por la API de Google si están las claves (funciona en Render gratis); si no, SMTP con contraseña de aplicación (Render gratis lo bloquea)
+      correo: porApi
+        ? crearTransporteGmailApi({ usuario: env.MAIL_USUARIO, clientId: env.GMAIL_CLIENT_ID, clientSecret: env.GMAIL_CLIENT_SECRET, refreshToken: env.GMAIL_REFRESH_TOKEN, fetchFn })
+        : crearTransporteGmail({ usuario: env.MAIL_USUARIO, clave: env.MAIL_CLAVE_APP }),
+      porcentaje,
+      dias,
+      urlLanding: env.URL_LANDING.replace(/\/$/, ""),
+    });
   }
 
   const servicio = crearServicio({ repo, telegram, meta, editor, generadorImagen, llm, validarEdicion: llm ? crearValidadorEdicion() : null, urlPublica: env.URL_PUBLICA, permitirPublicar, descuentos });
@@ -78,6 +83,7 @@ export async function construirProgramacion({ pool, env = process.env, fetchFn =
       secretoWebhook: env.MERCADOPAGO_WEBHOOK_SECRETO,
       ventaAbierta: env.VENTA_ABIERTA === "1",
       codigos,
+      consultaCodigo,
       cotizarEnvio: Number.isInteger(costoFijo) && costoFijo > 0 ? async () => ({ costo: costoFijo, servicio: "Correo Argentino" }) : null,
       urlPublica: env.URL_PUBLICA.replace(/\/$/, ""),
       urlLanding: env.URL_LANDING.replace(/\/$/, ""),
