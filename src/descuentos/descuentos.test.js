@@ -133,3 +133,12 @@ describe("mail y envío", () => {
     assert.equal((await envio.estado()).enviados, 0);
   });
 });
+
+describe("errores de correo", () => {
+  test("se explican en criollo", async () => {
+    const { explicarErrorDeCorreo } = await import("./correo.js");
+    assert.match(explicarErrorDeCorreo({ code: "EAUTH" }), /contraseña de aplicación/);
+    assert.match(explicarErrorDeCorreo({ code: "ETIMEDOUT" }), /No se pudo conectar con Gmail/);
+    assert.match(explicarErrorDeCorreo(new Error("otra cosa")), /otra cosa/);
+  });
+});

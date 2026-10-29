@@ -52,10 +52,25 @@ Es personal y de un solo uso${hasta ? `, y vale hasta el <strong style="color:#E
 // Cuenta de Gmail con "contraseña de aplicación" (no la contraseña normal)
 export function crearTransporteGmail({ usuario, clave }) {
   if (!usuario || !clave) throw new Error("Faltan MAIL_USUARIO o MAIL_CLAVE_APP.");
-  const transporte = nodemailer.createTransport({ service: "gmail", auth: { user: usuario, pass: clave } });
+  // Con tiempos de espera cortos: si el servidor no puede llegar a Gmail (por ejemplo, el hosting bloquea el puerto de correo) falla en segundos con un motivo claro, en vez de quedar colgado
+  const transporte = nodemailer.createTransport({ service: "gmail", auth: { user: usuario, pass: clave }, connectionTimeout: 10_000, greetingTimeout: 10_000, socketTimeout: 20_000 });
   return {
     desde: `VOW <${usuario}>`,
     contacto: usuario,
-    enviar: ({ para, asunto, html, texto }) => transporte.sendMail({ from: `VOW <${usuario}>`, to: para, subject: asunto, html, text: texto, headers: { "List-Unsubscribe": `<mailto:${usuario}?subject=Baja>` } }),
+    enviar: async ({ para, asunto, html, texto }) => {
+      try {
+        return await transporte.sendMail({ from: `VOW <${usuario}>`, to: para, subject: asunto, html, text: texto, headers: { "List-Unsubscribe": `<mailto:${usuario}?subject=Baja>` } });
+      } catch (error) {
+        throw new Error(explicarErrorDeCorreo(error));
+      }
+    },
   };
+}
+
+// Traduce los errores de nodemailer a algo que se pueda actuar sobre
+export function explicarErrorDeCorreo(error) {
+  const codigo = error?.code ?? "";
+  if (codigo === "EAUTH" || error?.responseCode === 535) return "Gmail rechazó el usuario o la contraseña de aplicación (revisá MAIL_USUARIO y MAIL_CLAVE_APP, sin espacios).";
+  if (["ETIMEDOUT", "ECONNECTION", "ESOCKET", "ECONNREFUSED", "ENETUNREACH", "EHOSTUNREACH"].includes(codigo)) return "No se pudo conectar con Gmail desde el servidor (¿el hosting bloquea el correo saliente?). Código: " + codigo;
+  return String(error?.message ?? error).slice(0, 160);
 }
