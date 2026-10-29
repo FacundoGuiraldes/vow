@@ -7,7 +7,7 @@ import { crearLLMGemini } from "./llm-gemini.js";
 import { crearRepositorio } from "./repositorio.js";
 import { crearRendimientoJuego } from "./rendimiento-juego.js";
 import { crearGestorCodigos } from "../descuentos/codigos.js";
-import { crearTransporteGmail } from "../descuentos/correo.js";
+import { crearTransporteGmail, crearTransporteGmailApi } from "../descuentos/correo.js";
 import { crearEnvioDescuentos } from "../descuentos/lista-espera.js";
 import { crearClienteMercadoPago } from "../pagos/mercadopago.js";
 import { crearRutasVentas } from "../pagos/rutas.js";
@@ -48,14 +48,18 @@ export async function construirProgramacion({ pool, env = process.env, fetchFn =
   // Códigos de descuento para la lista de espera: los códigos funcionan siempre; el envío de mails exige la cuenta de Gmail de VOW
   const codigos = crearGestorCodigos({ repo });
   let descuentos = null;
-  if (env.MAIL_USUARIO && env.MAIL_CLAVE_APP && env.URL_LANDING) {
+  const porApi = Boolean(env.GMAIL_CLIENT_ID && env.GMAIL_CLIENT_SECRET && env.GMAIL_REFRESH_TOKEN);
+  if (env.MAIL_USUARIO && (porApi || env.MAIL_CLAVE_APP) && env.URL_LANDING) {
     const porcentaje = Number(env.DESCUENTO_LISTA_PORCENTAJE || 10);
     const dias = Number(env.DESCUENTO_LISTA_DIAS || 14);
     if (Number.isInteger(porcentaje) && porcentaje >= 1 && porcentaje <= 60 && Number.isInteger(dias) && dias >= 1) {
       descuentos = crearEnvioDescuentos({
         codigos,
         listarEmails: async () => (await pool.query("SELECT email FROM lista_espera ORDER BY id")).rows.map((r) => r.email),
-        correo: crearTransporteGmail({ usuario: env.MAIL_USUARIO, clave: env.MAIL_CLAVE_APP }),
+        // Por la API de Google si están las claves (funciona en Render gratis); si no, SMTP con contraseña de aplicación (Render gratis lo bloquea)
+        correo: porApi
+          ? crearTransporteGmailApi({ usuario: env.MAIL_USUARIO, clientId: env.GMAIL_CLIENT_ID, clientSecret: env.GMAIL_CLIENT_SECRET, refreshToken: env.GMAIL_REFRESH_TOKEN, fetchFn })
+          : crearTransporteGmail({ usuario: env.MAIL_USUARIO, clave: env.MAIL_CLAVE_APP }),
         porcentaje,
         dias,
         urlLanding: env.URL_LANDING.replace(/\/$/, ""),

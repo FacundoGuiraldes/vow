@@ -832,7 +832,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
       }
     }
     if (nombre === "descuento_lista_espera") {
-      if (!descuentos) return { error: "Los mails de descuento todavía no están configurados: faltan MAIL_USUARIO y MAIL_CLAVE_APP en Render." };
+      if (!descuentos) return { error: "Los mails de descuento todavía no están configurados: faltan en Render MAIL_USUARIO y GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET y GMAIL_REFRESH_TOKEN." };
       try {
         if (argumentos.accion === "ver") return await descuentos.estado();
         if (argumentos.accion === "prueba") return { ok: true, ...(await descuentos.prueba(String(argumentos.destino ?? "").trim().toLowerCase())) };

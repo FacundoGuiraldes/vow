@@ -52,10 +52,66 @@ Es personal y de un solo uso${hasta ? `, y vale hasta el <strong style="color:#E
 // Cuenta de Gmail con "contraseña de aplicación" (no la contraseña normal)
 export function crearTransporteGmail({ usuario, clave }) {
   if (!usuario || !clave) throw new Error("Faltan MAIL_USUARIO o MAIL_CLAVE_APP.");
-  const transporte = nodemailer.createTransport({ service: "gmail", auth: { user: usuario, pass: clave } });
+  // Con tiempos de espera cortos: si el servidor no puede llegar a Gmail (por ejemplo, el hosting bloquea el puerto de correo) falla en segundos con un motivo claro, en vez de quedar colgado
+  const transporte = nodemailer.createTransport({ service: "gmail", auth: { user: usuario, pass: clave }, connectionTimeout: 10_000, greetingTimeout: 10_000, socketTimeout: 20_000 });
   return {
     desde: `VOW <${usuario}>`,
     contacto: usuario,
-    enviar: ({ para, asunto, html, texto }) => transporte.sendMail({ from: `VOW <${usuario}>`, to: para, subject: asunto, html, text: texto, headers: { "List-Unsubscribe": `<mailto:${usuario}?subject=Baja>` } }),
+    enviar: async ({ para, asunto, html, texto }) => {
+      try {
+        return await transporte.sendMail({ from: `VOW <${usuario}>`, to: para, subject: asunto, html, text: texto, headers: { "List-Unsubscribe": `<mailto:${usuario}?subject=Baja>` } });
+      } catch (error) {
+        throw new Error(explicarErrorDeCorreo(error));
+      }
+    },
   };
+}
+
+// Gmail por la API de Google (internet normal, puerto 443): sale igual desde la cuenta de Gmail de VOW, pero funciona en hostings que bloquean el correo saliente (SMTP).
+// Necesita un cliente OAuth de Google Cloud y un "refresh token" con permiso solo para enviar (gmail.send).
+export function crearTransporteGmailApi({ usuario, clientId, clientSecret, refreshToken, fetchFn = fetch, ahora = () => Date.now() }) {
+  if (!usuario || !clientId || !clientSecret || !refreshToken) throw new Error("Faltan MAIL_USUARIO, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET o GMAIL_REFRESH_TOKEN.");
+  const armador = nodemailer.createTransport({ streamTransport: true, buffer: true, newline: "unix" });
+  let acceso = { token: null, vence: 0 };
+
+  async function tokenDeAcceso() {
+    if (acceso.token && acceso.vence - 60_000 > ahora()) return acceso.token;
+    const r = await fetchFn("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, refresh_token: refreshToken, grant_type: "refresh_token" }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    const datos = await r.json().catch(() => ({}));
+    if (!r.ok || !datos.access_token) throw Object.assign(new Error(`Google no dio permiso para enviar (${datos.error ?? r.status}). Hay que generar de nuevo el refresh token.`), { sinPermiso: true });
+    acceso = { token: datos.access_token, vence: ahora() + (Number(datos.expires_in) || 3600) * 1000 };
+    return acceso.token;
+  }
+
+  return {
+    desde: `VOW <${usuario}>`,
+    contacto: usuario,
+    enviar: async ({ para, asunto, html, texto }) => {
+      const { message } = await armador.sendMail({ from: `VOW <${usuario}>`, to: para, subject: asunto, html, text: texto, headers: { "List-Unsubscribe": `<mailto:${usuario}?subject=Baja>` } });
+      const respuesta = await fetchFn("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await tokenDeAcceso()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ raw: message.toString("base64url") }),
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (!respuesta.ok) {
+        const detalle = await respuesta.json().catch(() => ({}));
+        throw new Error(`Gmail no aceptó el mail (${respuesta.status}${detalle?.error?.message ? `: ${String(detalle.error.message).slice(0, 100)}` : ""}).`);
+      }
+      return respuesta.json();
+    },
+  };
+}
+
+// Traduce los errores de nodemailer a algo que se pueda actuar sobre
+export function explicarErrorDeCorreo(error) {
+  const codigo = error?.code ?? "";
+  if (codigo === "EAUTH" || error?.responseCode === 535) return "Gmail rechazó el usuario o la contraseña de aplicación (revisá MAIL_USUARIO y MAIL_CLAVE_APP, sin espacios).";
+  if (["ETIMEDOUT", "ECONNECTION", "ESOCKET", "ECONNREFUSED", "ENETUNREACH", "EHOSTUNREACH"].includes(codigo)) return "No se pudo conectar con Gmail desde el servidor (¿el hosting bloquea el correo saliente?). Código: " + codigo;
+  return String(error?.message ?? error).slice(0, 160);
 }

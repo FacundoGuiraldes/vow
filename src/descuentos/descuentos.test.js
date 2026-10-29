@@ -133,3 +133,43 @@ describe("mail y envío", () => {
     assert.equal((await envio.estado()).enviados, 0);
   });
 });
+
+describe("errores de correo", () => {
+  test("se explican en criollo", async () => {
+    const { explicarErrorDeCorreo } = await import("./correo.js");
+    assert.match(explicarErrorDeCorreo({ code: "EAUTH" }), /contraseña de aplicación/);
+    assert.match(explicarErrorDeCorreo({ code: "ETIMEDOUT" }), /No se pudo conectar con Gmail/);
+    assert.match(explicarErrorDeCorreo(new Error("otra cosa")), /otra cosa/);
+  });
+});
+
+describe("Gmail por API", () => {
+  test("pide el token, manda el mail armado en base64url y reutiliza el token", async () => {
+    const { crearTransporteGmailApi } = await import("./correo.js");
+    const llamadas = [];
+    const fetchFn = async (url, opciones) => {
+      llamadas.push({ url: String(url), opciones });
+      if (String(url).includes("oauth2")) return { ok: true, status: 200, json: async () => ({ access_token: "tok", expires_in: 3600 }) };
+      return { ok: true, status: 200, json: async () => ({ id: "m1" }) };
+    };
+    const t = crearTransporteGmailApi({ usuario: "vow@gmail.com", clientId: "id", clientSecret: "sec", refreshToken: "ref", fetchFn, ahora: () => 1_000 });
+    await t.enviar({ para: "ana@mail.com", asunto: "Tu 10% off", html: "<p>Hola ñandú</p>", texto: "Hola" });
+    await t.enviar({ para: "bea@mail.com", asunto: "Tu 10% off", html: "<p>Hola</p>", texto: "Hola" });
+    assert.equal(llamadas.filter((l) => l.url.includes("oauth2")).length, 1); // un solo token para los dos
+    const envio = llamadas.find((l) => l.url.includes("messages/send"));
+    assert.equal(envio.opciones.headers.Authorization, "Bearer tok");
+    const crudo = Buffer.from(JSON.parse(envio.opciones.body).raw, "base64url").toString("utf8");
+    assert.match(crudo, /^From: VOW <vow@gmail.com>/m);
+    assert.match(crudo, /^To: ana@mail.com/m);
+    assert.match(crudo, /List-Unsubscribe: <mailto:vow@gmail.com\?subject=Baja>/);
+  });
+
+  test("explica si Google rechaza el permiso o el mail", async () => {
+    const { crearTransporteGmailApi } = await import("./correo.js");
+    const sinPermiso = crearTransporteGmailApi({ usuario: "v@g.com", clientId: "i", clientSecret: "s", refreshToken: "r", fetchFn: async () => ({ ok: false, status: 400, json: async () => ({ error: "invalid_grant" }) }) });
+    await assert.rejects(sinPermiso.enviar({ para: "a@b.co", asunto: "x", html: "x", texto: "x" }), /invalid_grant.*refresh token/);
+    const rechazo = crearTransporteGmailApi({ usuario: "v@g.com", clientId: "i", clientSecret: "s", refreshToken: "r", fetchFn: async (u) => String(u).includes("oauth2") ? { ok: true, json: async () => ({ access_token: "t" }) } : { ok: false, status: 403, json: async () => ({ error: { message: "Insufficient Permission" } }) } });
+    await assert.rejects(rechazo.enviar({ para: "a@b.co", asunto: "x", html: "x", texto: "x" }), /403.*Insufficient/);
+    assert.throws(() => crearTransporteGmailApi({ usuario: "v@g.com" }), /Faltan/);
+  });
+});
