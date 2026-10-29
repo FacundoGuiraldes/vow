@@ -148,6 +148,8 @@ export function crearApp({
   // La publicación programada (bot de Telegram, aviso de las 8, publicador) va ANTES del parser de 10 kb:
   // el plan de la semana pesa más, así que su router trae el suyo.
   if (programacion) app.use("/api/programacion", programacion);
+  // Si la venta no está configurada en este servidor, la landing igual pregunta si está abierta: se le contesta que no (sin un 404 en la consola)
+  app.get("/api/programacion/ventas/estado", (req, res) => res.json({ abierta: false }));
   app.use(express.json({ limit: "10kb" }));
 
   app.get("/api/salud", (req, res) => {

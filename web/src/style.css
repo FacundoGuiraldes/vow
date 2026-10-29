@@ -421,3 +421,32 @@ footer {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; }
 }
+
+/* ---------- Tienda del Drop 00 (solo visible con la venta abierta) ---------- */
+.tienda { position: relative; padding: 96px var(--pad-l) 72px; background: var(--bone); color: var(--black); }
+.tienda[hidden], .tienda [hidden] { display: none; }
+.tienda__aviso { margin: 0 0 24px; padding: 14px 18px; background: var(--black); color: var(--bone); font-family: var(--font-mono); font-size: 0.85rem; }
+.tienda__lista { list-style: none; margin: 32px 0 0; padding: 0; display: grid; gap: 16px; max-width: 720px; }
+.tienda__producto { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid var(--black); }
+.tienda__producto h3 { font-family: var(--font-title); font-size: 1rem; text-transform: uppercase; margin: 0; }
+.tienda__precio { font-family: var(--font-mono); margin: 4px 0 0; }
+.tienda__opciones { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tienda select, .tienda input:not([type="radio"]) { min-height: 44px; padding: 8px 10px; border: 1px solid var(--black); border-radius: 0; background: transparent; color: var(--black); font-family: var(--font-body); font-size: 1rem; }
+.tienda input[type="number"] { width: 72px; }
+.tienda__agregar { min-height: 44px; padding: 8px 20px; border: 1px solid var(--black); background: var(--black); color: var(--bone); font-family: var(--font-mono); text-transform: uppercase; cursor: pointer; }
+.tienda__agregar:disabled { opacity: 0.5; cursor: not-allowed; }
+.tienda__form { margin-top: 48px; max-width: 520px; display: flex; flex-direction: column; gap: 16px; }
+.tienda__form h3 { font-family: var(--font-title); font-size: 1.1rem; text-transform: uppercase; margin: 0; }
+.tienda__form label { display: flex; flex-direction: column; gap: 6px; font-family: var(--font-mono); font-size: 0.8rem; text-transform: uppercase; }
+.tienda__form #tienda-envio-datos { display: flex; flex-direction: column; gap: 16px; }
+.tienda__form #tienda-envio-datos[hidden], .tienda__form label[hidden] { display: none; }
+.tienda__entrega { border: 1px solid var(--black); padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+.tienda__entrega label { flex-direction: row; align-items: center; gap: 10px; text-transform: none; font-size: 0.95rem; }
+.tienda__lineas { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.tienda__lineas li { display: flex; gap: 12px; justify-content: space-between; align-items: center; font-size: 0.95rem; }
+.tienda__quitar { background: none; border: 0; padding: 8px; min-height: 44px; text-decoration: underline; cursor: pointer; font-family: var(--font-mono); }
+.tienda__total { display: flex; justify-content: space-between; font-family: var(--font-mono); margin: 12px 0 0; }
+.tienda__nota, .tienda__vacio { font-family: var(--font-mono); font-size: 0.75rem; line-height: 1.5; margin: 0; }
+.tienda__msg { min-height: 1.4em; font-family: var(--font-mono); font-size: 0.85rem; margin: 0; }
+.tienda__form .hero-btn { cursor: pointer; justify-content: center; }
+.tienda__form .hero-btn:disabled { opacity: 0.5; cursor: not-allowed; }

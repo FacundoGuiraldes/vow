@@ -110,6 +110,36 @@
       </div>
     </section>
 
+    <section class="tienda" id="tienda" aria-labelledby="tienda-title" hidden>
+      <div class="section-label" aria-hidden="true">DROP 00</div>
+      <p class="tienda__aviso" id="tienda-aviso" role="status" hidden></p>
+      <h2 class="title-large" id="tienda-title">Drop 00</h2>
+      <ul class="tienda__lista" id="tienda-lista"></ul>
+      <form id="tienda-form" class="tienda__form" novalidate>
+        <h3>Tu pedido</h3>
+        <div id="tienda-carrito" aria-live="polite"></div>
+        <fieldset class="tienda__entrega">
+          <legend>Entrega</legend>
+          <label><input type="radio" name="entrega" value="retiro" checked> Retiro en persona</label>
+          <label id="tienda-opcion-envio"><input type="radio" name="entrega" value="envio"> Envío a domicilio</label>
+        </fieldset>
+        <label>Nombre y apellido<input name="nombre" autocomplete="name" required maxlength="80"></label>
+        <label>Email<input name="email" type="email" autocomplete="email" required maxlength="120"></label>
+        <label>Teléfono<input name="telefono" type="tel" autocomplete="tel" required maxlength="30"></label>
+        <div id="tienda-envio-datos" hidden>
+          <label>Calle<input name="calle" autocomplete="address-line1" maxlength="80"></label>
+          <label>Número<input name="numero" maxlength="10"></label>
+          <label>Piso y departamento (opcional)<input name="piso" maxlength="20"></label>
+          <label>Código postal<input name="cp" autocomplete="postal-code" maxlength="10"></label>
+          <label>Localidad<input name="localidad" autocomplete="address-level2" maxlength="60"></label>
+          <label>Provincia<input name="provincia" autocomplete="address-level1" maxlength="40"></label>
+        </div>
+        <p class="tienda__nota">Pagás en Mercado Pago. Tus datos se usan solo para este pedido.</p>
+        <p id="tienda-msg" class="tienda__msg" role="status"></p>
+        <button type="submit" id="tienda-pagar" class="hero-btn" disabled>Ir a pagar</button>
+      </form>
+    </section>
+
     <section class="waitlist" id="sec-05" aria-labelledby="waitlist-title">
       <div class="mk mk--tl" aria-hidden="true"></div><div class="mk mk--tr" aria-hidden="true"></div>
       <div class="mk mk--bl" aria-hidden="true"></div><div class="mk mk--br" aria-hidden="true"></div>

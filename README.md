@@ -329,6 +329,19 @@ Puesta en marcha:
 5. cron-job.org: POST cada minuto a `URL_PUBLICA/api/programacion/tick` con `Authorization: Bearer <PROGRAMACION_SECRETO>` (también mantiene despierto a Render free).
 6. Tras un par de semanas de simulación, activar `INSTAGRAM_PERMITIR_PUBLICAR=1`. El token de Meta vence cada 60 días.
 
+## Venta propia con Mercado Pago
+
+La venta del Drop 00 no depende de una tienda de terceros: el comprador elige productos, el servidor calcula el total con los precios del sistema y lo manda a pagar a **Mercado Pago Checkout Pro**. El pago se hace en la página de Mercado Pago, así que los datos de la tarjeta nunca pasan por nuestro servidor. Cuando Mercado Pago avisa que se aprobó, el Almacén del HQ descuenta el stock solo (VOW HQ lo ve al instante).
+
+- `GET  /api/programacion/ventas/estado`: si la venta está abierta y qué se vende (sin stock exacto).
+- `POST /api/programacion/ventas/pedidos`: arma el pedido y devuelve el link de pago. Solo funciona con `VENTA_ABIERTA=1`.
+- `POST /api/programacion/ventas/mercadopago`: aviso de Mercado Pago, validado con su firma (`x-signature`). Se consulta el pago a la API de Mercado Pago, se verifica que el monto coincida con el pedido y recién entonces se descuenta el stock, una sola vez por pedido.
+- **Los precios nunca vienen del navegador:** el servidor rechaza un pedido que traiga precio.
+- **Stock:** se verifica al crear el pedido y se descuenta al aprobarse el pago. Si dos personas pagan la última unidad, la segunda queda como "pagado sin stock" y deja una novedad para devolverle el dinero desde Mercado Pago.
+- **Envío:** por ahora retiro en persona, o un costo fijo (`ENVIO_COSTO_FIJO`). La cotización automática con Correo Argentino (MiCorreo) está pendiente: requiere las credenciales de MiCorreo y el peso y las medidas de cada producto.
+- **Datos personales:** el pedido guarda nombre, mail, teléfono y domicilio del comprador. La política de privacidad de la landing todavía solo cubre la lista de espera: hay que ampliarla y sumar términos de venta y botón de arrepentimiento antes de abrir (consultalo con un abogado o contador).
+- **Puesta en marcha:** cuenta de Mercado Pago con credenciales de producción, webhook configurado hacia `/api/programacion/ventas/mercadopago` (su clave secreta va en `MERCADOPAGO_WEBHOOK_SECRETO`) y las variables de `.env.example`. Probar antes con las credenciales de prueba.
+
 ## Stack
 
 | Capa | Tecnología |
@@ -383,6 +396,7 @@ cp .env.example .env
 | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | Opcionales: imágenes con IA (Cloudflare Workers AI). |
 | `ALLOWED_ORIGINS` | Orígenes que pueden llamar a la API desde el navegador, separados por coma. Hace falta cuando la landing llama a la API en otro dominio o puerto (por ejemplo, si `VITE_API_URL` apunta a `http://localhost:3000`, tiene que incluir la dirección donde corre Vite). Si queda vacía, ningún otro sitio puede llamar a la API. |
 | `VITE_API_URL` | URL base de la API que usa la landing. Si queda vacía, la landing llama a `/api/...` en su mismo dominio; en desarrollo, Vite reenvía esas rutas a la API local en el puerto 3000. |
+| `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_SECRETO`, `URL_LANDING`, `VENTA_ABIERTA`, `ENVIO_COSTO_FIJO` | Venta propia con Mercado Pago (en Render). Con las tres primeras se arma; `VENTA_ABIERTA=1` abre la venta al público. `ENVIO_COSTO_FIJO` es el costo de envío en pesos; vacío, solo retiro. |
 | `VITE_TIENDA_URL` | Dirección https de la tienda. Si está definida, la landing muestra el botón "Ir a la tienda" bajo el botón principal; si queda vacía, el botón no aparece. |
 | `TRUST_PROXY` | Se activa con `1` solo cuando la API corre detrás de un proxy. Así el límite de pedidos usa la IP real del visitante (`X-Forwarded-For`) y no la del proxy. En local se deja vacía. |
 

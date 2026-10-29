@@ -53,7 +53,7 @@ function entregar(req, res, { mime, datos }) {
     .end(datos.subarray(inicio, fin + 1));
 }
 
-export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOficina = null, secretoWebhook, rendimiento = null, permitirPublicar = false, limitePorMinuto = 120 }) {
+export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOficina = null, secretoWebhook, rendimiento = null, ventas = null, permitirPublicar = false, limitePorMinuto = 120 }) {
   const router = Router();
   const pendientes = new Set(); // procesamientos del webhook que siguen en curso (los tests los esperan)
   router.use(json({ limit: "256kb" }));
@@ -88,6 +88,9 @@ export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOfic
       siguiente(error);
     }
   });
+
+  // Venta propia con Mercado Pago (src/pagos)
+  if (ventas) router.use("/ventas", ventas);
 
   router.post("/tick", conClave, async (req, res, siguiente) => {
     try {
