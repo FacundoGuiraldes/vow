@@ -450,3 +450,8 @@ footer {
 .tienda__msg { min-height: 1.4em; font-family: var(--font-mono); font-size: 0.85rem; margin: 0; }
 .tienda__form .hero-btn { cursor: pointer; justify-content: center; }
 .tienda__form .hero-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.tienda__codigo { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 12px; }
+.tienda__codigo label { flex: 1 1 220px; }
+.tienda__codigo .tienda__nota { flex: 1 1 100%; min-height: 1.2em; }
+.tienda__codigo[hidden] { display: none; }

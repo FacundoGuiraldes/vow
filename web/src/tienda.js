@@ -50,8 +50,13 @@ export async function iniciarTienda(apiUrl) {
   const bloqueEnvio = document.getElementById('tienda-envio-datos');
   const opcionEnvio = document.getElementById('tienda-opcion-envio');
   const carrito = []; // { producto, nombre, precio, cantidad, gorra?, shaker? }
+  let descuento = 0; // porcentaje del código aplicado (el servidor lo vuelve a calcular al pagar)
+  const codigoBloque = document.getElementById('tienda-codigo-bloque');
+  const codigoInput = document.getElementById('tienda-codigo');
+  const codigoMsg = document.getElementById('tienda-codigo-msg');
 
   if (!estado.envio) opcionEnvio.hidden = true;
+  if (estado.codigos) codigoBloque.hidden = false;
 
   function dibujarCarrito() {
     carritoEl.replaceChildren();
@@ -64,7 +69,8 @@ export async function iniciarTienda(apiUrl) {
           el('span', {}, `${l.cantidad} × ${l.nombre}${[l.gorra, l.shaker].filter(Boolean).length ? ` (${[l.gorra, l.shaker].filter(Boolean).join(', ')})` : ''}`),
           el('span', {}, pesos(l.precio * l.cantidad)),
           el('button', { type: 'button', class: 'tienda__quitar', 'aria-label': `Quitar ${l.nombre}`, onclick: () => { carrito.splice(i, 1); dibujarCarrito(); } }, 'Quitar')))),
-        el('p', { class: 'tienda__total' }, el('span', {}, 'Productos'), el('strong', {}, pesos(total))),
+        ...(descuento ? [el('p', { class: 'tienda__total' }, el('span', {}, `Descuento VOW (${descuento}%)`), el('strong', {}, `− ${pesos(total - carrito.reduce((a, l) => a + Math.round(l.precio * (100 - descuento) / 100) * l.cantidad, 0))}`))] : []),
+        el('p', { class: 'tienda__total' }, el('span', {}, 'Productos'), el('strong', {}, pesos(descuento ? carrito.reduce((a, l) => a + Math.round(l.precio * (100 - descuento) / 100) * l.cantidad, 0) : total))),
         el('p', { class: 'tienda__nota' }, 'El envío, si lo elegís, se suma al pagar.')
       );
     }
@@ -98,6 +104,21 @@ export async function iniciarTienda(apiUrl) {
       el('div', { class: 'tienda__opciones' }, selects, cantidad, agregar)));
   }
 
+  codigoInput.addEventListener('input', () => { descuento = 0; codigoMsg.textContent = ''; dibujarCarrito(); });
+  document.getElementById('tienda-codigo-aplicar').addEventListener('click', async () => {
+    const codigo = codigoInput.value.trim();
+    if (!codigo) { codigoMsg.textContent = 'Escribí tu código.'; return; }
+    codigoMsg.textContent = 'Revisando…';
+    try {
+      const r = await pedirJson(`${apiUrl}/api/programacion/ventas/codigo`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ codigo }) });
+      descuento = r.ok ? Number(r.datos.porcentaje) || 0 : 0;
+      codigoMsg.textContent = r.ok ? `Listo: ${descuento}% de descuento en los productos.` : (r.datos.error || 'No pudimos revisar el código.');
+    } catch {
+      codigoMsg.textContent = 'No pudimos conectar. Probá de nuevo.';
+    }
+    dibujarCarrito();
+  });
+
   form.addEventListener('change', () => { bloqueEnvio.hidden = form.elements.entrega.value !== 'envio'; });
 
   form.addEventListener('submit', async e => {
@@ -107,6 +128,7 @@ export async function iniciarTienda(apiUrl) {
     const envio = datos.get('entrega') === 'envio';
     const cuerpo = {
       items: carrito.map(({ producto, cantidad, gorra, shaker }) => ({ producto, cantidad, ...(gorra ? { gorra } : {}), ...(shaker ? { shaker } : {}) })),
+      ...(String(datos.get('codigo') ?? '').trim() ? { codigo: String(datos.get('codigo')).trim() } : {}),
       comprador: { nombre: datos.get('nombre'), email: datos.get('email'), telefono: datos.get('telefono') },
       entrega: envio ? { tipo: 'envio', cp: datos.get('cp'), calle: datos.get('calle'), numero: datos.get('numero'), piso: datos.get('piso'), localidad: datos.get('localidad'), provincia: datos.get('provincia') } : { tipo: 'retiro' }
     };

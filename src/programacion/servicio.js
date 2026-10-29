@@ -70,7 +70,7 @@ function elegirArchivo(msg) {
   return null;
 }
 
-export function crearServicio({ repo, telegram, meta = null, editor = null, generadorImagen = null, llm = null, validarEdicion = null, ahora = () => ahoraArgentina(), urlPublica = "", permitirPublicar = false, investigacion = lineasDeInvestigacion } = {}) {
+export function crearServicio({ repo, telegram, meta = null, editor = null, generadorImagen = null, llm = null, validarEdicion = null, ahora = () => ahoraArgentina(), urlPublica = "", permitirPublicar = false, descuentos = null, investigacion = lineasDeInvestigacion } = {}) {
   const decir = (texto, opciones) => telegram.enviarMensaje(texto, opciones);
   const decirDePieza = async (fila, texto, opciones) => {
     const id = await telegram.enviarMensaje(texto, opciones);
@@ -829,6 +829,17 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
       } catch (error) {
         if (error instanceof ErrorOperacion) return { error: error.message };
         throw error;
+      }
+    }
+    if (nombre === "descuento_lista_espera") {
+      if (!descuentos) return { error: "Los mails de descuento todavía no están configurados: faltan MAIL_USUARIO y MAIL_CLAVE_APP en Render." };
+      try {
+        if (argumentos.accion === "ver") return await descuentos.estado();
+        if (argumentos.accion === "prueba") return { ok: true, ...(await descuentos.prueba(String(argumentos.destino ?? "").trim().toLowerCase())) };
+        if (argumentos.accion === "enviar") return { ok: true, ...(await descuentos.enviar({ esperados: argumentos.esperados })) };
+        return { error: "La acción tiene que ser ver, prueba o enviar." };
+      } catch (error) {
+        return { error: `No se pudo: ${String(error.message).slice(0, 200)}` };
       }
     }
     if (nombre === "ver_stock") return vistaInventario(await leerInventario(repo), hoy);
