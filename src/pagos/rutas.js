@@ -9,10 +9,12 @@ import { firmaValida } from "./mercadopago.js";
 import { ErrorCodigo } from "../descuentos/codigos.js";
 import { ErrorPedido, confirmarPago, crearPedido } from "./pedidos.js";
 
-export function crearRutasVentas({ repo, mp, secretoWebhook, ventaAbierta = false, cotizarEnvio = null, codigos = null, urlPublica, urlLanding }) {
+export function crearRutasVentas({ repo, mp, secretoWebhook, ventaAbierta = false, cotizarEnvio = null, codigos = null, consultaCodigo = null, urlPublica, urlLanding }) {
   const router = Router();
   const limitePedidos = rateLimit({ windowMs: 60_000, limit: 10, standardHeaders: true, legacyHeaders: false, message: { error: "Demasiados pedidos. Probá en un minuto." } });
 
+  // Más estricto: para que nadie pueda ir probando mails de otras personas
+  const limiteConsulta = rateLimit({ windowMs: 60_000, limit: 5, standardHeaders: true, legacyHeaders: false, message: { error: "Demasiados intentos. Probá en un minuto." } });
   const limiteCodigos = rateLimit({ windowMs: 60_000, limit: 15, standardHeaders: true, legacyHeaders: false, message: { error: "Demasiados intentos. Probá en un minuto." } });
 
   router.get("/estado", async (req, res, siguiente) => {
@@ -25,6 +27,7 @@ export function crearRutasVentas({ repo, mp, secretoWebhook, ventaAbierta = fals
         abierta: true,
         envio: Boolean(cotizarEnvio),
         codigos: Boolean(codigos),
+        consultaCodigo: Boolean(codigos && consultaCodigo),
         // Qué colores hay (sí o no, sin cantidades) para cada cosa que pide color
         colores: { gorra: { negra: hay("gorra-negra"), beige: hay("gorra-beige") }, shaker: { negro: hay("shaker-negro"), claro: hay("shaker-claro") } },
         productos: Object.entries(CATALOGO).map(([id, p]) => ({ id, nombre: p.nombre, precio: p.precio, pide: p.usa.map(([g]) => g).filter((g) => g !== "medias"), disponible: disponible(id) })),
@@ -40,6 +43,16 @@ export function crearRutasVentas({ repo, mp, secretoWebhook, ventaAbierta = fals
       if (!ventaAbierta || !codigos) return res.status(503).json({ error: "Los códigos de descuento todavía no están disponibles." });
       const { porcentaje } = await codigos.validar(req.body?.codigo);
       return res.json({ ok: true, porcentaje });
+    } catch (error) {
+      if (error instanceof ErrorCodigo) return res.status(error.estado).json({ error: error.message });
+      return siguiente(error);
+    }
+  });
+
+  router.post("/mi-codigo", limiteConsulta, async (req, res, siguiente) => {
+    try {
+      if (!ventaAbierta || !codigos || !consultaCodigo) return res.status(503).json({ error: "Todavía no está disponible." });
+      return res.json(await consultaCodigo.consultar(req.body?.email));
     } catch (error) {
       if (error instanceof ErrorCodigo) return res.status(error.estado).json({ error: error.message });
       return siguiente(error);

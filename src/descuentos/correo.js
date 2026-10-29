@@ -5,11 +5,13 @@ import nodemailer from "nodemailer";
 const escapar = (t) => String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const FECHA = new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "long", timeZone: "America/Argentina/Buenos_Aires" });
 
-export function armarMail({ codigo, porcentaje, vence, urlLanding, contacto, prueba = false }) {
+export function armarMail({ codigo, porcentaje, vence, urlLanding, contacto, prueba = false, drop = "00" }) {
   const hasta = vence ? FECHA.format(new Date(vence)) : null;
   const url = `${urlLanding.replace(/\/$/, "")}/#tienda`;
   const logo = `${urlLanding.replace(/\/$/, "")}/assets/logo-mail.png`;
-  const asunto = "Tu código para el Drop 00 de VOW";
+  const asunto = `Tu código para el Drop ${drop} de VOW`;
+  // Del segundo drop en adelante el beneficio es para quienes estaban en la lista antes del primero
+  const motivo = drop === "00" ? "Te anotaste en la lista de espera de VOW" : "Te anotaste en la lista de espera de VOW antes del lanzamiento del Drop 00";
   const titulo = "'Unbounded','Arial Black',Arial,Helvetica,sans-serif";
   const cuerpo = "'Space Grotesk',Arial,Helvetica,sans-serif";
   const mono = "'Space Mono','Courier New',monospace";
@@ -20,9 +22,9 @@ export function armarMail({ codigo, porcentaje, vence, urlLanding, contacto, pru
 <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="width:100%;max-width:560px;background:#0A0A0A;">
 ${prueba ? `<tr><td style="font-family:${mono};font-size:12px;color:#CDBFA6;border:1px dashed #8C8378;padding:10px 12px;">Esto es una prueba: el código de abajo es de muestra y no sirve para comprar.</td></tr><tr><td style="height:20px;"></td></tr>` : ""}
 <tr><td style="padding:0 0 28px 0;"><img src="${escapar(logo)}" width="72" height="72" alt="VOW" style="display:block;border:0;border-radius:14px;"></td></tr>
-<tr><td style="font-family:${mono};font-size:12px;letter-spacing:3px;color:#8C8378;padding-bottom:14px;text-transform:uppercase;">Drop 00 · lista de espera</td></tr>
-<tr><td style="font-family:${titulo};font-weight:900;font-size:32px;line-height:1.1;color:#ECE8E1;padding-bottom:20px;text-transform:uppercase;">Tu código<br>para el<br>Drop 00</td></tr>
-<tr><td style="font-family:${cuerpo};font-size:16px;line-height:1.6;color:#CDBFA6;padding-bottom:28px;">Te anotaste en la lista de espera de VOW, y por eso tenés un <strong style="color:#ECE8E1;">${porcentaje}% de descuento</strong> en tu compra del Drop 00. Este es tu código:</td></tr>
+<tr><td style="font-family:${mono};font-size:12px;letter-spacing:3px;color:#8C8378;padding-bottom:14px;text-transform:uppercase;">Drop ${drop} · lista de espera</td></tr>
+<tr><td style="font-family:${titulo};font-weight:900;font-size:32px;line-height:1.1;color:#ECE8E1;padding-bottom:20px;text-transform:uppercase;">Tu código<br>para el<br>Drop ${drop}</td></tr>
+<tr><td style="font-family:${cuerpo};font-size:16px;line-height:1.6;color:#CDBFA6;padding-bottom:28px;">${motivo}, y por eso tenés un <strong style="color:#ECE8E1;">${porcentaje}% de descuento</strong> en tu compra del Drop ${drop}. Este es tu código:</td></tr>
 <tr><td style="padding-bottom:28px;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #ECE8E1;"><tr><td align="center" style="padding:22px 12px;">
 <div style="font-family:${mono};font-size:11px;letter-spacing:3px;color:#8C8378;padding-bottom:10px;text-transform:uppercase;">Tu código</div>
 <div style="font-family:${mono};font-weight:700;font-size:30px;letter-spacing:4px;color:#ECE8E1;">${escapar(codigo)}</div>
@@ -35,9 +37,9 @@ Es personal y de un solo uso${hasta ? `, y vale hasta el <strong style="color:#E
 </table></td></tr></table></body></html>`;
   const texto = [
     ...(prueba ? ["Esto es una prueba: el código de abajo es de muestra y no sirve para comprar.", ""] : []),
-    `VOW · Drop 00`,
+    `VOW · Drop ${drop}`,
     ``,
-    `Te anotaste en la lista de espera de VOW. Por eso tenés un ${porcentaje}% de descuento en tu compra del Drop 00.`,
+    `${motivo}. Por eso tenés un ${porcentaje}% de descuento en tu compra del Drop ${drop}.`,
     ``,
     `Tu código: ${codigo}`,
     ``,
