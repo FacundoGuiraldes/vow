@@ -329,6 +329,17 @@ Puesta en marcha:
 5. cron-job.org: POST cada minuto a `URL_PUBLICA/api/programacion/tick` con `Authorization: Bearer <PROGRAMACION_SECRETO>` (también mantiene despierto a Render free).
 6. Tras un par de semanas de simulación, activar `INSTAGRAM_PERMITIR_PUBLICAR=1`. El token de Meta vence cada 60 días.
 
+## Ventas de Tiendanube al Almacén del HQ
+
+Cuando se paga un pedido en la tienda, Tiendanube avisa a `POST /api/programacion/tiendanube` y el Almacén descuenta el stock solo; si se cancela, el stock vuelve. Se ve en VOW HQ (Almacén y Caja) y deja una novedad. Cada pedido se registra una sola vez aunque el aviso llegue repetido.
+
+- **Seguridad:** cada aviso trae una firma (`x-linkedstore-hmac-sha256`) calculada con el *client secret* de la app; sin firma válida se rechaza.
+- **Código en el SKU:** en Tiendanube, el campo SKU de cada variante tiene que ser un código de VOW: `gorra-negra`, `gorra-beige`, `shaker-negro`, `shaker-claro`, `medias`, `medias2`, `medias3`, y para packs con color `pledge:negra`, `kept:claro`, `oath:negra,claro` (gorra y después shaker). Un producto sin código no descuenta nada y deja una novedad.
+- **Precios:** el Almacén usa los precios del sistema, no lo que cobró la tienda: si hacés un descuento, el importe de la venta en el HQ es el de lista.
+- **Stock sin alcanzar:** si el pedido pagado supera el stock del Almacén, no se pierde: queda una novedad para corregir a mano.
+- **Alcance:** el sentido es Tiendanube → HQ. El stock que muestra Tiendanube se carga a mano.
+- **Puesta en marcha:** hace falta una app de Tiendanube instalada en la tienda (sus claves van en `TIENDANUBE_CLIENT_SECRET`, `TIENDANUBE_ACCESS_TOKEN` y `TIENDANUBE_STORE_ID`) y correr una vez `npm run tiendanube:webhooks`. Los productos de Drop 00 no se agregan a la tabla pública `productos`.
+
 ## Stack
 
 | Capa | Tecnología |
@@ -384,6 +395,7 @@ cp .env.example .env
 | `ALLOWED_ORIGINS` | Orígenes que pueden llamar a la API desde el navegador, separados por coma. Hace falta cuando la landing llama a la API en otro dominio o puerto (por ejemplo, si `VITE_API_URL` apunta a `http://localhost:3000`, tiene que incluir la dirección donde corre Vite). Si queda vacía, ningún otro sitio puede llamar a la API. |
 | `VITE_API_URL` | URL base de la API que usa la landing. Si queda vacía, la landing llama a `/api/...` en su mismo dominio; en desarrollo, Vite reenvía esas rutas a la API local en el puerto 3000. |
 | `VITE_TIENDA_URL` | Dirección https de la tienda. Si está definida, la landing muestra el botón "Ir a la tienda" bajo el botón principal; si queda vacía, el botón no aparece. |
+| `TIENDANUBE_CLIENT_SECRET`, `TIENDANUBE_ACCESS_TOKEN`, `TIENDANUBE_STORE_ID` | Claves de la app de Tiendanube instalada en la tienda (en Render). Sin las tres, el aviso de ventas queda apagado. `TIENDANUBE_CONTACTO` (opcional) es el mail que se manda en el `User-Agent` de la API. |
 | `TRUST_PROXY` | Se activa con `1` solo cuando la API corre detrás de un proxy. Así el límite de pedidos usa la IP real del visitante (`X-Forwarded-For`) y no la del proxy. En local se deja vacía. |
 
 La API también acepta `PORT`, que es opcional (por defecto 3000). La landing lee el mismo `.env` de la raíz, y Vite solo expone al navegador las variables que empiezan con `VITE_`.
@@ -441,6 +453,7 @@ El `.env` no se crea solo: hay que copiarlo de `.env.example` y completarlo, com
 | `npm run rendimiento` | Mide las publicaciones de @vow_ar contra las cuentas de referencia (sin IA). |
 | `npm run plan:lunes` | Arma el plan de la semana y lo manda por Telegram (lo usa el workflow `plan-lunes.yml`). |
 | `npm run telegram:webhook` | Registra en Telegram la dirección y el secreto del webhook del bot. |
+| `npm run tiendanube:webhooks` | Le pide a Tiendanube que avise los pedidos pagados y cancelados a la API (ver "Ventas de Tiendanube al Almacén"). |
 | `npm run mcp:instagram` | Levanta el servidor MCP de Instagram a mano (normalmente lo levanta Claude Code desde `.mcp.json`). |
 | `npm run laminas`, `npm run reel`, `npm run reel:logo`, `npm run foto-perfil` | Generan las láminas de los carruseles, los reels y la foto de perfil de Instagram. |
 | `npm run hola` | Pide un eslogan a la API de Anthropic. Hace una llamada real y consume crédito. |

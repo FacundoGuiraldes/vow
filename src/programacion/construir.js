@@ -6,6 +6,8 @@ import { crearGeneradorImagen } from "./imagen-ia.js";
 import { crearLLMGemini } from "./llm-gemini.js";
 import { crearRepositorio } from "./repositorio.js";
 import { crearRendimientoJuego } from "./rendimiento-juego.js";
+import { crearClienteTiendanube } from "../tiendanube/cliente.js";
+import { procesarAviso } from "../tiendanube/procesar.js";
 import { crearRutasProgramacion } from "./rutas.js";
 import { crearServicio } from "./servicio.js";
 import { crearClienteTelegram } from "./telegram.js";
@@ -41,7 +43,13 @@ export async function construirProgramacion({ pool, env = process.env, fetchFn =
   const llm = env.GEMINI_API_KEY ? crearLLMGemini({ apiKey: env.GEMINI_API_KEY, modelo: env.GEMINI_MODELO_CHAT || undefined, fetchFn }) : null;
 
   const servicio = crearServicio({ repo, telegram, meta, editor, generadorImagen, llm, validarEdicion: llm ? crearValidadorEdicion() : null, urlPublica: env.URL_PUBLICA, permitirPublicar });
-  const router = crearRutasProgramacion({ servicio, repo, secretoApi: env.PROGRAMACION_SECRETO, secretoOficina: env.OFICINA_SECRETO || null, secretoWebhook: env.TELEGRAM_WEBHOOK_SECRETO, permitirPublicar, rendimiento: meta ? crearRendimientoJuego({ meta }) : null });
+  // Ventas de Tiendanube al Almacén: solo si están las tres claves de la app
+  let tiendanube = null;
+  if (env.TIENDANUBE_CLIENT_SECRET && env.TIENDANUBE_ACCESS_TOKEN && env.TIENDANUBE_STORE_ID) {
+    const cliente = crearClienteTiendanube({ storeId: env.TIENDANUBE_STORE_ID, token: env.TIENDANUBE_ACCESS_TOKEN, contacto: env.TIENDANUBE_CONTACTO || "vow2026ar@gmail.com", fetchFn });
+    tiendanube = { secreto: env.TIENDANUBE_CLIENT_SECRET, procesar: (aviso) => procesarAviso({ repo, cliente, aviso }) };
+  }
+  const router = crearRutasProgramacion({ servicio, repo, tiendanube, secretoApi: env.PROGRAMACION_SECRETO, secretoOficina: env.OFICINA_SECRETO || null, secretoWebhook: env.TELEGRAM_WEBHOOK_SECRETO, permitirPublicar, rendimiento: meta ? crearRendimientoJuego({ meta }) : null });
   // Al arrancar se revisa la bandeja de Telegram (un poco después, para no pisar a la copia anterior mientras termina de cerrar)
   setTimeout(() => servicio.recuperarActualizaciones().catch((error) => console.error(`No se pudo revisar la bandeja de Telegram: ${error.message}`)), 90_000).unref();
   return { router, servicio, telegram, permitirPublicar, edicionConIA: editor !== null, imagenesConIA: generadorImagen !== null, chatConIA: llm !== null };

@@ -148,7 +148,7 @@ export function aplicarInventario(repo, cambio, { origen = "juego", ahora = Date
     const ids = Object.keys(inv.ventas).sort((a, b) => inv.ventas[a].en.localeCompare(inv.ventas[b].en));
     for (const id of ids.slice(0, Math.max(0, ids.length - MAX_VENTAS))) delete inv.ventas[id];
     await repo.guardarEstado("inventario", inv);
-    await repo.agregarNovedad(`${cambio.tipo === "venta" || cambio.tipo === "anular_venta" ? "Caja" : "Almacén"} (${origen === "juego" ? "oficina" : "chat"}): ${resumen}`.slice(0, 1000));
+    await repo.agregarNovedad(`${cambio.tipo === "venta" || cambio.tipo === "anular_venta" ? "Caja" : "Almacén"} (${origen === "juego" ? "oficina" : origen === "tiendanube" ? "Tiendanube" : "chat"}): ${resumen}`.slice(0, 1000));
     return { inventario: inv, resumen, ...(ventaId ? { id: ventaId } : {}) };
   });
 }
@@ -174,6 +174,6 @@ export function markdownDeInventario(inv) {
   const filas = SKUS.map((s) => `| ${PRODUCTOS[s].nombre} | ${inv.stock[s]} |`);
   const ventas = (Array.isArray(inv.ventas) ? inv.ventas : Object.entries(inv.ventas).map(([id, v]) => ({ id, ...v }))).sort((a, b) => b.en.localeCompare(a.en));
   const lineas = ventas.length ? ventas.map((v) => `- ${v.fecha} · ${v.items.map((l) => `${l.cantidad} × ${CATALOGO[l.producto]?.nombre ?? l.producto}${Object.values(l.colores).length ? ` (${Object.values(l.colores).join(", ")})` : ""}`).join(" + ")} · ${pesos(v.importe)}${v.nota ? ` · ${v.nota.replace(/\|/g, "/")}` : ""}${v.anulada ? " · ANULADA" : ""}`) : ["_Todavía no hay ventas._"];
-  const movs = inv.movimientos.length ? [...inv.movimientos].reverse().slice(0, 40).map((m) => `- ${m.en.slice(0, 16).replace("T", " ")} UTC · ${m.origen === "juego" ? "juego" : "bot"} · ${m.texto}`) : ["_Sin movimientos._"];
+  const movs = inv.movimientos.length ? [...inv.movimientos].reverse().slice(0, 40).map((m) => `- ${m.en.slice(0, 16).replace("T", " ")} UTC · ${m.origen === "juego" ? "juego" : m.origen === "tiendanube" ? "Tiendanube" : "bot"} · ${m.texto}`) : ["_Sin movimientos._"];
   return ["# Inventario y ventas del Drop 00", "", "Copia automática del Almacén y la Caja de VOW HQ. La fuente de verdad es la base de datos del servicio: no se edita a mano acá (el próximo sincronizado lo pisa).", "", "## Stock", "", "| Producto | Cantidad |", "| --- | --- |", ...filas, "", "## Ventas", "", ...lineas, "", "## Últimos movimientos", "", ...movs, ""].join("\n");
 }

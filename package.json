@@ -32,7 +32,8 @@
     "rendimiento": "node src/rendimiento.js",
     "mcp:instagram": "node src/mcp/instagram/servidor.js",
     "plan:lunes": "node src/programacion/plan-lunes.js",
-    "telegram:webhook": "node src/programacion/configurar-webhook.js"
+    "telegram:webhook": "node src/programacion/configurar-webhook.js",
+    "tiendanube:webhooks": "node src/tiendanube/configurar-webhooks.js"
   },
   "repository": {
     "type": "git",

@@ -5,6 +5,7 @@
 //   GET  /novedades      lo que Facundo le contó al bot y todavía no leyó el Estratega (clave)
 //   GET  /oficina       todo lo que muestra el juego de la oficina: piezas, medios, charla, novedades y rendimiento (clave)
 //   POST /oficina/accion lo que hace el juego: aprobar una pieza, pedir otra sugerencia, marcar pendientes, anotar en el cuaderno (clave)
+//   POST /tiendanube    aviso de Tiendanube cuando se paga o se cancela un pedido: descuenta o devuelve el stock del Almacén (se valida con la firma)
 //   GET  /medios/:token  el archivo de una pieza: Meta lo descarga desde acá (el token es imposible de adivinar)
 import { createHash, timingSafeEqual } from "node:crypto";
 import { Router, json, raw } from "express";
@@ -12,6 +13,7 @@ import { rateLimit } from "express-rate-limit";
 import { esFechaISO, esHoraValida } from "./fechas.js";
 import { ErrorAccion, aplicarAccion, armarEstadoOficina } from "./oficina.js";
 import { leerOperacion } from "./operacion.js";
+import { firmaValida } from "../tiendanube/firma.js";
 
 const FORMATO_TOKEN = /^[a-f0-9]{48}$/;
 const LIMITE_PIEZAS = 5;
@@ -53,10 +55,11 @@ function entregar(req, res, { mime, datos }) {
     .end(datos.subarray(inicio, fin + 1));
 }
 
-export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOficina = null, secretoWebhook, rendimiento = null, permitirPublicar = false, limitePorMinuto = 120 }) {
+export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOficina = null, secretoWebhook, rendimiento = null, tiendanube = null, permitirPublicar = false, limitePorMinuto = 120 }) {
   const router = Router();
   const pendientes = new Set(); // procesamientos del webhook que siguen en curso (los tests los esperan)
-  router.use(json({ limit: "256kb" }));
+  // Se guarda el cuerpo crudo: la firma de Tiendanube se calcula sobre los bytes exactos que mandó
+  router.use(json({ limit: "256kb", verify: (req, res, buf) => { req.cuerpoCrudo = buf; } }));
 
   const limitador = rateLimit({ windowMs: 60_000, limit: limitePorMinuto, skip: (req) => req.path.startsWith("/medios/"), standardHeaders: true, legacyHeaders: false, message: { error: "Demasiados pedidos." } });
   router.use(limitador);
@@ -86,6 +89,19 @@ export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOfic
       trabajo.finally(() => pendientes.delete(trabajo));
     } catch (error) {
       siguiente(error);
+    }
+  });
+
+  // Tiendanube avisa de un pedido pagado o cancelado. Se procesa antes de contestar: si algo falla contesta 500 y Tiendanube reintenta solo.
+  router.post("/tiendanube", async (req, res, siguiente) => {
+    try {
+      if (!tiendanube) return res.sendStatus(503);
+      if (!firmaValida(req.cuerpoCrudo, String(req.headers["x-linkedstore-hmac-sha256"] ?? ""), tiendanube.secreto)) return res.sendStatus(401);
+      const resultado = await tiendanube.procesar({ event: req.body?.event, id: req.body?.id });
+      return res.status(200).json({ ok: true, resultado });
+    } catch (error) {
+      console.error(`Error con un aviso de Tiendanube (Tiendanube reintenta): ${error.message}`);
+      return siguiente(error);
     }
   });
 
