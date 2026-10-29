@@ -8,8 +8,8 @@ Copia automática del Almacén y la Caja de VOW HQ. La fuente de verdad es la ba
 | --- | --- |
 | Gorra negra | 0 |
 | Gorra beige | 0 |
-| Shaker negro | 0 |
-| Shaker claro | 0 |
+| Shaker negro | 10 |
+| Shaker claro | 10 |
 | Medias (par) | 0 |
 
 ## Ventas
@@ -18,4 +18,5 @@ _Todavía no hay ventas._
 
 ## Últimos movimientos
 
-_Sin movimientos._
+- 2026-10-29 15:32 UTC · juego · Llegaron 10 shaker claro: ahora hay 10
+- 2026-10-29 15:32 UTC · juego · Llegaron 10 shaker negro: ahora hay 10
