@@ -226,6 +226,8 @@ section[tabindex="-1"]:focus { outline: none; }
 .hero-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
 .hero-btn:hover, .hero-btn:focus-visible { background: var(--bone); color: var(--black); }
 .hero-btn:focus-visible { outline: 2px solid var(--bordo); outline-offset: 3px; }
+.hero-btn--tienda { margin-top: 12px; background: transparent; color: var(--black); }
+.hero-btn--tienda[hidden] { display: none; }
 
 /* ---------- 02 Manifiesto (oscuro) ---------- */
 .manifest { min-height: 70vh; min-height: 70svh; display: flex; align-items: center; background: var(--black); color: var(--bone); }

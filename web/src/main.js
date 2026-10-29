@@ -25,6 +25,16 @@ document.getElementById('marquee-sr').textContent = content.marquee.replace(/[\s
 document.getElementById('hero-title').innerText = content.hero.title;
 document.getElementById('hero-cta').textContent = content.hero.cta;
 
+// Botón a la tienda: aparece solo si VITE_TIENDA_URL es una dirección https válida
+try {
+  const tiendaUrl = new URL(import.meta.env.VITE_TIENDA_URL || '');
+  if (tiendaUrl.protocol === 'https:') {
+    const tiendaLink = document.getElementById('hero-tienda');
+    tiendaLink.href = tiendaUrl.href;
+    tiendaLink.hidden = false;
+  }
+} catch { /* sin tienda configurada: el botón queda oculto */ }
+
 const manifestEl = document.getElementById('manifest-text');
 content.manifest.split(' ').forEach((w, i) => {
   if (i) manifestEl.append(' ');

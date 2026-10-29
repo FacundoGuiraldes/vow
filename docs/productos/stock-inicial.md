@@ -54,7 +54,9 @@ Todo es producción argentina: no pasa por Aduana. Facundo factura como monotrib
 | Logo | Isotipo con "VOW" debajo |
 | Costo | **$125.400** ($6.270 por unidad) |
 | Calidad | Facundo vio la muestra: es buena |
-| Capacidad, material y método del logo | **Por confirmar** |
+| Ficha del proveedor (Faurear) | Capacidad de **700 ml**, resorte mezclador de acero inoxidable, tapa con pico rebatible, logo personalizado |
+| Material del vaso y método del logo | **Por confirmar** (la ficha no lo dice). No afirmar "libre de BPA" sin confirmarlo |
+| Medidas y peso | **Por medir** con el producto en mano (necesario para Envío Nube y el packaging) |
 | Entrega | **Por confirmar** |
 | Pago | **Por confirmar** si está completo |
 
@@ -93,7 +95,7 @@ El shaker es el más delicado: su costo ($6.270) es casi lo que cuesta un shaker
 
 - Cuándo se abre la venta del Drop 00 y cuánto detalle se muestra. Hoy lo público es solo "Drop 00 en 2026" (y "Drop 01 en 2027"), sin meses ni días.
 - Reparto de talles y colores de las medias.
-- Shakers: capacidad, material, método del logo, entrega y estado del pago.
+- Shakers: material del vaso, método del logo, medidas, peso, entrega y estado del pago. La capacidad ya está (700 ml).
 - Entrega de las medias.
 - Composición y etiquetado de medias y gorras (composición de fibras, origen y cuidado). Las medias no llevan etiqueta tejida: ver si alcanza con un *hangtag* impreso y consultarlo con un contador.
 - Precios finales de venta.
