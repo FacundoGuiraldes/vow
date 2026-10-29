@@ -93,10 +93,13 @@ describe("pedido con código", () => {
 describe("mail y envío", () => {
   test("el mail lleva el código, el porcentaje, el vencimiento y la baja; escapa lo que corresponde", () => {
     const m = armarMail({ codigo: "VOW-K7P2Q9", porcentaje: 15, vence: "2026-11-15T12:00:00Z", urlLanding: "https://vow.test/", contacto: "vow@gmail.com" });
-    assert.match(m.asunto, /15% off/);
-    for (const parte of ["VOW-K7P2Q9", "15% off", "15 de noviembre", "mailto:vow@gmail.com", "https://vow.test/#tienda", "https://vow.test/assets/logo-mail.png"]) assert.ok(m.html.includes(parte), parte);
+    assert.equal(m.asunto, "Tu código para el Drop 00 de VOW");
+    assert.ok(!/display:\s*none|fonts\.googleapis/.test(m.html), "sin texto oculto ni fuentes externas");
+    for (const parte of ["VOW-K7P2Q9", "15% de descuento", "15 de noviembre", "mailto:vow@gmail.com", "https://vow.test/#tienda", "https://vow.test/assets/logo-mail.png"]) assert.ok(m.html.includes(parte), parte);
     assert.ok(m.texto.includes("VOW-K7P2Q9"));
-    assert.match(armarMail({ codigo: "X", porcentaje: 10, vence: null, urlLanding: "https://v.t", contacto: "a@b.c", prueba: true }).asunto, /^\[PRUEBA\]/);
+    const prueba = armarMail({ codigo: "X", porcentaje: 10, vence: null, urlLanding: "https://v.t", contacto: "a@b.c", prueba: true });
+    assert.match(prueba.html, /Esto es una prueba/);
+    assert.doesNotMatch(armarMail({ codigo: "X", porcentaje: 10, vence: null, urlLanding: "https://v.t", contacto: "a@b.c" }).html, /Esto es una prueba/);
   });
 
   test("envía solo a quien falta, en tandas, y no repite", async () => {
@@ -127,7 +130,7 @@ describe("mail y envío", () => {
     const envio = crearEnvioDescuentos({ codigos, listarEmails: async () => ["a@x.com"], correo: { contacto: "v@g.com", enviar: async (m) => enviados.push(m) }, porcentaje: 10, urlLanding: "https://vow.test", ahora });
     await envio.prueba("yo@mail.com");
     assert.equal(enviados[0].para, "yo@mail.com");
-    assert.match(enviados[0].asunto, /^\[PRUEBA\]/);
+    assert.match(enviados[0].html, /Esto es una prueba/);
     await assert.rejects(codigos.validar("VOW-EJEMPL"), /no existe/);
     await assert.rejects(envio.prueba("no-es-mail"), /no es válido/);
     assert.equal((await envio.estado()).enviados, 0);
