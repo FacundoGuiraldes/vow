@@ -23,12 +23,13 @@ export function crearClienteMercadoPago({ accessToken, fetchFn = fetch }) {
       headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", ...opciones.headers },
       signal: AbortSignal.timeout(15_000),
     });
-    if (!respuesta.ok) throw new Error(`Mercado Pago respondió ${respuesta.status} en ${ruta.split("?")[0]}`);
+    if (!respuesta.ok) throw Object.assign(new Error(`Mercado Pago respondió ${respuesta.status} en ${ruta.split("?")[0]}`), { estado: respuesta.status });
     return respuesta.json();
   }
   return {
     // preferencia: { items: [{ title, quantity, unit_price }], external_reference, payer, back_urls, notification_url, ... }
     crearPreferencia: (preferencia) => pedir("/checkout/preferences", { method: "POST", headers: { "X-Idempotency-Key": preferencia.external_reference }, body: JSON.stringify({ ...preferencia, items: preferencia.items.map((i) => ({ ...i, currency_id: "ARS" })) }) }),
-    obtenerPago: (id) => pedir(`/v1/payments/${encodeURIComponent(id)}`),
+    // Devuelve null si el pago no existe (por ejemplo, la simulación del panel usa un número inventado)
+    obtenerPago: (id) => pedir(`/v1/payments/${encodeURIComponent(id)}`).catch((error) => { if (error.estado === 404) return null; throw error; }),
   };
 }

@@ -148,6 +148,18 @@ describe("rutas de ventas", () => {
     assert.equal(ok.status, 200);
     assert.equal((await ok.json()).resultado, "venta registrada");
     assert.equal((await leerInventario(repo)).stock.medias, 9);
+    // Un aviso firmado de un pago que no existe (como la simulación del panel) se ignora: no devuelve 500 ni se reintenta
+    const inexistente = await fetch(`${url}/mercadopago?data.id=123456&type=payment`, { method: "POST", headers: { "Content-Type": "application/json", "x-request-id": "r-10", "x-signature": firmar("123456", "r-10") }, body: JSON.stringify({ type: "payment", data: { id: "123456" } }) });
+    assert.equal(inexistente.status, 200);
+    assert.equal((await inexistente.json()).resultado, "ignorado");
+  });
+
+  test("el cliente devuelve null si Mercado Pago dice 404 y falla con otros errores", async () => {
+    const { crearClienteMercadoPago } = await import("./mercadopago.js");
+    const con = (status) => crearClienteMercadoPago({ accessToken: "t", fetchFn: async () => ({ ok: status < 300, status, json: async () => ({ id: 1 }) }) });
+    assert.equal(await con(404).obtenerPago("1"), null);
+    await assert.rejects(con(500).obtenerPago("1"), /500/);
+    assert.deepEqual(await con(200).obtenerPago("1"), { id: 1 });
   });
 });
 
