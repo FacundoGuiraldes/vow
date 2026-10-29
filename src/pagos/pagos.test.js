@@ -150,3 +150,18 @@ describe("rutas de ventas", () => {
     assert.equal((await leerInventario(repo)).stock.medias, 9);
   });
 });
+
+describe("estado de la venta sin configurar", () => {
+  test("la landing recibe abierta:false en vez de un 404", async () => {
+    const { crearApp } = await import("../api/servidor.js");
+    const servidor = await new Promise((r) => { const i = crearApp({ pool: null }).listen(0, "127.0.0.1", () => r(i)); });
+    try {
+      const r = await fetch(`http://127.0.0.1:${servidor.address().port}/api/programacion/ventas/estado`);
+      assert.equal(r.status, 200);
+      assert.deepEqual(await r.json(), { abierta: false });
+    } finally {
+      servidor.closeAllConnections();
+      servidor.close();
+    }
+  });
+});
