@@ -48,6 +48,7 @@ export function crearRutasVentas({ repo, mp, secretoWebhook, ventaAbierta = fals
       if (!firmaValida({ secreto: secretoWebhook, firma: String(req.headers["x-signature"] ?? ""), requestId: String(req.headers["x-request-id"] ?? ""), dataId })) return res.sendStatus(401);
       if (req.body?.type !== "payment" || !/^\d{1,20}$/.test(dataId)) return res.status(200).json({ ok: true, resultado: "ignorado" });
       const pago = await mp.obtenerPago(dataId);
+      if (!pago) return res.status(200).json({ ok: true, resultado: "ignorado" }); // un pago que no existe no se reintenta
       return res.status(200).json({ ok: true, resultado: await confirmarPago({ repo, pago }) });
     } catch (error) {
       console.error(`Error con un aviso de Mercado Pago (Mercado Pago reintenta): ${error.message}`);
