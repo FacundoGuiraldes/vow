@@ -38,19 +38,24 @@ async function leer(repo) {
 }
 const guardar = (repo, estado) => repo.guardarEstado(CLAVE, estado);
 
-export function crearGestorCodigos({ repo, ahora = () => Date.now() }) {
+// Cada código pertenece a un drop: el del Drop 00 deja de servir cuando se abre el siguiente. Los códigos viejos, sin drop, son del 00.
+const dropDe = (c) => c.drop ?? "00";
+
+export function crearGestorCodigos({ repo, ahora = () => Date.now(), dropActual = "00" }) {
+  const delDrop = (c) => dropDe(c) === dropActual;
   return {
+    dropActual,
     // emails: lista de emails. Devuelve { email: { codigo: "VOW-XXXXXX", vence } }. Los que ya tenían código lo conservan (con su vencimiento).
     asegurarCodigos: ({ emails, porcentaje, venceEn }) => enCola(async () => {
       const estado = await leer(repo);
-      const porEmail = new Map(Object.entries(estado.codigos).map(([cuerpo, c]) => [c.email, cuerpo]));
+      const porEmail = new Map(Object.entries(estado.codigos).filter(([, c]) => delDrop(c)).map(([cuerpo, c]) => [c.email, cuerpo]));
       const resultado = {};
       let cambio = false;
       for (const email of emails) {
         let cuerpo = porEmail.get(email);
         if (!cuerpo) {
           do cuerpo = generar(); while (estado.codigos[cuerpo]);
-          estado.codigos[cuerpo] = { email, porcentaje, creado: new Date(ahora()).toISOString(), vence: venceEn ?? null };
+          estado.codigos[cuerpo] = { email, drop: dropActual, porcentaje, creado: new Date(ahora()).toISOString(), vence: venceEn ?? null };
           porEmail.set(email, cuerpo);
           cambio = true;
         }
@@ -62,7 +67,7 @@ export function crearGestorCodigos({ repo, ahora = () => Date.now() }) {
 
     marcarEnviado: (email, cuando = ahora()) => enCola(async () => {
       const estado = await leer(repo);
-      const cuerpo = Object.keys(estado.codigos).find((k) => estado.codigos[k].email === email);
+      const cuerpo = Object.keys(estado.codigos).find((k) => estado.codigos[k].email === email && delDrop(estado.codigos[k]));
       if (!cuerpo) return;
       estado.codigos[cuerpo].enviado = new Date(cuando).toISOString();
       await guardar(repo, estado);
@@ -71,7 +76,7 @@ export function crearGestorCodigos({ repo, ahora = () => Date.now() }) {
     // Cuántos hay y en qué estado, sin mostrar los códigos
     resumen: async () => {
       const { codigos } = await leer(repo);
-      const lista = Object.values(codigos);
+      const lista = Object.values(codigos).filter(delDrop);
       return { total: lista.length, enviados: lista.filter((c) => c.enviado).length, usados: lista.filter((c) => c.usadoPor).length };
     },
 
@@ -83,21 +88,21 @@ export function crearGestorCodigos({ repo, ahora = () => Date.now() }) {
 
     emailsConEnvio: async () => {
       const { codigos } = await leer(repo);
-      return new Set(Object.values(codigos).filter((c) => c.enviado).map((c) => c.email));
+      return new Set(Object.values(codigos).filter((c) => delDrop(c) && c.enviado).map((c) => c.email));
     },
 
     // Devuelve { porcentaje } o lanza ErrorCodigo con un mensaje para mostrarle a quien compra
     validar: async (codigo, { pedidoId = null } = {}) => {
       const cuerpo = normalizarCodigo(codigo);
       const { codigos } = await leer(repo);
-      return revisar(codigos[cuerpo], ahora(), pedidoId);
+      return revisar(codigos[cuerpo], ahora(), pedidoId, dropActual);
     },
 
     reservar: (codigo, pedidoId) => enCola(async () => {
       const cuerpo = normalizarCodigo(codigo);
       const estado = await leer(repo);
       const c = estado.codigos[cuerpo];
-      const { porcentaje } = revisar(c, ahora(), pedidoId);
+      const { porcentaje } = revisar(c, ahora(), pedidoId, dropActual);
       c.reservadoPor = pedidoId;
       c.reservadoHasta = new Date(ahora() + HORAS_RESERVA * 3600_000).toISOString();
       await guardar(repo, estado);
@@ -128,8 +133,9 @@ export function crearGestorCodigos({ repo, ahora = () => Date.now() }) {
   };
 }
 
-function revisar(c, ahoraMs, pedidoId) {
+function revisar(c, ahoraMs, pedidoId, dropActual) {
   if (!c) throw new ErrorCodigo("Ese código no existe. Revisá que esté bien escrito.");
+  if (dropDe(c) !== dropActual) throw new ErrorCodigo(`Ese código era para el Drop ${dropDe(c)} y ya no se puede usar.`);
   if (c.usadoPor) throw new ErrorCodigo("Ese código ya se usó.");
   if (c.vence && Date.parse(c.vence) < ahoraMs) throw new ErrorCodigo("Ese código venció.");
   if (c.reservadoPor && c.reservadoPor !== pedidoId && Date.parse(c.reservadoHasta) > ahoraMs) throw new ErrorCodigo("Ese código se está usando en otro pedido. Probá de nuevo en un rato.", 409);

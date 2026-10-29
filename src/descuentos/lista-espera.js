@@ -23,7 +23,7 @@ export function crearEnvioDescuentos({ codigos, listarEmails, correo, porcentaje
     async prueba(destino) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(destino ?? "")) throw new Error("Ese mail de destino no es válido.");
       const venceEn = new Date(ahora() + dias * 86_400_000).toISOString();
-      const mail = armarMail({ codigo: "VOW-EJEMPL", porcentaje, vence: venceEn, urlLanding, contacto: correo.contacto, prueba: true });
+      const mail = armarMail({ codigo: "VOW-EJEMPL", drop: codigos.dropActual, porcentaje, vence: venceEn, urlLanding, contacto: correo.contacto, prueba: true });
       await correo.enviar({ para: destino, ...mail });
       return { enviadoA: destino };
     },
@@ -39,7 +39,7 @@ export function crearEnvioDescuentos({ codigos, listarEmails, correo, porcentaje
       let enviados = 0;
       for (const email of tanda) {
         try {
-          await correo.enviar({ para: email, ...armarMail({ codigo: mapa[email].codigo, porcentaje, vence: mapa[email].vence, urlLanding, contacto: correo.contacto }) });
+          await correo.enviar({ para: email, ...armarMail({ codigo: mapa[email].codigo, drop: codigos.dropActual, porcentaje, vence: mapa[email].vence, urlLanding, contacto: correo.contacto }) });
           await codigos.marcarEnviado(email);
           enviados += 1;
         } catch (error) {

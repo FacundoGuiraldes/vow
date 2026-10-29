@@ -221,3 +221,37 @@ describe("consultá tu código", () => {
     abierta.servidor.closeAllConnections(); abierta.servidor.close();
   });
 });
+
+describe("códigos por drop", () => {
+  test("el código del Drop 00 no sirve en el Drop 01, y en el 01 cada persona recibe uno nuevo", async () => {
+    const repo = crearRepositorioMemoria();
+    const d00 = crearGestorCodigos({ repo, ahora });
+    const d01 = crearGestorCodigos({ repo, ahora, dropActual: "01" });
+    const { "a@x.com": viejo } = await d00.asegurarCodigos({ emails: ["a@x.com"], porcentaje: 10, venceEn: null });
+    assert.equal((await d00.validar(viejo.codigo)).porcentaje, 10);
+    await assert.rejects(() => d01.validar(viejo.codigo), /era para el Drop 00/);
+    const { "a@x.com": nuevo } = await d01.asegurarCodigos({ emails: ["a@x.com"], porcentaje: 10, venceEn: null });
+    assert.notEqual(nuevo.codigo, viejo.codigo);
+    assert.equal((await d01.validar(nuevo.codigo)).porcentaje, 10);
+    await assert.rejects(() => d00.validar(nuevo.codigo), /era para el Drop 01/);
+    // pedidos y envíos de cada drop se cuentan aparte
+    await d00.marcarEnviado("a@x.com");
+    assert.equal((await d00.resumen()).enviados, 1);
+    assert.equal((await d01.resumen()).enviados, 0);
+    assert.equal((await d01.emailsConEnvio()).size, 0);
+  });
+
+  test("los códigos guardados antes de existir los drops cuentan como del Drop 00", async () => {
+    const repo = crearRepositorioMemoria();
+    await repo.guardarEstado("descuentos", { codigos: { ABC234: { email: "a@x.com", porcentaje: 10, creado: "2026-10-01T00:00:00Z", vence: null } } });
+    assert.equal((await crearGestorCodigos({ repo, ahora }).validar("VOW-ABC234")).porcentaje, 10);
+    await assert.rejects(() => crearGestorCodigos({ repo, ahora, dropActual: "01" }).validar("VOW-ABC234"), /Drop 00/);
+  });
+
+  test("el mail del Drop 01 lo dice y explica por qué lo recibe", () => {
+    const m = armarMail({ codigo: "VOW-ABC234", porcentaje: 10, vence: null, urlLanding: "https://vow.test", contacto: "v@x.com", drop: "01" });
+    assert.match(m.asunto, /Drop 01/);
+    assert.match(m.texto, /antes del lanzamiento del Drop 00/);
+    assert.doesNotMatch(armarMail({ codigo: "VOW-ABC234", porcentaje: 10, vence: null, urlLanding: "https://vow.test", contacto: "v@x.com" }).texto, /antes del lanzamiento/);
+  });
+});

@@ -46,22 +46,32 @@ export async function construirProgramacion({ pool, env = process.env, fetchFn =
   const llm = env.GEMINI_API_KEY ? crearLLMGemini({ apiKey: env.GEMINI_API_KEY, modelo: env.GEMINI_MODELO_CHAT || undefined, fetchFn }) : null;
 
   // Códigos de descuento para la lista de espera: los códigos funcionan siempre; el envío de mails exige la cuenta de Gmail de VOW
-  const codigos = crearGestorCodigos({ repo });
+  // Cada drop tiene sus códigos. Del Drop 01 en adelante solo reciben código quienes se anotaron antes de LISTA_CORTE (el día que se lanzó el Drop 00)
+  const drop = env.DROP_ACTUAL || "00";
+  const corte = env.LISTA_CORTE ? new Date(env.LISTA_CORTE) : null;
+  const dropValido = /^\d{2}$/.test(drop) && (drop === "00" || (corte !== null && !Number.isNaN(corte.getTime())));
+  if (!dropValido) console.error("DROP_ACTUAL tiene que ser de dos cifras (00, 01...) y, desde el 01, hace falta LISTA_CORTE con la fecha de lanzamiento del Drop 00 (por ejemplo 2026-11-14T00:00:00-03:00): los códigos de la lista de espera quedan apagados.");
+  const codigos = crearGestorCodigos({ repo, dropActual: dropValido ? drop : "00" });
+  const soloAntesDelCorte = drop !== "00" && corte !== null && !Number.isNaN(corte.getTime());
   let descuentos = null;
   let consultaCodigo = null;
   const porApi = Boolean(env.GMAIL_CLIENT_ID && env.GMAIL_CLIENT_SECRET && env.GMAIL_REFRESH_TOKEN);
   const porcentaje = Number(env.DESCUENTO_LISTA_PORCENTAJE || 10);
   const dias = Number(env.DESCUENTO_LISTA_DIAS || 14);
-  const configValida = Number.isInteger(porcentaje) && porcentaje >= 1 && porcentaje <= 60 && Number.isInteger(dias) && dias >= 1;
+  const configValida = dropValido && Number.isInteger(porcentaje) && porcentaje >= 1 && porcentaje <= 60 && Number.isInteger(dias) && dias >= 1;
   if (!configValida) console.error("DESCUENTO_LISTA_PORCENTAJE (1 a 60) y DESCUENTO_LISTA_DIAS tienen que ser números enteros: los códigos de la lista de espera quedan apagados.");
   if (configValida && pool) {
     // "Consultá tu código" en la tienda: no necesita mail ni dominio, solo la lista de espera
-    consultaCodigo = crearConsultaCodigo({ codigos, existeEmail: async (email) => (await pool.query("SELECT 1 FROM lista_espera WHERE email = $1", [email])).rowCount > 0, porcentaje, dias });
+    consultaCodigo = crearConsultaCodigo({ codigos, existeEmail: async (email) => (await (soloAntesDelCorte
+      ? pool.query("SELECT 1 FROM lista_espera WHERE email = $1 AND creado_en < $2", [email, corte])
+      : pool.query("SELECT 1 FROM lista_espera WHERE email = $1", [email]))).rowCount > 0, porcentaje, dias });
   }
   if (configValida && env.MAIL_USUARIO && (porApi || env.MAIL_CLAVE_APP) && env.URL_LANDING) {
     descuentos = crearEnvioDescuentos({
       codigos,
-      listarEmails: async () => (await pool.query("SELECT email FROM lista_espera ORDER BY id")).rows.map((r) => r.email),
+      listarEmails: async () => (await (soloAntesDelCorte
+        ? pool.query("SELECT email FROM lista_espera WHERE creado_en < $1 ORDER BY id", [corte])
+        : pool.query("SELECT email FROM lista_espera ORDER BY id"))).rows.map((r) => r.email),
       // Por la API de Google si están las claves (funciona en Render gratis); si no, SMTP con contraseña de aplicación (Render gratis lo bloquea)
       correo: porApi
         ? crearTransporteGmailApi({ usuario: env.MAIL_USUARIO, clientId: env.GMAIL_CLIENT_ID, clientSecret: env.GMAIL_CLIENT_SECRET, refreshToken: env.GMAIL_REFRESH_TOKEN, fetchFn })
