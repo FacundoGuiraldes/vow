@@ -98,8 +98,23 @@ if (!reducedMotion) {
     opacity: 0, y: 24, duration: 0.7, ease: 'expo.out', stagger: 0.08, delay: 0.1
   });
 
+  // Wordmark gigante: sube desde el borde al cargar
+  gsap.from('.hero-wordmark', { yPercent: 28, opacity: 0, duration: 1.1, ease: 'expo.out', delay: 0.15 });
+
+  // Barra de avance de lectura
+  gsap.to('.progreso', { scaleX: 1, ease: 'none', scrollTrigger: { start: 0, end: 'max', scrub: 0.2 } });
+
+  // Títulos de sección: entran una sola vez
+  gsap.utils.toArray('.title-large').forEach(titulo => {
+    gsap.from(titulo, { opacity: 0, y: 32, duration: 0.7, ease: 'expo.out', scrollTrigger: { trigger: titulo, start: 'top 90%', once: true } });
+  });
+
+  // Imagen del Drop 01: se acerca despacio mientras se la recorre; el sello se estampa al llegar
+  gsap.fromTo('.drop-feature__img', { scale: 1.12 }, { scale: 1, ease: 'none', scrollTrigger: { trigger: '.drop-feature__frame', start: 'top bottom', end: 'bottom 40%', scrub: true } });
+  gsap.from('.sello', { opacity: 0, scale: 1.5, duration: 0.45, ease: 'expo.out', scrollTrigger: { trigger: '.drop-feature__frame', start: 'top 55%', once: true } });
+
   // Bloques que entran una sola vez al llegar a la pantalla
-  gsap.utils.toArray('.drop-feature, .catalog-list-wrap, .faq__lista, .beneficios, .waitlist .form, .drop-head').forEach(bloque => {
+  gsap.utils.toArray('.drop-feature__card, .faq__lista, .beneficios, .waitlist .form, .drop-head').forEach(bloque => {
     gsap.from(bloque, { opacity: 0, y: 24, duration: 0.6, ease: 'expo.out', scrollTrigger: { trigger: bloque, start: 'top 88%', once: true } });
   });
 
@@ -332,6 +347,8 @@ async function loadCatalog() {
       setCatalogStatus(CATALOG_EMPTY_TEXT);
     } else {
       catalogList.hidden = false;
+    // Las filas entran de a una (solo con movimiento permitido)
+    if (!reducedMotion) gsap.from(catalogList.children, { opacity: 0, y: 16, duration: 0.5, ease: 'expo.out', stagger: 0.05, scrollTrigger: { trigger: catalogList, start: 'top 88%', once: true } });
       setCatalogStatus(`Drop 01: ${productos.length} productos en desarrollo.`, { visuallyHidden: true });
     }
     ScrollTrigger.refresh();

@@ -226,17 +226,21 @@ section[tabindex="-1"]:focus { outline: none; }
 /* CTA como botón relleno. Hover/foco: se invierte (hueso con borde negro) */
 .hero-btn {
   display: inline-flex; align-items: center; gap: 12px; min-height: 44px; padding: 18px 32px;
-  background: var(--black); color: var(--bone); border: 1px solid var(--black); border-radius: 0;
+  background: linear-gradient(var(--bone), var(--bone)) no-repeat left center / 0% 100%, var(--black);
+  color: var(--bone); border: 1px solid var(--black); border-radius: 0;
   font-family: var(--font-mono); font-size: 14px; font-weight: 700; letter-spacing: 0.1em;
   text-transform: uppercase; text-decoration: none;
-  transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out);
+  transition: background-size 320ms var(--ease-out), color 200ms var(--ease-out);
 }
 /* El botón del hero lo anima GSAP (transform): la respuesta al apretar va solo en los botones de formularios */
 .tienda__form .hero-btn:active:not(:disabled), .form-claro .hero-btn:active:not(:disabled) { transform: scale(0.97); }
 .hero-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
-.hero-btn:hover, .hero-btn:focus-visible { background: var(--bone); color: var(--black); }
+.hero-btn:hover, .hero-btn:focus-visible { background-size: 100% 100%; color: var(--black); }
+.hero-btn svg { transition: transform 240ms var(--ease-out); }
+@media (hover: hover) and (pointer: fine) { .hero-btn:hover svg { transform: translate(3px, -3px); } }
 .hero-btn:focus-visible { outline: 2px solid var(--bordo); outline-offset: 3px; }
-.hero-btn--tienda { margin-top: 12px; background: transparent; color: var(--black); }
+.hero-btn--tienda { margin-top: 12px; color: var(--black); background: linear-gradient(var(--black), var(--black)) no-repeat left center / 0% 100%, transparent; }
+.hero-btn--tienda:hover, .hero-btn--tienda:focus-visible { color: var(--bone); }
 .hero-btn--tienda[hidden] { display: none; }
 .hero-sub { font-family: var(--font-mono); font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--topo-ink); margin: -12px 0 24px; }
 .hero-nota { max-width: 34ch; margin-top: 16px; font-family: var(--font-mono); font-size: 0.78rem; line-height: 1.5; color: var(--topo-ink); }
@@ -420,12 +424,14 @@ section[tabindex="-1"]:focus { outline: none; }
 
 footer {
   background: var(--black); color: var(--bone);
-  padding: 40px var(--gutter); padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
-  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px 24px;
+  padding: 40px var(--pad-r) 40px var(--gutter); padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
+  display: grid; gap: 20px;
   font-family: var(--font-mono); font-size: 0.8rem; border-top: 1px dashed currentColor;
 }
 @media (min-width: 1200px) { footer { padding-left: var(--pad-l); } }
-.footer-logo { width: 64px; aspect-ratio: 801 / 745; color: var(--bone); }
+.footer-fila { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; }
+.footer-contacto { display: flex; flex-wrap: wrap; gap: 0 24px; }
+.footer-logo { width: 56px; aspect-ratio: 801 / 745; color: var(--bone); }
 .footer-logo svg { display: block; width: 100%; height: auto; }
 .ig-link { color: var(--bone); text-decoration: none; padding: 12px 0; }
 .ig-link:hover, .ig-link:focus-visible { text-decoration: underline; color: var(--beige); }
@@ -593,7 +599,7 @@ footer p { color: rgba(236,232,225,0.8); }
 .form-claro__msg { min-height: 1.4em; font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.5; color: var(--black); }
 
 /* ---------- Pie de página: enlaces legales y botón de arrepentimiento ---------- */
-.footer-legal { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 20px; flex: 1 1 100%; padding-top: 16px; border-top: 1px dashed rgba(236,232,225,0.35); }
+.footer-legal { display: flex; flex-wrap: wrap; align-items: center; gap: 0 20px; padding-top: 12px; border-top: 1px dashed rgba(236,232,225,0.35); }
 .boton-arrepentimiento {
   display: inline-flex; align-items: center; min-height: 44px; padding: 10px 18px; border: 1px solid var(--bone);
   color: var(--bone); text-decoration: none; text-transform: uppercase; font-family: var(--font-mono); font-weight: 700; font-size: 0.8rem; letter-spacing: 0.08em;
@@ -603,3 +609,28 @@ footer p { color: rgba(236,232,225,0.8); }
 .boton-arrepentimiento:focus-visible { outline: 2px solid var(--beige); outline-offset: 3px; }
 @media (hover: hover) and (pointer: fine) { .boton-arrepentimiento:hover { background: var(--bone); color: var(--black); } }
 .privacy-body p + p { margin-top: 10px; }
+
+/* ---------- Efectos ---------- */
+/* Barra de avance de lectura: sube con el scroll (la mueve main.js solo con movimiento permitido) */
+.progreso { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 700; background: var(--bordo-light); transform-origin: left center; transform: scaleX(0); pointer-events: none; }
+.no-motion .progreso { display: none; }
+/* La imagen del Drop 01 respira dentro de su marco */
+.drop-feature__frame { overflow: hidden; }
+.drop-feature__img { transform-origin: 50% 60%; }
+/* Filas del catálogo: el nombre se corre y aparece un filo bordó al pasar el mouse */
+@media (hover: hover) and (pointer: fine) {
+  .catalog-item { position: relative; }
+  .catalog-item::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--bordo-light); transform: scaleY(0); transform-origin: top; transition: transform 260ms var(--ease-out); }
+  .catalog-item:hover::before { transform: scaleY(1); }
+  .catalog-item .lineup-name { transition: transform 260ms var(--ease-out); }
+  .catalog-item:hover .lineup-name { transform: translateX(10px); }
+}
+/* Subrayado que se dibuja en los enlaces de texto de las páginas legales */
+.privacy-body a, .faq details a { text-decoration: none; background: linear-gradient(currentColor, currentColor) no-repeat left bottom / 100% 1px; transition: background-size 260ms var(--ease-out), color 160ms var(--ease-out); }
+@media (hover: hover) and (pointer: fine) { .privacy-body a:hover, .faq details a:hover { background-size: 0% 1px; background-position: right bottom; } }
+/* Preguntas: el contenido se despliega suavemente */
+.faq details[open] > p { animation: despliegue 320ms var(--ease-out); }
+@keyframes despliegue { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .faq details[open] > p { animation: none; } }
+/* Selección de texto con los colores de la marca */
+::selection { background: var(--bordo); color: var(--bone); }
