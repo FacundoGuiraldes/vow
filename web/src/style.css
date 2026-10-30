@@ -634,3 +634,4 @@ footer p { color: rgba(236,232,225,0.8); }
 @media (prefers-reduced-motion: reduce) { .faq details[open] > p { animation: none; } }
 /* Selección de texto con los colores de la marca */
 ::selection { background: var(--bordo); color: var(--bone); }
+.privacy-body .privacy-updated { margin-top: 32px; }
