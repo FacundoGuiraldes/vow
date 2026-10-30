@@ -45,7 +45,7 @@ Cómo se resuelve la tensión entre "verse bien" y "no presumir": lo estético e
 - **Fuerza y compromiso:** afirmaciones cortas, en imperativo, que asumen un compromiso. La fuerza está en lo que dice y en lo que calla, no en el volumen: sin adornos, sin signos de exclamación, sin mayúsculas gritadas.
 - Poco o ningún emoji. Sin signos de exclamación en cadena. Sin mayúsculas gritadas (salvo títulos de diseño).
 - Lunfardo con moderación: si suena forzado, no se usa.
-- Cada pieza termina con **una sola** acción: anotarse en la lista de espera.
+- Cada pieza termina con **una sola** acción. Se da antes de pedir (reciprocidad): una pieza que le regala algo a quien la mira puede cerrar con su propia interacción (guardar, mandar, contar, votar), y las que piden anotarse en la lista de espera tienen que haber dado algo antes. En cada plan, al menos una pieza pide anotarse y no todas. Los modelos de psicología que se usan (y los que no) están en `psicologia-de-marketing.md`.
 
 ### Calidad del texto: que no suene a eslogan
 

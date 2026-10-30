@@ -42,6 +42,8 @@ export const SISTEMA_CRITICO = `Sos el editor crítico de contenido de VOW, marc
 Puntuá cada pieza de 1 a 5 en cada criterio (${NOMBRES_CRITERIOS.join(", ")}):
 ${NOMBRES_CRITERIOS.map((c) => `- ${c}: ${CRITERIOS[c]}`).join("\n")}
 
+Además de los criterios, tené presente la psicología de marketing de VOW: la pieza tiene que dar algo antes de pedir (un detalle, una observación que se reconoce, una pregunta útil), pedir UNA sola cosa, apoyarse en una prueba (algo que se ve) y no en adjetivos, y no usar urgencia, escasez, cifras ni prueba social que no sean reales. Una pieza que solo pide anotarse sin haber dado nada no pasa de 2 en compartible. Una pieza que se parece a "Atate el compromiso. Salí." o "Lo que firmás con vos no se rompe" es un póster: concreción y gancho no pasan de 2.
+
 Sé exigente: un 5 es raro, un 3 es "pasable pero olvidable". Si una pieza es una frase sobre la promesa sobre un fondo liso, concreción y compartible no pasan de 2. En "mejora" escribí un cambio concreto (qué se ve, qué se pregunta, qué gancho probar), nunca "hacerlo más impactante". Respondé llamando a la herramienta evaluar_plan, con una entrada por pieza y en el mismo orden.`;
 
 const promedio = (valores) => valores.reduce((a, b) => a + b, 0) / valores.length;

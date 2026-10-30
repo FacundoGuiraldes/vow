@@ -590,10 +590,10 @@ test("una story puede venir sin epígrafe; el resto de los formatos no", () => {
   assert.ok(story({ epigrafe: "", cta: "" }).errores.includes("Pieza 1: falta cta."));
 });
 
-test("una story de encuesta puede cerrar con su interacción, pero un reel tiene que pedir la lista", () => {
+test("una pieza puede cerrar con su interacción, pero el cta tiene que ser una acción concreta", () => {
   const story = piezaValida({ formato: "story", epigrafe: "", cta: "Votá en la encuesta.", gancho: "El short, en dos largos. ¿Cuál?" });
   assert.equal(validarPlan(planValido([story]), { semanaInicio: SEMANA }).ok, true);
-  const reel = piezaValida({ cta: "Votá en la encuesta." });
+  const reel = piezaValida({ cta: "Mirá el reel." });
   const { ok, errores } = validarPlan(planValido([reel]), { semanaInicio: SEMANA });
   assert.equal(ok, false);
   assert.match(errores.join(" "), /anotarse en la lista/);
@@ -700,4 +700,31 @@ test("un salto de línea escrito como \\n literal se convierte en un salto real,
   const r = await planificarSemana({ ...pedido, piezas: 1 }, { cliente, leer: leerFalso, listar: async () => [] });
   assert.equal(r.ok, true);
   assert.equal(r.plan.piezas[0].epigrafe, "Es lo que sostiene todo.\n\nAnotate en la lista: link en la bio.");
+});
+
+test("el sistema del Estratega incluye la psicología de marketing y la prueba de concreción", async () => {
+  const { texto } = await construirSistema();
+  assert.match(texto, /=== PSICOLOGÍA DE MARKETING/);
+  assert.match(texto, /Reciprocidad/);
+  assert.match(texto, /PRUEBA DE CONCRECIÓN/);
+  assert.match(texto, /modelo_psicologia/);
+});
+
+test("un reel puede cerrar con guardar o mandar si otra pieza del plan pide anotarse", () => {
+  const guardable = piezaValida({ cta: "Guardalo para tu próximo entrenamiento." });
+  const pide = piezaValida({ formato: "story", epigrafe: "", cta: "Anotate en la lista de espera." });
+  assert.equal(validarPlan(planValido([guardable, pide]), { semanaInicio: SEMANA }).errores.some((e) => /acción final/.test(e)), false);
+});
+
+test("un plan de varias piezas donde ninguna pide anotarse se rechaza", () => {
+  const a = piezaValida({ cta: "Guardalo." });
+  const b = piezaValida({ formato: "story", epigrafe: "", cta: "Votá en la encuesta." });
+  const { ok, errores } = validarPlan(planValido([a, b]), { semanaInicio: SEMANA });
+  assert.equal(ok, false);
+  assert.match(errores.join(" "), /Ninguna pieza pide anotarse/);
+});
+
+test("un cta que junta dos acciones se rechaza", () => {
+  const { errores } = validarPlan(planValido([piezaValida({ cta: "Guardalo y anotate en la lista de espera." })]), { semanaInicio: SEMANA });
+  assert.match(errores.join(" "), /junta dos acciones/);
 });
