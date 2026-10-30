@@ -1611,8 +1611,8 @@ function armarD(){
       var est=ESTADO_MAP[p.estado]||p.estado,titulo=p.gancho||('Pieza del '+p.fecha),fm=(p.formato||'')==='imagen'?'carrusel':(p.formato||'pieza');
       var ex=piezas.filter(function(x){return x.fecha===p.fecha&&(x.formato===p.formato||x.formato===fm)&&!x._id})[0]||(function(){var u=piezas.filter(function(x){return x.fecha===p.fecha&&!x._id});return u.length===1?u[0]:undefined})();
       var nota=(ESTADO_TXT[p.estado]||p.estado)+(p.hora?' · '+p.hora:'')+(p.error?' · '+p.error:'');
-      if(ex){ex.epigrafe=textoVisible(p);ex._epi=(p.pieza&&p.pieza.epigrafe)||'';ex.titulo=titulo;ex.texto=textoPieza(p);ex.formato=fm;ex._fmt=p.formato;ex.estado=est;ex._id=p.id;ex._est=p.estado;ex._hora=p.hora;ex.nota=nota;ex.fecha=p.fecha;if(p.permalink)ex.permalink=p.permalink}
-      else piezas.push({fecha:p.fecha,formato:fm,titulo:titulo,estado:est,nota:nota,texto:textoPieza(p),epigrafe:textoVisible(p),_epi:(p.pieza&&p.pieza.epigrafe)||'',_id:p.id,_fmt:p.formato,_est:p.estado,_hora:p.hora,permalink:p.permalink||null,_vivo:true});
+      if(ex){ex.epigrafe=textoVisible(p);ex._epi=(p.pieza&&p.pieza.epigrafe)||'';ex.titulo=titulo;ex.texto=textoPieza(p);ex.formato=fm;ex._fmt=p.formato;ex.estado=est;ex._id=p.id;ex._est=p.estado;ex._hora=p.hora;ex._cal=p.calidad||null;ex.nota=nota;ex.fecha=p.fecha;if(p.permalink)ex.permalink=p.permalink}
+      else piezas.push({fecha:p.fecha,formato:fm,titulo:titulo,estado:est,nota:nota,texto:textoPieza(p),epigrafe:textoVisible(p),_epi:(p.pieza&&p.pieza.epigrafe)||'',_id:p.id,_fmt:p.formato,_est:p.estado,_hora:p.hora,_cal:p.calidad||null,permalink:p.permalink||null,_vivo:true});
       var k=p.fecha+'_'+fm;
       if(p.medios&&p.medios.length){MEDIOS_VIVOS[k]={imgs:p.medios.filter(function(m){return m.tipo==='imagen'}).map(function(m){return API+'/api/programacion/medios/'+m.token}),vid:(p.medios.filter(function(m){return m.tipo==='video'})[0]||{}).token?API+'/api/programacion/medios/'+p.medios.filter(function(m){return m.tipo==='video'})[0].token:undefined};MEDIOS_ID[p.id]=MEDIOS_VIVOS[k]}
       var tt=ex?ex.titulo:titulo;

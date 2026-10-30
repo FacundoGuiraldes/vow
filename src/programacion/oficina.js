@@ -8,6 +8,7 @@ import { ErrorInventario, aplicarInventario, leerInventario, vistaInventario } f
 import { lineasDeInvestigacion, vistaEstrategia } from "./estrategia-semana.js";
 import { ahoraArgentina, lunesDe } from "./fechas.js";
 import { createHash } from "node:crypto";
+import { revisarPieza } from "../agents/calidad-instagram.js";
 const DIA_MS = 86_400_000;
 const LIMITE_ENTRADAS = 200;
 const LIMITE_TEXTO = 300;
@@ -112,7 +113,7 @@ export async function armarEstadoOficina({ repo, rendimiento = null, permitirPub
   const filas = await Promise.all(
     piezas.map(async (p) => ({
       id: p.id, fecha: p.fecha, hora: p.hora, estado: p.estado, formato: p.pieza?.formato ?? null, pilar: p.pieza?.pilar ?? null,
-      gancho: p.pieza?.gancho ?? null, pieza: p.pieza ?? null,
+      gancho: p.pieza?.gancho ?? null, pieza: p.pieza ?? null, calidad: revisarPieza(p.pieza),
       confirmada_el: p.confirmada_el ?? null, permalink: p.permalink ?? null, error: p.error ?? null,
       medios: (await repo.mediosDePieza(p.id)).map((m) => ({ tipo: m.tipo, token: m.token })),
     })),
