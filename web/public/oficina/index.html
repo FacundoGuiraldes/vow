@@ -1911,7 +1911,7 @@ PANEL.recepcion=function(){
   r.appendChild(el('h4',null,'Últimas publicaciones'));
   (x.publicaciones||[]).slice(0,5).forEach(function(p){var f=el('div','fila'),d=pd(p.fecha);f.appendChild(el('div','fe',d?dd(d):''));
     var tx=el('div','tx');tx.appendChild(document.createTextNode(p.gancho||p.tipo||'Publicación'));
-    tx.appendChild(el('div','mono','alcance '+(p.alcance==null?'—':fmtN(p.alcance))+' · me gusta '+(p.me_gusta==null?'—':p.me_gusta)+' · guardados '+(p.guardados==null?'—':p.guardados)));
+    tx.appendChild(el('div','mono','alcance '+(p.alcance==null?'—':fmtN(p.alcance))+' · me gusta '+(p.me_gusta==null?'—':p.me_gusta)+' · guardados '+(p.guardados==null?'—':p.guardados)+(p.enviados_por_alcance==null?'':' · enviados '+p.enviados_por_alcance+' %')+(p.multiplo==null?'':' · '+p.multiplo+'× lo típico')));
     f.appendChild(tx);r.appendChild(f)});
   return {t:'Instagram',s:'@'+(c.usuario||'vow_ar'),b:r};
 };

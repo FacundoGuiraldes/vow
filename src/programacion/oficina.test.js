@@ -103,6 +103,22 @@ describe("rendimiento de Instagram para el juego", () => {
     assert.deepEqual(r.totales, { alcance: 100, interacciones: 14, me_gusta: 9, guardados: 2 });
   });
 
+  test("calcula enviados por alcance y cuántas veces más vistas que lo típico (solo con 6 o más publicaciones)", async () => {
+    const vistas = [100, 100, 100, 100, 100, 400];
+    const meta = {
+      perfil: async () => ({ username: "vow_ar" }),
+      publicaciones: async () => vistas.map((_, i) => ({ id: String(i), caption: "x", timestamp: "2026-10-20T22:00:00+0000" })),
+      metricas: async (id) => ({ reach: 200, views: vistas[Number(id)], shares: 10, saved: 4 }),
+    };
+    const r = await crearRendimientoJuego({ meta }).obtener();
+    assert.equal(r.publicaciones[0].enviados_por_alcance, 5);
+    assert.equal(r.publicaciones[0].guardados_por_alcance, 2);
+    assert.equal(r.publicaciones[0].multiplo, 1);
+    assert.equal(r.publicaciones[5].multiplo, 4);
+    const pocas = await crearRendimientoJuego({ meta: { ...meta, publicaciones: async () => [{ id: "0", caption: "x" }, { id: "1", caption: "y" }] } }).obtener();
+    assert.equal(pocas.publicaciones[0].multiplo, null);
+  });
+
   test("guarda el resultado unos minutos para no gastar el cupo de Meta", async () => {
     let reloj = 0;
     const meta = metaFalsa();

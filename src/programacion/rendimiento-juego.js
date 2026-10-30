@@ -15,6 +15,16 @@ export function crearRendimientoJuego({ meta, ttlMs = 15 * 60_000, limite = 9, a
         };
       }),
     );
+    // "Cuánto compartieron por cada persona alcanzada" y "cuántas veces más vistas que su publicación típica": miden mejor que las vistas sueltas.
+    // El múltiplo solo se calcula con 6 publicaciones o más (con menos no hay patrón). Es de ig-audit, de Instagram Agent Skill (MIT).
+    const porcentaje = (a, b) => (Number.isFinite(a) && Number.isFinite(b) && b > 0 ? Math.round((a / b) * 1000) / 10 : null);
+    const vistas = filas.map((f) => f.vistas).filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
+    const mediana = vistas.length >= 6 ? (vistas.length % 2 ? vistas[(vistas.length - 1) / 2] : (vistas[vistas.length / 2 - 1] + vistas[vistas.length / 2]) / 2) : null;
+    for (const f of filas) {
+      f.enviados_por_alcance = porcentaje(f.compartidos, f.alcance);
+      f.guardados_por_alcance = porcentaje(f.guardados, f.alcance);
+      f.multiplo = mediana > 0 && Number.isFinite(f.vistas) ? Math.round((f.vistas / mediana) * 10) / 10 : null;
+    }
     const suma = (clave) => filas.reduce((total, f) => total + (Number(f[clave]) || 0), 0);
     return {
       actualizado: new Date(ahora()).toISOString(),
