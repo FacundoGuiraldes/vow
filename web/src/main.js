@@ -11,7 +11,6 @@ import logoSvg from './assets/logo.svg?raw';
 import Lenis from '@studio-freight/lenis';
 import { gsap } from 'gsap';
 import { iniciarTienda } from './tienda.js';
-import { negocio } from './negocio.js';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -65,33 +64,16 @@ const el = (tag, className, text) => {
 
 document.querySelector('.footer-logo').innerHTML = logoSvg;
 
-// Datos del vendedor (solo los que están cargados en negocio.js)
-const vendedorEl = document.getElementById('vendedor');
-[
-  ['Marca', negocio.marca],
-  ['Responsable', negocio.responsable],
-  ['Razón social', negocio.razonSocial],
-  ['CUIT', negocio.cuit],
-  ['Condición frente al IVA', negocio.condicionIva],
-  ['Domicilio', negocio.domicilio],
-  ['Email', negocio.email],
-  ['Instagram', negocio.instagram ? `@${negocio.instagram}` : null],
-  ['País', negocio.pais]
-].filter(([, valor]) => valor).forEach(([nombre, valor]) => {
-  const fila = el('div', 'vendedor__fila');
-  fila.append(el('dt', null, nombre), el('dd', null, valor));
-  vendedorEl.append(fila);
-});
-
 // ---------- Scroll + animaciones ----------
 let lenis = null;
+let marqueeTween = null;
 if (!reducedMotion) {
   lenis = new Lenis();
   lenis.on('scroll', ScrollTrigger.update);
   gsap.ticker.add(time => lenis.raf(time * 1000));
   gsap.ticker.lagSmoothing(0);
 
-  gsap.to('.marquee', { xPercent: -50, repeat: -1, duration: 20, ease: 'none' });
+  marqueeTween = gsap.to('.marquee', { xPercent: -50, repeat: -1, duration: 20, ease: 'none' });
 
   // Entrada del hero: escalonada, con salida fuerte (expo.out) y corta
   gsap.from(['#hero-logo', '#hero-title', '.hero-sub', '#hero-cta-link', '.hero-nota'], {
@@ -143,9 +125,26 @@ function scrollToElement(target, { immediate = false, onComplete = () => {} } = 
     onComplete();
     return;
   }
+  lenis.resize(); // Lenis mide el alto de la página por su cuenta y puede estar desactualizado (llegó el catálogo): sin esto recorta el destino
   lenis.scrollTo(window.scrollY, { immediate: true });
   lenis.scrollTo(target, { immediate, onComplete });
   if (immediate) onComplete();
+}
+
+// El alto de la página se sigue acomodando después de cargar (fuentes, catálogo que llega de la API). Si cambia
+// mientras se llega al destino, se vuelve a posicionar, hasta que la persona se mueva sola o pasen 4 s.
+let seguirReposicion = null;
+const destinoObserver = new ResizeObserver(() => seguirReposicion?.());
+destinoObserver.observe(document.body);
+['wheel', 'touchstart', 'keydown', 'mousedown'].forEach(ev => window.addEventListener(ev, () => { seguirReposicion = null; }, { passive: true }));
+function seguirDestino(destino) {
+  const reposicionar = () => {
+    lenis?.resize();
+    ScrollTrigger.refresh();
+    scrollToElement(destino, { immediate: true, onComplete: () => {} });
+  };
+  seguirReposicion = reposicionar;
+  setTimeout(() => { if (seguirReposicion === reposicionar) seguirReposicion = null; }, 4000);
 }
 
 // Enlaces al formulario (skip-link y CTAs): scroll y foco en el email (sirve también para teclado/lectores)
@@ -155,65 +154,26 @@ document.querySelectorAll('a[href="#sec-05"]').forEach(link =>
   link.addEventListener('click', e => {
     e.preventDefault();
     scrollToElement(waitlistSection, { onComplete: () => emailInput.focus({ preventScroll: true }) });
+    seguirDestino(waitlistSection);
   })
 );
 
-// Enlaces a la política de privacidad: scroll a la sección y foco en ella para teclado/lectores
-const privacySection = document.getElementById('privacidad');
-function goToPrivacy({ immediate = false } = {}) {
-  scrollToElement(privacySection, { immediate, onComplete: () => privacySection.focus({ preventScroll: true }) });
-}
-document.querySelectorAll('a[href="#privacidad"]').forEach(link =>
+// Enlaces a las preguntas frecuentes: scroll a la sección y foco en ella
+const preguntasSection = document.getElementById('preguntas');
+document.querySelectorAll('a[href="#preguntas"]').forEach(link =>
   link.addEventListener('click', e => {
     e.preventDefault();
-    history.replaceState(null, '', '#privacidad');
-    goToPrivacy();
+    history.replaceState(null, '', '#preguntas');
+    scrollToElement(preguntasSection, { onComplete: () => preguntasSection.focus({ preventScroll: true }) });
   })
 );
-// Entrada directa con /#privacidad (o #terminos, etc.): el layout se sigue acomodando después de cargar (fuentes,
-// catálogo que llega de la API), así que mientras la persona no se mueva sola se vuelve a posicionar cada vez que
-// cambia el alto de la página. Vale también si solo cambia el hash con la página ya abierta.
-const ANCLAS_LEGALES = ['privacidad', 'terminos', 'reembolsos', 'cookies', 'arrepentimiento'];
-let seguirAncla = null;
-function empezarASeguirAncla() {
-  seguirAncla = null;
-  const id = location.hash.slice(1);
-  if (!ANCLAS_LEGALES.includes(id)) return;
-  const destino = document.getElementById(id);
-  const reposition = () => {
-    lenis?.resize(); // Lenis mide el alto de la página por su cuenta y llega tarde: sin esto recorta el destino al alto viejo
-    ScrollTrigger.refresh();
-    scrollToElement(destino, { immediate: true, onComplete: () => destino.focus({ preventScroll: true }) });
-  };
-  seguirAncla = reposition;
-  reposition();
-  setTimeout(() => { if (seguirAncla === reposition) seguirAncla = null; }, 12000);
-}
-const anclaObserver = new ResizeObserver(() => seguirAncla?.());
-anclaObserver.observe(document.body);
-['wheel', 'touchstart', 'keydown', 'mousedown'].forEach(ev => window.addEventListener(ev, () => { seguirAncla = null; }, { passive: true }));
-document.fonts?.addEventListener?.('loadingdone', () => seguirAncla?.());
-window.addEventListener('hashchange', empezarASeguirAncla);
-window.addEventListener('load', empezarASeguirAncla);
-
-// Enlaces a las páginas legales y a las preguntas: scroll a la sección y foco en ella
-['terminos', 'reembolsos', 'cookies', 'arrepentimiento', 'preguntas'].forEach(id => {
-  const target = document.getElementById(id);
-  document.querySelectorAll(`a[href="#${id}"]`).forEach(link =>
-    link.addEventListener('click', e => {
-      e.preventDefault();
-      history.replaceState(null, '', `#${id}`);
-      scrollToElement(target, { onComplete: () => target.focus({ preventScroll: true }) });
-    })
-  );
-});
 
 // ---------- Índice de secciones ----------
-// #sec-05 y #privacidad ya tienen sus handlers (foco en el email / en la política). Acá van las otras secciones:
+// #sec-05 ya tiene su handler (foco en el email). Acá van las otras secciones:
 // scroll con el mismo helper y foco en la sección (tienen tabindex="-1").
 document.querySelectorAll('.indice a').forEach(link => {
   const id = link.getAttribute('href').slice(1);
-  if (id === 'sec-05' || id === 'privacidad') return;
+  if (id === 'sec-05') return;
   const target = document.getElementById(id);
   link.addEventListener('click', e => {
     e.preventDefault();
@@ -473,43 +433,18 @@ form.addEventListener('submit', async e => {
 // Tienda del Drop 00: solo se muestra si el servidor tiene la venta abierta
 iniciarTienda(API_URL);
 
-// ---------- Botón de arrepentimiento ----------
-// Sin registro ni trámites: se manda nombre y mail y se muestra el código en el momento
-const arrForm = document.getElementById('arrepentimiento-form');
-const arrMsg = document.getElementById('arrepentimiento-msg');
-const arrBtn = document.getElementById('arrepentimiento-enviar');
-arrForm.addEventListener('submit', async e => {
-  e.preventDefault();
-  if (arrBtn.disabled) return;
-  const datos = Object.fromEntries(new FormData(arrForm));
-  const nombre = String(datos.nombre ?? '').trim();
-  if (nombre.length < 2) { arrMsg.textContent = 'Escribí tu nombre y apellido.'; arrForm.elements.nombre.focus(); return; }
-  if (!arrForm.elements.email.checkValidity() || !String(datos.email ?? '').trim()) { arrMsg.textContent = 'Escribí el mail con el que compraste.'; arrForm.elements.email.focus(); return; }
-  arrBtn.disabled = true;
-  arrMsg.textContent = 'Enviando…';
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
-  try {
-    const res = await fetch(`${API_URL}/api/programacion/ventas/arrepentimiento`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ nombre, email: String(datos.email).trim(), pedido: String(datos.pedido ?? '').trim() }),
-      signal: controller.signal
-    });
-    const cuerpo = await res.json().catch(() => ({}));
-    if (res.ok && cuerpo.codigo) {
-      arrMsg.textContent = `Listo. Tu código de arrepentimiento es ${cuerpo.codigo}. Guardalo: te escribimos al mail para coordinar la devolución y el reembolso.`;
-      arrForm.reset();
-    } else {
-      arrMsg.textContent = cuerpo.error || 'No pudimos registrarlo. Escribinos a vow2026ar@gmail.com y te damos el código.';
-    }
-  } catch {
-    arrMsg.textContent = 'No pudimos conectar. Escribinos a vow2026ar@gmail.com y te damos el código.';
-  } finally {
-    clearTimeout(timer);
-    arrBtn.disabled = false;
-  }
-});
+// ---------- Pausa de la cinta (WCAG 2.2.2: el movimiento que dura más de 5 s se puede detener) ----------
+const pausaCinta = document.getElementById('pausa-cinta');
+if (!marqueeTween) {
+  pausaCinta.hidden = true; // con movimiento reducido la cinta ya está quieta
+} else {
+  pausaCinta.addEventListener('click', () => {
+    const pausada = pausaCinta.getAttribute('aria-pressed') !== 'true';
+    marqueeTween.paused(pausada);
+    pausaCinta.setAttribute('aria-pressed', String(pausada));
+    pausaCinta.textContent = pausada ? 'Reanudar cinta' : 'Pausar cinta';
+  });
+}
 
 // ---------- CTA fijo en celular ----------
 // Aparece al salir del hero y se oculta cuando ya se ve el formulario de acceso

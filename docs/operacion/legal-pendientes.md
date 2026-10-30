@@ -1,6 +1,6 @@
 # Legal y confianza: qué está hecho y qué falta
 
-Última revisión: 30/10/2026. **No es asesoramiento legal.** Antes de abrir la venta, que un abogado o contador revise las páginas legales de la web (`web/index.html`, secciones `#privacidad`, `#terminos`, `#reembolsos`, `#cookies`, `#arrepentimiento`).
+Última revisión: 30/10/2026. **No es asesoramiento legal.** Antes de abrir la venta, que un abogado o contador revise las páginas legales de la web (páginas `web/privacidad/`, `web/terminos/`, `web/reembolsos/`, `web/cookies/` y `web/arrepentimiento/`; el home solo enlaza a ellas desde el pie).
 
 ## Ya está en la web
 

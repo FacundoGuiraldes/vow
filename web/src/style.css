@@ -414,7 +414,7 @@ section[tabindex="-1"]:focus { outline: none; }
 .privacy { color: var(--black); }
 .privacy:focus { outline: none; }
 .privacy-body { max-width: 65ch; margin-top: 32px; font-size: 1rem; line-height: 1.6; }
-.privacy-body h3 {
+.privacy-body h2, .privacy-body h3 {
   font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; text-transform: uppercase;
   color: var(--bordo); margin: 28px 0 8px; padding-top: 20px; border-top: 1px dashed rgba(10,10,10,0.45);
 }
@@ -431,7 +431,7 @@ footer {
 @media (min-width: 1200px) { footer { padding-left: var(--pad-l); } }
 .footer-fila { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; }
 .footer-contacto { display: flex; flex-wrap: wrap; gap: 0 24px; }
-.footer-logo { width: 56px; aspect-ratio: 801 / 745; color: var(--bone); }
+.footer-logo { display: block; width: 56px; aspect-ratio: 801 / 745; color: var(--bone); }
 .footer-logo svg { display: block; width: 100%; height: auto; }
 .ig-link { color: var(--bone); text-decoration: none; padding: 12px 0; }
 .ig-link:hover, .ig-link:focus-visible { text-decoration: underline; color: var(--beige); }
@@ -635,3 +635,45 @@ footer p { color: rgba(236,232,225,0.8); }
 /* Selección de texto con los colores de la marca */
 ::selection { background: var(--bordo); color: var(--bone); }
 .privacy-body .privacy-updated { margin-top: 32px; }
+
+/* ---------- Páginas legales como páginas propias ---------- */
+@media (prefers-reduced-motion: no-preference) { @view-transition { navigation: auto; } }
+.pagina-legal { background: var(--bone); }
+.legal-cabecera { padding: 20px var(--pad-r) 0 var(--gutter); }
+@media (min-width: 1200px) { .legal-cabecera { padding-left: var(--pad-l); } }
+.legal-volver {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-family: var(--font-mono); font-size: 0.8rem; font-weight: 700;
+  text-transform: uppercase; color: var(--black); text-decoration: none;
+}
+.legal-volver span { display: inline-block; transition: transform 200ms var(--ease-out); }
+.legal-volver:focus-visible { outline: 2px solid var(--bordo); outline-offset: 3px; }
+@media (hover: hover) and (pointer: fine) { .legal-volver:hover { color: var(--bordo); } .legal-volver:hover span { transform: translateX(-4px); } }
+.legal-main { padding: 32px var(--pad-r) 72px var(--gutter); min-height: 70vh; }
+@media (min-width: 1200px) { .legal-main { padding-left: var(--pad-l); } }
+.legal-main > * { animation: entrada-legal 420ms var(--ease-out) both; }
+.legal-main > :nth-child(2) { animation-delay: 40ms; }
+.legal-main > :nth-child(3) { animation-delay: 80ms; }
+.legal-main > :nth-child(4) { animation-delay: 120ms; }
+@keyframes entrada-legal { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .legal-main > * { animation: none; } }
+.legal-otros { display: flex; flex-wrap: wrap; align-items: center; gap: 0 20px; max-width: 65ch; margin-top: 48px; padding-top: 12px; border-top: 1px dashed rgba(10,10,10,0.45); font-family: var(--font-mono); font-size: 0.8rem; }
+.legal-otros span { flex-basis: 100%; text-transform: uppercase; color: var(--topo-ink); }
+.legal-otros a { display: inline-flex; align-items: center; min-height: 44px; color: var(--black); }
+.legal-otros a:hover, .legal-otros a:focus-visible { color: var(--bordo); }
+.pagina-legal footer { border-top: 1px dashed currentColor; }
+
+/* ---------- Barra de utilidades (arriba de la cinta) ---------- */
+.barra-util {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 16px;
+  padding: 0 var(--pad-r) 0 var(--gutter); background: var(--bone); color: var(--black);
+  border-bottom: 1px dashed rgba(10,10,10,0.35); font-family: var(--font-mono); font-size: 0.75rem; text-transform: uppercase;
+}
+@media (min-width: 1200px) { .barra-util { padding-left: var(--pad-l); } }
+.barra-util[hidden], .barra-util__pausa[hidden] { display: none; }
+.barra-util__pausa {
+  min-height: 44px; padding: 0; background: none; border: 0; color: inherit; font: inherit; text-transform: inherit; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.barra-util__arrepentimiento { display: inline-flex; align-items: center; min-height: 44px; color: var(--black); }
+.barra-util a:focus-visible, .barra-util button:focus-visible { outline: 2px solid var(--bordo); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) { .barra-util a:hover, .barra-util button:hover { color: var(--bordo); } }
