@@ -90,8 +90,10 @@ function validarOrigen(origen) {
   return { valor: origen.trim() || null };
 }
 
+export const MENSAJE_CONSENTIMIENTO = "Tildá la casilla para aceptar la política de privacidad y recibir el aviso del lanzamiento.";
+
 export function validarPedido(cuerpo = {}) {
-  const { email, instagram, origen } = cuerpo ?? {};
+  const { email, instagram, origen, consentimiento } = cuerpo ?? {};
 
   const resultadoEmail = validarEmail(email);
   if (resultadoEmail.error) {
@@ -106,6 +108,11 @@ export function validarPedido(cuerpo = {}) {
   const resultadoOrigen = validarOrigen(origen);
   if (resultadoOrigen.error) {
     return { error: resultadoOrigen.error, campo: "origen" };
+  }
+
+  // Consentimiento expreso (Ley 25.326): sin la casilla tildada no se guarda nada
+  if (consentimiento !== true) {
+    return { error: MENSAJE_CONSENTIMIENTO, campo: "consentimiento" };
   }
 
   return {

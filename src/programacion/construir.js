@@ -11,6 +11,7 @@ import { crearTransporteGmail, crearTransporteGmailApi } from "../descuentos/cor
 import { crearConsultaCodigo, crearEnvioDescuentos } from "../descuentos/lista-espera.js";
 import { crearClienteMercadoPago } from "../pagos/mercadopago.js";
 import { crearRutasVentas } from "../pagos/rutas.js";
+import { crearArrepentimientos } from "../pagos/arrepentimiento.js";
 import { crearRutasProgramacion } from "./rutas.js";
 import { crearServicio } from "./servicio.js";
 import { crearClienteTelegram } from "./telegram.js";
@@ -94,6 +95,7 @@ export async function construirProgramacion({ pool, env = process.env, fetchFn =
       ventaAbierta: env.VENTA_ABIERTA === "1",
       codigos,
       consultaCodigo,
+      arrepentimientos: crearArrepentimientos({ repo, avisar: (texto) => telegram.enviarMensaje(texto) }),
       cotizarEnvio: Number.isInteger(costoFijo) && costoFijo > 0 ? async () => ({ costo: costoFijo, servicio: "Correo Argentino" }) : null,
       urlPublica: env.URL_PUBLICA.replace(/\/$/, ""),
       urlLanding: env.URL_LANDING.replace(/\/$/, ""),

@@ -63,6 +63,12 @@ test.describe("Accesibilidad", { tag: "@a11y" }, () => {
     await page.keyboard.press("Tab");
     await expect(formulario.instagram).toBeFocused();
     await page.keyboard.press("Tab");
+    await expect(formulario.consentimiento).toBeFocused();
+    await page.keyboard.press("Space");
+    await expect(formulario.consentimiento).toBeChecked();
+    await page.keyboard.press("Tab");
+    await expect(formulario.linkPrivacidad).toBeFocused();
+    await page.keyboard.press("Tab");
     await expect(formulario.enviar).toBeFocused();
 
     await page.keyboard.press("Enter");

@@ -6,16 +6,14 @@
   <meta name="description" content="VOW. Tu promesa. Tu fuerza. Accesorios y ropa de gym." />
   <meta name="theme-color" content="#0A0A0A" />
   <meta property="og:title" content="VOW | Lista de espera" />
-  <meta property="og:description" content="Disciplina cruda. Primera tanda limitada." />
+  <meta property="og:description" content="Ropa y accesorios de gym. Sumate a la lista de espera." />
   <link rel="icon" type="image/svg+xml" href="/assets/logo-black.svg" />
   <title>VOW | Lista de espera</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&family=Unbounded:wght@800;900&display=swap" rel="stylesheet">
 </head>
 <body>
   <a class="skip-link" href="#sec-05">Saltar al formulario</a>
 
+  <div class="progreso" aria-hidden="true"></div>
   <div class="noise" aria-hidden="true"></div>
   <div class="cursor" aria-hidden="true"></div>
   <div class="grid-overlay" aria-hidden="true"><div></div><div></div><div></div><div></div></div>
@@ -46,6 +44,7 @@
         <img src="/src/assets/logo-mark.svg" alt="VOW" width="492" height="518">
       </div>
       <h1 id="hero-title" class="hero-title"></h1>
+      <p class="hero-sub">Ropa y accesorios de gym.</p>
       <a class="hero-btn" href="#sec-05" id="hero-cta-link">
         <span id="hero-cta"></span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true" focusable="false"><path d="M5 19L19 5M19 5v10M19 5H9"/></svg>
@@ -54,6 +53,7 @@
         <span>Ir a la tienda</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true" focusable="false"><path d="M5 19L19 5M19 5v10M19 5H9"/></svg>
       </a>
+      <p class="hero-nota">Anotarte te da aviso del lanzamiento y un código de descuento para tu primera compra.</p>
       <div class="hero-wordmark" aria-hidden="true">VOW</div>
     </section>
 
@@ -145,10 +145,50 @@
           <label>Localidad<input name="localidad" autocomplete="address-level2" maxlength="60"></label>
           <label>Provincia<input name="provincia" autocomplete="address-level1" maxlength="40"></label>
         </div>
-        <p class="tienda__nota">Pagás en Mercado Pago. Tus datos se usan solo para este pedido.</p>
+        <div class="consent consent--claro">
+          <input type="checkbox" id="tienda-consent" name="terminos" required>
+          <label for="tienda-consent">Leí y acepto los <a href="#terminos">Términos y condiciones</a>, la <a href="#reembolsos">política de reembolsos</a> y la <a href="#privacidad">política de privacidad</a>.</label>
+        </div>
+        <p class="tienda__nota">Pagás en Mercado Pago. Tus datos se usan solo para este pedido. Si te arrepentís, tenés el <a href="#arrepentimiento">botón de arrepentimiento</a>.</p>
         <p id="tienda-msg" class="tienda__msg" role="status"></p>
         <button type="submit" id="tienda-pagar" class="hero-btn" disabled>Ir a pagar</button>
+        <ul class="tienda__confianza" aria-label="Cómo funciona la compra">
+          <li>Pago con Mercado Pago</li>
+          <li>Ves el precio final antes de pagar</li>
+          <li>Retiro en persona o envío, según el Drop</li>
+        </ul>
       </form>
+    </section>
+
+    <section class="faq" id="preguntas" aria-labelledby="faq-title" tabindex="-1">
+      <div class="section-label" aria-hidden="true">INFO</div>
+      <h2 class="title-large" id="faq-title">Preguntas</h2>
+      <div class="faq__lista">
+        <details>
+          <summary>¿Cuándo sale la colección?</summary>
+          <p>El Drop 01 está en desarrollo y sale en 2027. Anotándote, te avisamos primero.</p>
+        </details>
+        <details>
+          <summary>¿Qué recibo al anotarme?</summary>
+          <p>El aviso del lanzamiento y un código de descuento personal, de un solo uso, por mail.</p>
+        </details>
+        <details>
+          <summary>¿Cómo se paga?</summary>
+          <p>Con Mercado Pago, desde esta misma web cuando se abra la venta. Ves el precio final antes de pagar.</p>
+        </details>
+        <details>
+          <summary>¿Cómo recibo mi pedido?</summary>
+          <p>Cada Drop indica si hay retiro en persona, envío a domicilio o ambos. El costo del envío, si lo hay, lo ves antes de pagar.</p>
+        </details>
+        <details>
+          <summary>¿Puedo devolver mi compra?</summary>
+          <p>Sí: tenés 10 días para arrepentirte y la garantía legal. Mirá los <a href="#reembolsos">reembolsos</a> o usá el <a href="#arrepentimiento">botón de arrepentimiento</a>.</p>
+        </details>
+        <details>
+          <summary>¿Qué hacen con mis datos?</summary>
+          <p>Para avisarte del lanzamiento y preparar tu pedido. El detalle está en la <a href="#privacidad">política de privacidad</a>.</p>
+        </details>
+      </div>
     </section>
 
     <section class="waitlist" id="sec-05" aria-labelledby="waitlist-title">
@@ -156,6 +196,11 @@
       <div class="mk mk--bl" aria-hidden="true"></div><div class="mk mk--br" aria-hidden="true"></div>
       <div class="section-label" aria-hidden="true">03 / 03</div>
       <h2 class="title-large" id="waitlist-title">ACCESO</h2>
+      <ul class="beneficios" aria-label="Qué recibís al anotarte">
+        <li>Aviso del lanzamiento antes que nadie</li>
+        <li>Un código de descuento personal para tu primera compra</li>
+        <li>Solo usamos tu mail para eso. Te das de baja cuando quieras</li>
+      </ul>
       <form id="waitlist-form" class="form" novalidate>
         <div class="input-group">
           <label for="email" class="sr-only">Email</label>
@@ -168,11 +213,14 @@
                  spellcheck="false" maxlength="31" placeholder="@tuusuario" aria-describedby="ig-help form-msg">
           <p class="input-help" id="ig-help">Opcional. Solo lo usamos para avisarte del lanzamiento.</p>
         </div>
+        <div class="consent">
+          <input type="checkbox" id="consent" name="consentimiento" required aria-describedby="form-msg">
+          <label for="consent">Acepto la <a href="#privacidad">Política de privacidad</a> y quiero recibir por mail el aviso del lanzamiento y mi código de descuento. Puedo darme de baja cuando quiera.</label>
+        </div>
         <button type="submit" class="cta-btn">
           <span class="cta-label">ENVIAR</span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true" focusable="false"><path d="M5 19L19 5M19 5v10M19 5H9"/></svg>
         </button>
-        <p class="form-legal">Al anotarte aceptás la <a href="#privacidad">Política de privacidad</a>.</p>
         <p id="form-msg" class="msg" role="status" aria-live="polite"></p>
       </form>
     </section>
@@ -181,42 +229,138 @@
       <div class="section-label" aria-hidden="true">LEGAL</div>
       <h2 class="title-large" id="privacy-title">Política de privacidad</h2>
       <div class="privacy-body">
-        <p class="privacy-intro">Esta política explica qué datos te pedimos cuando te anotás en la lista de espera de VOW y qué hacemos con ellos.</p>
+        <p class="privacy-intro">Qué datos te pedimos y para qué los usamos.</p>
 
         <h3>Qué datos pedimos</h3>
-        <p>Tu email, que es obligatorio, y tu usuario de Instagram, que es opcional. Además, se guarda la fecha en que te anotaste y que el registro vino de esta landing.</p>
+        <p><strong>Lista de espera:</strong> tu email y, si querés, tu Instagram, más la fecha y el canal por el que llegaste. <strong>Compras:</strong> nombre, email, teléfono y, si pedís envío, tu dirección. <strong>Arrepentimiento:</strong> nombre, email y número de pedido. Los pagos los procesa Mercado Pago: no vemos los datos de tu tarjeta.</p>
 
-        <h3>Para qué los usamos</h3>
-        <p>Únicamente para avisarte del lanzamiento de VOW. No los vendemos ni los compartimos con terceros con fines comerciales.</p>
+        <h3>Para qué</h3>
+        <p>Lista de espera: avisarte del lanzamiento y enviarte tu código de descuento. Compras: preparar, cobrar y entregar tu pedido, y cumplir obligaciones legales.</p>
 
-        <h3>Dónde se guardan</h3>
-        <p>En una base de datos alojada en proveedores de infraestructura: Neon para la base de datos, Render para el servidor y Cloudflare para el sitio. Estos proveedores pueden almacenar o procesar datos fuera de Argentina, y también pueden registrar datos técnicos de la conexión, como tu dirección IP. Nuestro servidor usa la IP solo por un momento, para limitar la cantidad de envíos por minuto, y no la guarda en la base de datos.</p>
+        <h3>Consentimiento</h3>
+        <p>La lista de espera funciona con tu consentimiento expreso, la casilla que tildás vos. Podés retirarlo cuando quieras.</p>
+
+        <h3>Con quién se comparten</h3>
+        <p>Neon (base de datos), Render (servidor), Cloudflare (sitio), Google (mails), Mercado Pago (pagos) y, si pedís envío, el correo. Algunos procesan datos fuera de Argentina. Tu IP se usa un instante para limitar envíos por minuto y no se guarda.</p>
 
         <h3>Cuánto tiempo</h3>
-        <p>Hasta que pidas la baja o, como máximo, 12 meses después del lanzamiento de VOW.</p>
+        <p>Lista de espera: hasta que pidas la baja o, como máximo, 12 meses después del lanzamiento. Compras: el tiempo que exigen las normas contables.</p>
 
-        <h3>Tus derechos</h3>
-        <p>Podés pedir acceso, rectificación o supresión de tus datos escribiendo a <a href="mailto:vow2026ar@gmail.com">vow2026ar@gmail.com</a>. Indicá el email con el que te anotaste para que podamos encontrar tu registro.</p>
-
-        <h3>Responsable</h3>
-        <p>Responsable del tratamiento: Facundo Guiraldes</p>
+        <h3>Tus derechos y la baja</h3>
+        <p>Podés pedir acceso, rectificación, supresión o la baja escribiendo a <a href="mailto:vow2026ar@gmail.com">vow2026ar@gmail.com</a> con el email que usaste. El acceso es gratuito y se puede ejercer cada seis meses, salvo interés legítimo. Responsable: Facundo Guiraldes.</p>
 
         <h3>Autoridad de control</h3>
-        <p>La Agencia de Acceso a la Información Pública, en su carácter de Órgano de Control de la Ley N.º 25.326, tiene la atribución de atender las denuncias y reclamos que interpongan quienes resulten afectados en sus derechos por incumplimiento de las normas vigentes en materia de protección de datos personales.</p>
+        <p>La Agencia de Acceso a la Información Pública, Órgano de Control de la Ley 25.326, atiende las denuncias por incumplimientos en materia de datos personales.</p>
 
-        <p class="privacy-updated">Última actualización: 14/10/2026.</p>
+        <p class="privacy-updated">Última actualización: 30/10/2026.</p>
+      </div>
+    </section>
+
+    <section class="privacy legal" id="terminos" aria-labelledby="terminos-title" tabindex="-1">
+      <div class="section-label" aria-hidden="true">LEGAL</div>
+      <h2 class="title-large" id="terminos-title">Términos y condiciones</h2>
+      <div class="privacy-body">
+        <p class="privacy-intro">Al comprar aceptás estas condiciones, la <a href="#reembolsos">política de reembolsos</a> y la <a href="#privacidad">política de privacidad</a>.</p>
+
+        <h3>Quién vende</h3>
+        <dl class="vendedor" id="vendedor"></dl>
+
+        <h3>Compra y pago</h3>
+        <p>Los precios están en pesos argentinos y el precio final, con descuentos y envío, se ve antes de pagar. El pago es con Mercado Pago y la compra se confirma cuando lo aprueba. Las imágenes del Drop 01 son conceptuales: el producto puede cambiar antes de salir. Si algo se agota antes de que pagues, te avisamos y te devolvemos el dinero.</p>
+
+        <h3>Entrega</h3>
+        <p>Cada Drop indica si hay retiro en persona, envío a domicilio o ambos. El costo del envío, si lo hay, se suma antes de pagar y los plazos son estimados.</p>
+
+        <h3>Códigos de descuento</h3>
+        <p>Son personales, de un solo uso, no acumulables y valen para el Drop indicado hasta la fecha del mail. Descuentan los productos, no el envío.</p>
+
+        <h3>Arrepentimiento y garantía</h3>
+        <p>Tenés 10 días corridos para revocar la compra (art. 34, Ley 24.240) y la garantía legal por defectos. Mirá la <a href="#reembolsos">política de reembolsos</a>.</p>
+
+        <h3>Propiedad intelectual</h3>
+        <p>La marca VOW, el logo, los textos y las imágenes son de VOW o se usan con permiso, y no se pueden usar comercialmente sin autorización escrita.</p>
+
+        <h3>Ley y reclamos</h3>
+        <p>Rige la ley argentina. Podés reclamar ante la Dirección de Defensa del Consumidor de tu jurisdicción (<a href="https://www.argentina.gob.ar/produccion/defensadelconsumidor" target="_blank" rel="noopener noreferrer">argentina.gob.ar/produccion/defensadelconsumidor</a>).</p>
+
+        <p class="privacy-updated">Última actualización: 30/10/2026.</p>
+      </div>
+    </section>
+
+    <section class="privacy legal" id="reembolsos" aria-labelledby="reembolsos-title" tabindex="-1">
+      <div class="section-label" aria-hidden="true">LEGAL</div>
+      <h2 class="title-large" id="reembolsos-title">Reembolsos y devoluciones</h2>
+      <div class="privacy-body">
+        <p class="privacy-intro">Si no estás conforme, podés arrepentirte o reclamar por la garantía.</p>
+
+        <h3>Arrepentimiento (10 días)</h3>
+        <p>Podés revocar la compra dentro de los 10 días corridos desde que recibís el producto o desde la compra, lo que ocurra último, sin dar razones. Usá el <a href="#arrepentimiento">botón de arrepentimiento</a>: no hace falta registrarte. El producto vuelve sin usar y la devolución corre por cuenta de VOW (art. 34, Ley 24.240).</p>
+
+        <h3>Reembolso</h3>
+        <p>Te devolvemos lo pagado por el mismo medio de pago, a través de Mercado Pago; la acreditación depende de ellos. Si no podemos entregar tu pedido, el reembolso es completo.</p>
+
+        <h3>Garantía por defectos</h3>
+        <p>Si algo llega con un defecto o no es lo que compraste, rige la garantía legal (Ley 24.240, arts. 11 a 18). Escribinos a <a href="mailto:vow2026ar@gmail.com">vow2026ar@gmail.com</a> con tu número de pedido y fotos.</p>
+
+        <p class="privacy-updated">Última actualización: 30/10/2026.</p>
+      </div>
+    </section>
+
+    <section class="privacy legal" id="arrepentimiento" aria-labelledby="arrepentimiento-title" tabindex="-1">
+      <div class="section-label" aria-hidden="true">LEGAL</div>
+      <h2 class="title-large" id="arrepentimiento-title">Botón de arrepentimiento</h2>
+      <div class="privacy-body">
+        <p class="privacy-intro">Completá el formulario y te damos un código en el momento. No hace falta registrarte.</p>
+        <form id="arrepentimiento-form" class="form-claro" novalidate>
+          <label>Nombre y apellido<input name="nombre" autocomplete="name" required maxlength="80"></label>
+          <label>Mail con el que compraste<input name="email" type="email" autocomplete="email" inputmode="email" required maxlength="120"></label>
+          <label>Número de pedido (opcional)<input name="pedido" maxlength="40" autocomplete="off"></label>
+          <button type="submit" class="hero-btn" id="arrepentimiento-enviar">Solicitar arrepentimiento</button>
+          <p id="arrepentimiento-msg" class="form-claro__msg" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
+    <section class="privacy legal" id="cookies" aria-labelledby="cookies-title" tabindex="-1">
+      <div class="section-label" aria-hidden="true">LEGAL</div>
+      <h2 class="title-large" id="cookies-title">Política de cookies</h2>
+      <div class="privacy-body">
+        <p class="privacy-intro">Esta web no usa cookies ni herramientas de seguimiento.</p>
+
+        <h3>Qué usamos</h3>
+        <p>No hay analítica, píxeles ni publicidad, y nada se guarda en tu navegador. Las tipografías se cargan desde este mismo sitio. Por eso no hay cartel de cookies.</p>
+
+        <h3>Mercado Pago</h3>
+        <p>Al pagar pasás al sitio de Mercado Pago, que tiene sus propias cookies y políticas.</p>
+
+        <h3>Si cambia</h3>
+        <p>Si algún día sumamos analítica, actualizamos esta política y te pedimos consentimiento antes de activarla.</p>
+
+        <p class="privacy-updated">Última actualización: 30/10/2026.</p>
       </div>
     </section>
   </main>
 
   <footer>
-    <div class="footer-logo" role="img" aria-label="VOW"></div>
-    <a href="https://www.instagram.com/vow_ar" class="ig-link" target="_blank" rel="noopener noreferrer"
-       aria-label="@vow_ar en Instagram (se abre en otra pestaña)">@vow_ar</a>
-    <a href="#privacidad" class="ig-link">Privacidad</a>
-    <a href="mailto:vow2026ar@gmail.com" class="ig-link">vow2026ar@gmail.com</a>
-    <p>© 2026 VOW</p>
+    <div class="footer-fila">
+      <div class="footer-logo" role="img" aria-label="VOW"></div>
+      <div class="footer-contacto">
+        <a href="https://www.instagram.com/vow_ar" class="ig-link" target="_blank" rel="noopener noreferrer"
+           aria-label="@vow_ar en Instagram (se abre en otra pestaña)">@vow_ar</a>
+        <a href="mailto:vow2026ar@gmail.com" class="ig-link">vow2026ar@gmail.com</a>
+      </div>
+    </div>
+    <nav class="footer-legal" aria-label="Legal">
+      <a href="#privacidad" class="ig-link">Privacidad</a>
+      <a href="#terminos" class="ig-link">Términos</a>
+      <a href="#reembolsos" class="ig-link">Reembolsos</a>
+      <a href="#cookies" class="ig-link">Cookies</a>
+      <a href="#arrepentimiento" class="boton-arrepentimiento">Botón de arrepentimiento</a>
+    </nav>
+    <p>© 2026 VOW · Argentina</p>
   </footer>
+
+  <a class="cta-fijo" id="cta-fijo" href="#sec-05" hidden>Sumarme a la lista</a>
 
   <script type="module" src="/src/main.js"></script>
 </body>

@@ -20,7 +20,7 @@ test.describe("Formulario de lista de espera", { tag: "@funcional" }, () => {
     await expect(formulario.email).toHaveValue("");
     await expect(formulario.instagram).toHaveValue("");
     expect(api.pedidos).toHaveLength(1);
-    expect(api.ultimoCuerpo()).toEqual({ email, instagram: "@vow_ar", origen: "landing" });
+    expect(api.ultimoCuerpo()).toEqual({ email, instagram: "@vow_ar", origen: "landing", consentimiento: true });
   });
 
   // El parámetro ?origen= sirve para medir canales (por ejemplo, el QR de cada gimnasio).
@@ -57,6 +57,18 @@ test.describe("Formulario de lista de espera", { tag: "@funcional" }, () => {
       await expect(formulario.email).toHaveAttribute("aria-invalid", "true");
       await expect(formulario.email).toBeFocused();
     }
+    expect(api.pedidos).toHaveLength(0);
+  });
+
+  test("sin tildar el consentimiento no se envía nada y se marca la casilla", async ({ page, formulario }) => {
+    const api = await mockearListaEspera(page);
+    await formulario.email.fill(emailDePrueba());
+
+    await formulario.enviar.click();
+
+    await expect(formulario.mensaje).toHaveText(textos.form.consentRequired);
+    await expect(formulario.consentimiento).toHaveAttribute("aria-invalid", "true");
+    await expect(formulario.consentimiento).toBeFocused();
     expect(api.pedidos).toHaveLength(0);
   });
 

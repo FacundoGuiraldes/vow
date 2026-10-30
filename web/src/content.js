@@ -10,6 +10,7 @@ export const content = {
     submit: "ENVIAR",
     success: "SUMADO A LA LISTA DE ESPERA.",
     invalidEmail: "INGRESÁ UN EMAIL VÁLIDO.",
+    consentRequired: "TILDÁ LA CASILLA PARA ACEPTAR LA POLÍTICA DE PRIVACIDAD.",
     rateLimited: "Probá de nuevo en un minuto",
     error: "NO PUDIMOS CONECTARNOS. REVISÁ TU CONEXIÓN Y PROBÁ DE NUEVO."
   }

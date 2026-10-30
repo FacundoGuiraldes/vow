@@ -10,6 +10,7 @@ export class FormularioEspera {
   readonly enviar: Locator;
   readonly mensaje: Locator;
   readonly linkPrivacidad: Locator;
+  readonly consentimiento: Locator;
 
   constructor(readonly page: Page) {
     this.seccion = page.getByRole("region", { name: textos.regiones.acceso, exact: true });
@@ -20,12 +21,14 @@ export class FormularioEspera {
     // Único botón del formulario: su nombre cambia entre "ENVIAR" y "ENVIANDO..."
     this.enviar = this.seccion.getByRole("button");
     this.mensaje = this.seccion.getByRole("status");
+    this.consentimiento = this.seccion.getByRole("checkbox");
     this.linkPrivacidad = this.seccion.getByRole("link", { name: textos.regiones.privacidad, exact: true });
   }
 
   async completar(email: string, instagram?: string) {
     await this.email.fill(email);
     if (instagram !== undefined) await this.instagram.fill(instagram);
+    await this.consentimiento.check();
   }
 
   async anotarse(email: string, instagram?: string) {

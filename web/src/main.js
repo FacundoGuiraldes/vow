@@ -1,9 +1,17 @@
+// Tipografías alojadas en el propio sitio (sin pedirle nada a Google: no se manda la IP de quien visita a un tercero)
+import '@fontsource-variable/unbounded';
+import '@fontsource/space-grotesk/latin-400.css';
+import '@fontsource/space-grotesk/latin-500.css';
+import '@fontsource/space-grotesk/latin-700.css';
+import '@fontsource/space-mono/latin-400.css';
+import '@fontsource/space-mono/latin-700.css';
 import './style.css';
 import { content } from './content.js';
 import logoSvg from './assets/logo.svg?raw';
 import Lenis from '@studio-freight/lenis';
 import { gsap } from 'gsap';
 import { iniciarTienda } from './tienda.js';
+import { negocio } from './negocio.js';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -44,6 +52,8 @@ content.manifest.split(' ').forEach((w, i) => {
   span.textContent = w;
   manifestEl.append(span);
 });
+// Cierre del manifiesto ("Esta es tu promesa.") resaltado
+[...manifestEl.querySelectorAll('.word')].slice(-4).forEach(w => w.classList.add('word--clave'));
 
 // Crea un nodo con clase y texto (siempre textContent, nunca HTML)
 const el = (tag, className, text) => {
@@ -55,6 +65,24 @@ const el = (tag, className, text) => {
 
 document.querySelector('.footer-logo').innerHTML = logoSvg;
 
+// Datos del vendedor (solo los que están cargados en negocio.js)
+const vendedorEl = document.getElementById('vendedor');
+[
+  ['Marca', negocio.marca],
+  ['Responsable', negocio.responsable],
+  ['Razón social', negocio.razonSocial],
+  ['CUIT', negocio.cuit],
+  ['Condición frente al IVA', negocio.condicionIva],
+  ['Domicilio', negocio.domicilio],
+  ['Email', negocio.email],
+  ['Instagram', negocio.instagram ? `@${negocio.instagram}` : null],
+  ['País', negocio.pais]
+].filter(([, valor]) => valor).forEach(([nombre, valor]) => {
+  const fila = el('div', 'vendedor__fila');
+  fila.append(el('dt', null, nombre), el('dd', null, valor));
+  vendedorEl.append(fila);
+});
+
 // ---------- Scroll + animaciones ----------
 let lenis = null;
 if (!reducedMotion) {
@@ -65,9 +93,30 @@ if (!reducedMotion) {
 
   gsap.to('.marquee', { xPercent: -50, repeat: -1, duration: 20, ease: 'none' });
 
-  gsap.from('#hero-logo', { opacity: 0, y: 30, duration: 1, ease: 'power3.out', delay: 0.2 });
-  gsap.from('#hero-title', { opacity: 0, y: 30, duration: 1, ease: 'power3.out', delay: 0.4 });
-  gsap.from('#hero-cta-link', { opacity: 0, y: 30, duration: 1, ease: 'power3.out', delay: 0.55 });
+  // Entrada del hero: escalonada, con salida fuerte (expo.out) y corta
+  gsap.from(['#hero-logo', '#hero-title', '.hero-sub', '#hero-cta-link', '.hero-nota'], {
+    opacity: 0, y: 24, duration: 0.7, ease: 'expo.out', stagger: 0.08, delay: 0.1
+  });
+
+  // Wordmark gigante: sube desde el borde al cargar
+  gsap.from('.hero-wordmark', { yPercent: 28, opacity: 0, duration: 1.1, ease: 'expo.out', delay: 0.15 });
+
+  // Barra de avance de lectura
+  gsap.to('.progreso', { scaleX: 1, ease: 'none', scrollTrigger: { start: 0, end: 'max', scrub: 0.2 } });
+
+  // Títulos de sección: entran una sola vez
+  gsap.utils.toArray('.title-large').forEach(titulo => {
+    gsap.from(titulo, { opacity: 0, y: 32, duration: 0.7, ease: 'expo.out', scrollTrigger: { trigger: titulo, start: 'top 90%', once: true } });
+  });
+
+  // Imagen del Drop 01: se acerca despacio mientras se la recorre; el sello se estampa al llegar
+  gsap.fromTo('.drop-feature__img', { scale: 1.12 }, { scale: 1, ease: 'none', scrollTrigger: { trigger: '.drop-feature__frame', start: 'top bottom', end: 'bottom 40%', scrub: true } });
+  gsap.from('.sello', { opacity: 0, scale: 1.5, duration: 0.45, ease: 'expo.out', scrollTrigger: { trigger: '.drop-feature__frame', start: 'top 55%', once: true } });
+
+  // Bloques que entran una sola vez al llegar a la pantalla
+  gsap.utils.toArray('.drop-feature__card, .faq__lista, .beneficios, .waitlist .form, .drop-head').forEach(bloque => {
+    gsap.from(bloque, { opacity: 0, y: 24, duration: 0.6, ease: 'expo.out', scrollTrigger: { trigger: bloque, start: 'top 88%', once: true } });
+  });
 
   gsap.to('.word', {
     opacity: 1,
@@ -121,17 +170,42 @@ document.querySelectorAll('a[href="#privacidad"]').forEach(link =>
     goToPrivacy();
   })
 );
-// Entrada directa con /#privacidad: el layout se sigue acomodando después del load (fuentes, catálogo
-// que llega de la API), así que se vuelve a posicionar cuando terminan de cargar las fuentes y un rato después
-window.addEventListener('load', () => {
-  if (location.hash !== '#privacidad') return;
+// Entrada directa con /#privacidad (o #terminos, etc.): el layout se sigue acomodando después de cargar (fuentes,
+// catálogo que llega de la API), así que mientras la persona no se mueva sola se vuelve a posicionar cada vez que
+// cambia el alto de la página. Vale también si solo cambia el hash con la página ya abierta.
+const ANCLAS_LEGALES = ['privacidad', 'terminos', 'reembolsos', 'cookies', 'arrepentimiento'];
+let seguirAncla = null;
+function empezarASeguirAncla() {
+  seguirAncla = null;
+  const id = location.hash.slice(1);
+  if (!ANCLAS_LEGALES.includes(id)) return;
+  const destino = document.getElementById(id);
   const reposition = () => {
+    lenis?.resize(); // Lenis mide el alto de la página por su cuenta y llega tarde: sin esto recorta el destino al alto viejo
     ScrollTrigger.refresh();
-    goToPrivacy({ immediate: true });
+    scrollToElement(destino, { immediate: true, onComplete: () => destino.focus({ preventScroll: true }) });
   };
+  seguirAncla = reposition;
   reposition();
-  document.fonts.ready.then(() => requestAnimationFrame(reposition));
-  setTimeout(reposition, 800);
+  setTimeout(() => { if (seguirAncla === reposition) seguirAncla = null; }, 12000);
+}
+const anclaObserver = new ResizeObserver(() => seguirAncla?.());
+anclaObserver.observe(document.body);
+['wheel', 'touchstart', 'keydown', 'mousedown'].forEach(ev => window.addEventListener(ev, () => { seguirAncla = null; }, { passive: true }));
+document.fonts?.addEventListener?.('loadingdone', () => seguirAncla?.());
+window.addEventListener('hashchange', empezarASeguirAncla);
+window.addEventListener('load', empezarASeguirAncla);
+
+// Enlaces a las páginas legales y a las preguntas: scroll a la sección y foco en ella
+['terminos', 'reembolsos', 'cookies', 'arrepentimiento', 'preguntas'].forEach(id => {
+  const target = document.getElementById(id);
+  document.querySelectorAll(`a[href="#${id}"]`).forEach(link =>
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      history.replaceState(null, '', `#${id}`);
+      scrollToElement(target, { onComplete: () => target.focus({ preventScroll: true }) });
+    })
+  );
 });
 
 // ---------- Índice de secciones ----------
@@ -273,6 +347,8 @@ async function loadCatalog() {
       setCatalogStatus(CATALOG_EMPTY_TEXT);
     } else {
       catalogList.hidden = false;
+    // Las filas entran de a una (solo con movimiento permitido)
+    if (!reducedMotion) gsap.from(catalogList.children, { opacity: 0, y: 16, duration: 0.5, ease: 'expo.out', stagger: 0.05, scrollTrigger: { trigger: catalogList, start: 'top 88%', once: true } });
       setCatalogStatus(`Drop 01: ${productos.length} productos en desarrollo.`, { visuallyHidden: true });
     }
     ScrollTrigger.refresh();
@@ -295,7 +371,8 @@ const igInput = document.getElementById('ig');
 const submitBtn = form.querySelector('button[type="submit"]');
 const submitLabel = submitBtn.querySelector('.cta-label');
 const msg = document.getElementById('form-msg');
-const fieldsByName = { email: emailInput, instagram: igInput };
+const consentInput = document.getElementById('consent');
+const fieldsByName = { email: emailInput, instagram: igInput, consentimiento: consentInput };
 
 function setMessage(text, type = '') {
   msg.className = type ? `msg ${type}` : 'msg';
@@ -314,6 +391,7 @@ function markInvalid(input, invalid) {
 }
 
 [emailInput, igInput].forEach(input => input.addEventListener('input', () => markInvalid(input, false)));
+consentInput.addEventListener('change', () => markInvalid(consentInput, false));
 
 function showFieldError(input, text) {
   setMessage(text, 'error');
@@ -358,13 +436,19 @@ form.addEventListener('submit', async e => {
     return;
   }
 
+  // Consentimiento expreso: la casilla viene destildada y la tilda la persona
+  if (!consentInput.checked) {
+    showFieldError(consentInput, content.form.consentRequired);
+    return;
+  }
+
   markInvalid(emailInput, false);
   markInvalid(igInput, false);
   setMessage('');
   setLoading(true);
 
   try {
-    const res = await postWaitlist({ email, instagram: igInput.value, origen: visitOrigin });
+    const res = await postWaitlist({ email, instagram: igInput.value, origen: visitOrigin, consentimiento: true });
 
     // 200 = anotado. La API responde igual si el mail ya estaba, así que el mensaje es el mismo
     if (res.ok) {
@@ -388,3 +472,52 @@ form.addEventListener('submit', async e => {
 
 // Tienda del Drop 00: solo se muestra si el servidor tiene la venta abierta
 iniciarTienda(API_URL);
+
+// ---------- Botón de arrepentimiento ----------
+// Sin registro ni trámites: se manda nombre y mail y se muestra el código en el momento
+const arrForm = document.getElementById('arrepentimiento-form');
+const arrMsg = document.getElementById('arrepentimiento-msg');
+const arrBtn = document.getElementById('arrepentimiento-enviar');
+arrForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  if (arrBtn.disabled) return;
+  const datos = Object.fromEntries(new FormData(arrForm));
+  const nombre = String(datos.nombre ?? '').trim();
+  if (nombre.length < 2) { arrMsg.textContent = 'Escribí tu nombre y apellido.'; arrForm.elements.nombre.focus(); return; }
+  if (!arrForm.elements.email.checkValidity() || !String(datos.email ?? '').trim()) { arrMsg.textContent = 'Escribí el mail con el que compraste.'; arrForm.elements.email.focus(); return; }
+  arrBtn.disabled = true;
+  arrMsg.textContent = 'Enviando…';
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(`${API_URL}/api/programacion/ventas/arrepentimiento`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ nombre, email: String(datos.email).trim(), pedido: String(datos.pedido ?? '').trim() }),
+      signal: controller.signal
+    });
+    const cuerpo = await res.json().catch(() => ({}));
+    if (res.ok && cuerpo.codigo) {
+      arrMsg.textContent = `Listo. Tu código de arrepentimiento es ${cuerpo.codigo}. Guardalo: te escribimos al mail para coordinar la devolución y el reembolso.`;
+      arrForm.reset();
+    } else {
+      arrMsg.textContent = cuerpo.error || 'No pudimos registrarlo. Escribinos a vow2026ar@gmail.com y te damos el código.';
+    }
+  } catch {
+    arrMsg.textContent = 'No pudimos conectar. Escribinos a vow2026ar@gmail.com y te damos el código.';
+  } finally {
+    clearTimeout(timer);
+    arrBtn.disabled = false;
+  }
+});
+
+// ---------- CTA fijo en celular ----------
+// Aparece al salir del hero y se oculta cuando ya se ve el formulario de acceso
+const ctaFijo = document.getElementById('cta-fijo');
+ctaFijo.hidden = false;
+const heroSection = document.getElementById('sec-01');
+let heroVisible = true;
+let accesoVisible = false;
+const actualizarCtaFijo = () => ctaFijo.classList.toggle('is-visible', !heroVisible && !accesoVisible);
+new IntersectionObserver(([entry]) => { heroVisible = entry.isIntersecting; actualizarCtaFijo(); }, { threshold: 0.15 }).observe(heroSection);
+new IntersectionObserver(([entry]) => { accesoVisible = entry.isIntersecting; actualizarCtaFijo(); }, { threshold: 0.2 }).observe(waitlistSection);
