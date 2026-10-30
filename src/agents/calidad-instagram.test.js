@@ -1,6 +1,6 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { puntuarGancho, resumenCalidad, revisarEpigrafe, revisarPieza } from "./calidad-instagram.js";
+import { puntuarGancho, resumenCalidad, revisarCarrusel, revisarEpigrafe, revisarPieza } from "./calidad-instagram.js";
 
 describe("gancho", () => {
   test("un gancho corto, concreto y en voseo puntúa fuerte", () => {
@@ -105,5 +105,27 @@ describe("pieza", () => {
     assert.match(texto, /Revisión \(arreglar\)/);
     assert.match(texto, /decidís vos/);
     assert.equal(resumenCalidad(null), "");
+  });
+});
+
+describe("carrusel", () => {
+  const lamina = (n) => Array.from({ length: n }, (_, i) => `Lámina ${i + 1} con una idea`);
+
+  test("de 6 a 10 láminas cortas no tiene avisos", () => {
+    assert.deepEqual(revisarCarrusel(lamina(7)), []);
+  });
+
+  test("avisa si son pocas, muchas, la portada es larga o una lámina es un párrafo", () => {
+    assert.match(revisarCarrusel(lamina(3))[0].mensaje, /3 láminas/);
+    assert.match(revisarCarrusel(lamina(12))[0].mensaje, /12 láminas/);
+    assert.ok(revisarCarrusel(["Una portada que tiene demasiadas palabras para leerse", ...lamina(6)]).some((a) => /portada/.test(a.mensaje)));
+    assert.ok(revisarCarrusel([...lamina(6), Array.from({ length: 30 }, () => "palabra").join(" ")]).some((a) => /más de 25 palabras/.test(a.mensaje)));
+  });
+
+  test("sin láminas no avisa, y solo se revisa en piezas de formato carrusel", () => {
+    assert.deepEqual(revisarCarrusel(undefined), []);
+    const base = { gancho: "Probá el shaker del Drop 01", epigrafe: "Shaker del Drop 01.", texto_en_pantalla: lamina(2) };
+    assert.ok(revisarPieza({ ...base, formato: "carrusel" }).avisos.some((a) => a.chequeo === "carrusel"));
+    assert.ok(!revisarPieza({ ...base, formato: "reel" }).avisos.some((a) => a.chequeo === "carrusel"));
   });
 });

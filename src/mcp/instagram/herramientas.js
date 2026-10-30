@@ -9,6 +9,7 @@
 import { z } from "zod";
 import { LIMITE_LISTA_MAXIMO } from "./api.js";
 import { ITEMS_CARRUSEL, revisarTextoPublico, validarId, validarUrlPublica } from "./validaciones.js";
+import { triarComentarios } from "../../agents/triaje-comentarios.js";
 
 const ok = (datos) => ({ content: [{ type: "text", text: JSON.stringify(datos, null, 2) }] });
 const fallo = (mensaje) => ({ content: [{ type: "text", text: mensaje }], isError: true });
@@ -66,13 +67,13 @@ export function crearHerramientas(meta, { permitirPublicar = false } = {}) {
     {
       nombre: "comentarios",
       titulo: "Comentarios de una publicación",
-      descripcion: "Comentarios de una publicación de @vow_ar: ID, texto, usuario, fecha y likes.",
+      descripcion: "Comentarios de una publicación de @vow_ar: ID, texto, usuario, fecha, likes y una categoría (consulta, pregunta, aporte, apoyo, ruido), ordenados de lo más urgente a lo menos, con el conteo por categoría.",
       esquema: {
         publicacion: z.string().describe("ID de la publicación."),
         limite: z.number().int().min(1).max(LIMITE_LISTA_MAXIMO).optional().describe("Cuántos traer (por defecto 25)."),
       },
       anotaciones: LECTURA,
-      manejar: async ({ publicacion, limite }) => ok(await meta.comentarios(validarId(publicacion, "ID de publicación"), limite)),
+      manejar: async ({ publicacion, limite }) => ok(triarComentarios(await meta.comentarios(validarId(publicacion, "ID de publicación"), limite))),
     },
     {
       nombre: "preparar_publicacion",

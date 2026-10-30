@@ -138,6 +138,23 @@ export function revisarEpigrafe(epigrafe, { palabrasClave = [] } = {}) {
 }
 const bajas = (t) => String(t).toLowerCase();
 
+// ---------- Carrusel: una idea por lámina ----------
+// Cada texto de `texto_en_pantalla` es una lámina. Reglas del ig-carousel de Instagram Agent Skill: de 6 a 10 láminas,
+// portada de 6 palabras o menos, y ninguna con más de 25 palabras (si una lámina necesita un párrafo, son dos láminas).
+export function revisarCarrusel(laminas) {
+  const textos = (Array.isArray(laminas) ? laminas : []).filter((l) => typeof l === "string" && l.trim() !== "");
+  if (textos.length === 0) return [];
+  const avisos = [];
+  const agregar = (mensaje) => avisos.push({ nivel: "warn", chequeo: "carrusel", mensaje });
+  if (textos.length < 6) agregar(`Tiene ${textos.length} láminas y un carrusel que se desliza hasta el final suele tener de 6 a 10.`);
+  if (textos.length > 10) agregar(`Tiene ${textos.length} láminas: pasado el 10 casi nadie llega al final.`);
+  const portada = palabras(textos[0]).length;
+  if (portada > 6) agregar(`La portada tiene ${portada} palabras y se lee mejor con 6 o menos.`);
+  const largas = textos.map((t, i) => [i + 1, palabras(t).length]).filter(([, n]) => n > 25);
+  if (largas.length) agregar(`Láminas con más de 25 palabras: ${largas.map(([i, n]) => `la ${i} (${n})`).join(", ")}. Si necesita un párrafo, son dos láminas.`);
+  return avisos;
+}
+
 // ---------- Pieza completa ----------
 // Devuelve null si no hay nada para revisar. Nunca cambia la pieza.
 export function revisarPieza(pieza) {
@@ -147,7 +164,7 @@ export function revisarPieza(pieza) {
   if (!tieneGancho && !tieneEpigrafe) return null;
   const gancho = tieneGancho ? puntuarGancho(pieza.gancho) : null;
   const epigrafe = tieneEpigrafe ? revisarEpigrafe(pieza.epigrafe, { palabrasClave: Array.isArray(pieza.palabras_clave) ? pieza.palabras_clave.filter((k) => typeof k === "string") : [] }) : { veredicto: "listo", avisos: [] };
-  const avisos = [...epigrafe.avisos];
+  const avisos = [...epigrafe.avisos, ...(pieza.formato === "carrusel" ? revisarCarrusel(pieza.texto_en_pantalla) : [])];
   if (gancho && gancho.veredicto === "flojo") avisos.unshift({ nivel: "warn", chequeo: "gancho", mensaje: `El gancho puntúa ${gancho.puntaje}/100${gancho.banderas.length ? ` (${gancho.banderas.join(", ")})` : `; lo más flojo: ${NOMBRE_EJE[gancho.masBajo]}`}.` });
   const veredicto = avisos.some((a) => a.nivel === "fail") ? "arreglar" : avisos.length ? "revisar" : "listo";
   return { veredicto, gancho: gancho && { puntaje: gancho.puntaje, veredicto: gancho.veredicto, masBajo: gancho.masBajo }, avisos };
