@@ -29,9 +29,10 @@ export const esHoraDePublicacion = (valor) =>
 // Ganchos que suenan a tutorial o a lista de consejos (descartado por Facundo)
 const TONO_TUTORIAL = /^\s*(c[oó]mo|tips?\b|consejos?\b|pasos?\b|gu[ií]a\b|\d+\s+(cosas|tips|pasos|razones|formas|ideas))/i;
 // Una story de encuesta o de pregunta pide una interacción en vez de pedir anotarse
-export const CTA_DE_INTERACCION = /(?<!\p{L})(vot[aá]\w*|eleg[ií]\w*|respond[eé]\w*|contest[aá]\w*|cont[aá]\w*|dec[ií]\w*|mand[aá]\w*|compart[ií]\w*|deslizá|arrastrá|tocá)(?!\p{L})/iu;
+export const CTA_DE_INTERACCION = /(?<!\p{L})(vot[aá]\w*|eleg[ií]\w*|respond[eé]\w*|contest[aá]\w*|cont[aá]\w*|dec[ií]\w*|mand[aá]\w*|guard[aá]\w*|envi[aá]\w*|compart[ií]\w*|deslizá|arrastrá|tocá)(?!\p{L})/iu;
 const RUTA_CEREBRO = new URL("../../docs/marca/cerebro-de-marca.md", import.meta.url);
 const RUTA_BANCO = new URL("../../docs/marca/banco-de-contenido.md", import.meta.url);
+const RUTA_PSICOLOGIA = new URL("../../docs/marca/psicologia-de-marketing.md", import.meta.url);
 const RUTA_REFERENCIAS = new URL("../../docs/marca/referencias.md", import.meta.url);
 const RUTA_INVESTIGACION = new URL("../../docs/investigacion/", import.meta.url);
 const RUTA_RENDIMIENTO = new URL("../../docs/rendimiento/", import.meta.url);
@@ -73,7 +74,8 @@ export const HERRAMIENTA_PLAN = {
             texto_en_pantalla: { type: "array", items: { type: "string" } },
             epigrafe: { type: "string", description: "Texto que acompaña la publicación: dos a cuatro frases en lenguaje cotidiano, en párrafos cortos separados por una línea en blanco (\\n\\n); la acción final va en su propia línea. En una story va vacío: las stories no llevan epígrafe." },
             palabras_clave: { type: "array", items: { type: "string" } },
-            cta: { type: "string", description: "Una sola acción: anotarse en la lista de espera. En una story de encuesta o de pregunta, la acción es la propia interacción (\"Votá\", \"Contanos\", \"Respondé\")." },
+            cta: { type: "string", description: "Una sola acción. Cuando la pieza pide algo, es anotarse en la lista de espera. Cuando primero da algo (un dato, un detalle, una pregunta útil), la acción puede ser la propia interacción (\"Guardalo\", \"Mandaselo a quien entrena con vos\", \"Contanos\", \"Votá\"). Al menos una pieza del plan pide anotarse." },
+            modelo_psicologia: { type: "string", description: "El modelo de la sección de psicología de marketing en el que se apoya la pieza (por ejemplo \"Reciprocidad\", \"Prueba social\", \"Compromiso y coherencia\", \"Energía de activación\"), y en qué parte se nota. Un solo modelo, solo de los que VOW usa." },
             recursos: { type: "array", items: { type: "string" }, description: "Qué hace falta tener para hacerla." },
             material_a_producir: {
               type: "array",
@@ -89,7 +91,7 @@ export const HERRAMIENTA_PLAN = {
               type: "string",
               description: "Si produccion es \"ia\" o \"mixto\": indicación en español, lista para copiar y pegar en una herramienta de IA de imágenes o video. Si es \"propio\": cadena vacía.",
             },
-            justificacion: { type: "string", description: "Por qué esta pieza, con apoyo en la marca o en las referencias." },
+            justificacion: { type: "string", description: "Por qué esta pieza, con apoyo en la marca, la psicología de marketing o las referencias." },
             referencias: { type: "array", items: { type: "string" }, description: "Cuentas de referencia que inspiran la pieza, si aplica." },
           },
         },
@@ -257,10 +259,12 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
         errores.push(`${etiqueta}: repite el formato (${pieza.formato}) y el pilar (${pieza.pilar}) de la pieza ya definida del ${definida.fecha}.`);
       }
     }
-    // Una sola acción: anotarse en la lista de espera
-    // (una story puede cerrar con su propia interacción: votar, responder, contar)
-    const cierraConInteraccion = pieza.formato === "story" && CTA_DE_INTERACCION.test(pieza.cta ?? "");
-    if (typeof pieza.cta === "string" && !/lista/i.test(pieza.cta) && !cierraConInteraccion) errores.push(`${etiqueta}: la acción final tiene que ser anotarse en la lista${pieza.formato === "story" ? " (o, en una story, votar o responder)" : ""}.`);
+    // Una sola acción por pieza. Pide anotarse, o primero da algo y cierra con su propia interacción (guardar, mandar, contar, votar)
+    // (reciprocidad: dar valor antes de pedir). Que alguna pieza del plan pida anotarse se revisa más abajo.
+    const cierraConInteraccion = CTA_DE_INTERACCION.test(pieza.cta ?? "");
+    if (typeof pieza.cta === "string" && !/lista/i.test(pieza.cta) && !cierraConInteraccion) errores.push(`${etiqueta}: la acción final tiene que ser anotarse en la lista (o una interacción concreta: guardar, mandar, contar o votar).`);
+    // Una sola acción: no se juntan dos pedidos distintos en la misma frase ("Guardalo y anotate en la lista")
+    if (typeof pieza.cta === "string" && /lista/i.test(pieza.cta) && CTA_DE_INTERACCION.test(pieza.cta.replace(/anotate|anotarte|anotarse|lista de espera/gi, ""))) errores.push(`${etiqueta}: el cta junta dos acciones (anotarse y otra). Tiene que haber una sola.`);
 
     // No se puede mostrar lo que todavía no existe
     if (pieza.pilar === "producto en uso" && !recursos.producto) errores.push(`${etiqueta}: pide "producto en uso" pero todavía no hay producto.`);
@@ -282,6 +286,8 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
     }
   });
 
+  // El embudo: dar valor primero está bien, pero alguna pieza tiene que pedir anotarse (reciprocidad, y después compromiso)
+  if (plan.piezas.length >= 2 && !plan.piezas.some((pieza) => /lista/i.test(pieza.cta ?? ""))) errores.push("Ninguna pieza pide anotarse en la lista: al menos una tiene que hacerlo.");
   // Entre piezas: a lo sumo un gancho principal puede salir de la lista del cerebro de marca,
   // y ningún pilar se repite más de lo razonable (con 2 piezas, pilares distintos)
   const principalesCopiados = plan.piezas.filter((pieza) => conocidos.has(normalizar(pieza.gancho)));
@@ -319,9 +325,10 @@ export const leerUltimosPatrones = (opciones) => leerUltimo(RUTA_INVESTIGACION, 
 export const leerUltimoRendimiento = (opciones) => leerUltimo(RUTA_RENDIMIENTO, /^rendimiento-\d{4}-\d{2}-\d{2}\.md$/, opciones);
 
 export async function construirSistema(leer = (ruta) => readFile(ruta, "utf8"), { listar } = {}) {
-  const [cerebro, banco, referencias, informe, patrones, rendimiento, piezas] = await Promise.all([
+  const [cerebro, banco, psicologia, referencias, informe, patrones, rendimiento, piezas] = await Promise.all([
     leer(RUTA_CEREBRO),
     leer(RUTA_BANCO).catch(() => ""),
+    leer(RUTA_PSICOLOGIA).catch(() => ""),
     leer(RUTA_REFERENCIAS),
     leerUltimoInforme({ leer, listar }),
     leerUltimosPatrones({ leer, listar }),
@@ -356,9 +363,12 @@ ${piezas.map((p) => p.texto.trim()).join("\n\n---\n\n")}`
 
 Reglas:
 - Todo lo que escribas sigue el cerebro de marca de abajo. Si algo lo contradice, gana el cerebro de marca.
-- Hablás en voseo rioplatense. Cada pieza de feed termina con una sola acción: anotarse en la lista de espera. Una story de encuesta o de pregunta puede cerrar con su propia interacción ("Votá", "Contanos") y no necesita pedir la lista.
+- Hablás en voseo rioplatense. Cada pieza termina con UNA sola acción. Dar antes de pedir: una pieza que le regala algo a quien la mira (un detalle, una observación que se reconoce, una pregunta con opciones) puede cerrar con su propia interacción ("Guardalo", "Mandaselo a quien entrena con vos", "Contanos", "Votá"); las que piden anotarse en la lista de espera tienen que haber dado algo antes. En el plan, al menos una pieza pide anotarse y no todas lo piden: pedir en cada pieza cansa y no se parece a una marca que respeta a su gente.
 - MÉTODO (seguilo en este orden antes de llamar a la herramienta): 1) Leé el BANCO DE CONTENIDO y las notas: si hay un FOCO DE LA SEMANA de Facundo, el plan gira alrededor de ese foco. 2) Para cada pieza elegí primero el trabajo (mostrar, preguntar o sumar) y el dato visible concreto (qué se ve en el primer segundo), y recién después escribí el gancho. 3) Pensá tres enfoques distintos para cada pieza y quedate con el más concreto, el que se pueda filmar o hacer esta semana. 4) Pasá cada frase por la prueba del amigo; si suena a póster, reescribila diciendo la cosa concreta. 5) Mezclá formatos: las stories (y secuencias de stories) son el canal diario y barato; sumá 1 o 2 piezas de feed. No hagas todas las piezas de frases sobre la promesa: como mucho una.
 - Cada pieza tiene que mostrar o preguntar algo concreto (una decisión real, un detalle de una prenda, un color sobre una tela, una pregunta con opciones). En guion y texto_en_pantalla nombrá lo que se ve, no el concepto.
+- PSICOLOGÍA DE MARKETING (sección de abajo): en cada pieza apoyate en UN solo modelo de los que VOW usa, el que mejor encaja con lo que la pieza hace, y anotalo en "modelo_psicologia" y en "justificacion". Los modelos que VOW NO usa (señuelo, cuenta regresiva, números inflados, culpa, urgencia o escasez sin dato) no se usan nunca, ni disfrazados. Antes de dar por buena una pieza hacete la prueba rápida: ¿la persona haría lo mismo si viera todo lo que sabemos nosotros? Si no, se cambia.
+- PRUEBA DE CONCRECIÓN (la que más falla): completá "En el primer segundo se ve ___" con algo que se pueda filmar, fotografiar o dibujar (un cordón, un bolso en la puerta, dos opciones de largo de short). Si lo único que se ve es una frase sobre un fondo liso, la pieza no pasa. Para un carrusel, cada lámina dice una cosa concreta que quien lo ve reconoce de su propio entrenamiento.
+- BIEN Y MAL (ejemplos de tono, NO los copies): mal "Atate el compromiso. Salí." (orden de póster, no dice qué se ve), "Lo que firmás con vos no se rompe" (sentencia), "Domingo. Fijate si cumpliste." (vacío, no da nada). Bien: una observación que se reconoce ("El bolso ya está en la puerta desde anoche."), una decisión real con opciones ("¿Short largo o corto para piernas? Votá."), una pregunta que se contesta en un comentario ("¿Qué entrenás los lunes?"), un detalle visible de una prenda cuando haya producto.
 - Nunca inventes cifras, pruebas, stock, fechas ni opiniones. No uses números en los textos salvo "01" de "Drop 01" con su año "2027", y "00" de "Drop 00" con su año "2026". Los años van sin mes ni día. Al Drop 00 solo lo nombrás como adelanto y solo si Facundo lo pidió, está en las novedades o es el foco de la semana: sin precios, cantidades ni stock; podés mostrar indicios concretos (un bordado de cerca, el color de un hilo, el borde de una media) cuando el foco lo pide.
 - Solo podés proponer piezas que se puedan hacer con los recursos disponibles que te indican. Si no hay producto, no propongas mostrar producto.
 - Cada pieza lleva su hora de publicación (hora de Argentina, entre ${HORA_MINIMA_PUBLICACION} y ${HORA_MAXIMA_PUBLICACION}). Si hay un RENDIMIENTO de @vow_ar, elegí la hora con esos datos; si no, una hora de buena actividad como 19:00. Nunca inventes que una hora "rinde mejor" sin datos.
@@ -387,6 +397,10 @@ ${cerebro}
 ${banco ? `
 === BANCO DE CONTENIDO (de qué hablar y cómo bajarlo a algo que se ve) ===
 ${banco}
+` : ""}
+${psicologia ? `
+=== PSICOLOGÍA DE MARKETING (qué hace que alguien guarde, mande o se anote, y qué no se usa nunca) ===
+${psicologia}
 ` : ""}
 === MARCAS DE REFERENCIA ===
 ${referencias}${bloqueInvestigacion}${bloquePatrones}${bloqueRendimiento}${bloquePiezas}` };
