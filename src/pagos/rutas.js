@@ -1,15 +1,17 @@
 // Rutas de la venta propia, bajo /api/programacion/ventas:
 //   GET  /estado         si la venta está abierta y qué se vende (público: sin stock exacto)
 //   POST /pedidos        arma un pedido y devuelve el link de pago de Mercado Pago (público, solo si la venta está abierta)
+//   POST /arrepentimiento  botón de arrepentimiento: devuelve el código de revocación (público, funciona aunque la venta esté cerrada)
 //   POST /mercadopago    aviso de Mercado Pago cuando cambia un pago (se valida con la firma)
 import { Router } from "express";
 import { rateLimit } from "express-rate-limit";
 import { CATALOGO, leerInventario } from "../programacion/inventario.js";
 import { firmaValida } from "./mercadopago.js";
 import { ErrorCodigo } from "../descuentos/codigos.js";
+import { ErrorArrepentimiento } from "./arrepentimiento.js";
 import { ErrorPedido, confirmarPago, crearPedido } from "./pedidos.js";
 
-export function crearRutasVentas({ repo, mp, secretoWebhook, ventaAbierta = false, cotizarEnvio = null, codigos = null, consultaCodigo = null, urlPublica, urlLanding }) {
+export function crearRutasVentas({ repo, mp, secretoWebhook, ventaAbierta = false, cotizarEnvio = null, codigos = null, consultaCodigo = null, arrepentimientos = null, urlPublica, urlLanding }) {
   const router = Router();
   const limitePedidos = rateLimit({ windowMs: 60_000, limit: 10, standardHeaders: true, legacyHeaders: false, message: { error: "Demasiados pedidos. Probá en un minuto." } });
 
@@ -55,6 +57,16 @@ export function crearRutasVentas({ repo, mp, secretoWebhook, ventaAbierta = fals
       return res.json(await consultaCodigo.consultar(req.body?.email));
     } catch (error) {
       if (error instanceof ErrorCodigo) return res.status(error.estado).json({ error: error.message });
+      return siguiente(error);
+    }
+  });
+
+  router.post("/arrepentimiento", limiteConsulta, async (req, res, siguiente) => {
+    try {
+      if (!arrepentimientos) return res.status(503).json({ error: "No pudimos registrarlo. Escribinos por mail y te damos el código." });
+      return res.status(201).json(await arrepentimientos.registrar(req.body));
+    } catch (error) {
+      if (error instanceof ErrorArrepentimiento) return res.status(error.estado).json({ error: error.message });
       return siguiente(error);
     }
   });

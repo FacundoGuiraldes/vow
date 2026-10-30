@@ -86,9 +86,17 @@ pruebaConBase("rechaza un email de 254 caracteres o más", async () => {
   assert.match(r.cuerpo.error, /menos de 254 caracteres/);
 });
 
+pruebaConBase("sin consentimiento expreso no se guarda nada", async () => {
+  for (const consentimiento of [undefined, false, "true", 1]) {
+    const r = await enviar(servidor, { email: emailDePrueba(), consentimiento });
+    assert.equal(r.status, 400);
+    assert.equal(r.cuerpo.campo, "consentimiento");
+  }
+});
+
 pruebaConBase("registra un email válido normalizado en minúsculas y sin espacios", async () => {
   const email = emailDePrueba();
-  const r = await enviar(servidor, { email: `  ${email.toUpperCase()}  `, origen: "landing" });
+  const r = await enviar(servidor, { email: `  ${email.toUpperCase()}  `, origen: "landing", consentimiento: true });
   assert.equal(r.status, 200);
   assert.equal(r.cuerpo.mensaje, MENSAJE_EXITO);
 
@@ -100,8 +108,8 @@ pruebaConBase("registra un email válido normalizado en minúsculas y sin espaci
 
 pruebaConBase("un email repetido responde 200 con el mismo mensaje y no se duplica", async () => {
   const email = emailDePrueba();
-  const primera = await enviar(servidor, { email });
-  const segunda = await enviar(servidor, { email: email.toUpperCase() });
+  const primera = await enviar(servidor, { email, consentimiento: true });
+  const segunda = await enviar(servidor, { email: email.toUpperCase(), consentimiento: true });
 
   assert.equal(primera.status, 200);
   assert.equal(segunda.status, 200);
@@ -180,7 +188,7 @@ pruebaConBase("con TRUST_PROXY=1 el límite por IP usa la IP de X-Forwarded-For"
 
 pruebaConBase("guarda un Instagram válido normalizado", async () => {
   const email = emailDePrueba();
-  const r = await enviar(servidor, { email, instagram: "@Vow_AR ", origen: "landing" });
+  const r = await enviar(servidor, { email, instagram: "@Vow_AR ", origen: "landing", consentimiento: true });
   assert.equal(r.status, 200);
   assert.equal(r.cuerpo.mensaje, MENSAJE_EXITO);
 
@@ -192,7 +200,7 @@ pruebaConBase("guarda un Instagram válido normalizado", async () => {
 pruebaConBase("sin Instagram guarda NULL y responde 200", async () => {
   for (const cuerpo of [{}, { instagram: "" }, { instagram: "   " }, { instagram: null }]) {
     const email = emailDePrueba();
-    const r = await enviar(servidor, { email, ...cuerpo });
+    const r = await enviar(servidor, { email, ...cuerpo, consentimiento: true });
     assert.equal(r.status, 200);
     assert.equal((await leerRegistro(email)).instagram, null);
   }
@@ -212,8 +220,8 @@ pruebaConBase("rechaza un Instagram con espacios, caracteres raros o más de 30 
 
 pruebaConBase("un email repetido con otro Instagram no modifica el registro", async () => {
   const email = emailDePrueba();
-  const primera = await enviar(servidor, { email, instagram: "primero" });
-  const segunda = await enviar(servidor, { email, instagram: "segundo" });
+  const primera = await enviar(servidor, { email, instagram: "primero", consentimiento: true });
+  const segunda = await enviar(servidor, { email, instagram: "segundo", consentimiento: true });
 
   assert.equal(primera.status, 200);
   assert.equal(segunda.status, 200);

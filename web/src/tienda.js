@@ -142,6 +142,13 @@ export async function iniciarTienda(apiUrl) {
   form.addEventListener('submit', async e => {
     e.preventDefault();
     if (botonPagar.disabled || !carrito.length) return;
+    // Aceptación expresa de términos, reembolsos y privacidad antes de pagar
+    const aceptoTerminos = document.getElementById('tienda-consent');
+    if (!aceptoTerminos.checked) {
+      mensaje.textContent = 'Tildá la casilla para aceptar los términos y condiciones antes de pagar.';
+      aceptoTerminos.focus();
+      return;
+    }
     const datos = new FormData(form);
     const envio = datos.get('entrega') === 'envio';
     const cuerpo = {
