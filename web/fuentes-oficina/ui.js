@@ -495,6 +495,17 @@ function botonPrevia(e,f,est){
   return {abierta:abierta,boton:b};
 }
 
+/* Revisión de calidad del gancho y el epígrafe: solo sugerencias, la decisión sigue siendo de la persona */
+function bloqueCalidad(e){
+  var c=e._cal;if(!c)return null;
+  var b=el('div','cal cal-'+c.veredicto);
+  var t=c.veredicto==='listo'?'Revisión: sin avisos':'Revisión: '+c.avisos.length+(c.avisos.length===1?' aviso':' avisos');
+  if(c.gancho)t+=' · gancho '+c.gancho.puntaje+'/100';
+  b.appendChild(el('strong',null,t));
+  if(c.avisos.length){var ul=el('ul');c.avisos.forEach(function(a){ul.appendChild(el('li',a.nivel==='fail'?'fail':null,a.mensaje))});b.appendChild(ul);b.appendChild(el('p','nota','Son sugerencias: decidís vos.'))}
+  return b;
+}
+
 function tarjetaPieza(e){
   var d=pd(e.fecha),f=el('div','pieza'),m=(MED.piezas||{})[kMed(e)]||{},ap=!!HECHO[kPieza(e)];
   if(e._id&&MEDIOS_ID[e._id])m=Object.assign({},m,{imgs:MEDIOS_ID[e._id].imgs||[],vid:MEDIOS_ID[e._id].vid});
@@ -506,6 +517,7 @@ function tarjetaPieza(e){
   if(m.imgs&&m.imgs.length)f.appendChild(galeria(m.imgs));
   if(m.vid){var v=document.createElement('video');v.src=m.vid;v.controls=true;v.playsInline=true;v.preload='metadata';v.className='vid';f.appendChild(v)}
   var ep=epigrafeDe(e,m);f.appendChild(ep?el('p','epi',ep):el('p','vacio','Todavía no tiene epígrafe.'));
+  var cal=bloqueCalidad(e);if(cal)f.appendChild(cal);
   var pv=(e._id&&e.estado!=='publicado')?botonPrevia(e,f,est):null;
   if(pv&&pv.abierta)f.appendChild(previaInstagram(e,m));
   var a=el('div','acc');

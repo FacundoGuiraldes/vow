@@ -15,6 +15,16 @@ describe("la oficina", () => {
     await assert.rejects(aplicarAccion(e, { accion: "aprobar_pieza", id: fila.id }), (error) => error instanceof ErrorAccion && error.estado === 409);
   });
 
+  test("cada pieza trae su revisión de calidad y revisarla no cambia ni aprueba nada", async () => {
+    const e = crearEscenario();
+    const fila = await e.cargarPieza();
+    const estado = await armarEstadoOficina({ repo: e.repo });
+    const pieza = estado.piezas.find((p) => p.id === fila.id);
+    assert.ok(["listo", "revisar", "arreglar"].includes(pieza.calidad.veredicto));
+    assert.ok(Array.isArray(pieza.calidad.avisos));
+    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, fila.estado);
+  });
+
   test("aprobar desde el juego NO confirma la publicación del día", async () => {
     const e = crearEscenario({ fecha: "2026-10-30" });
     const fila = await e.cargarPieza();

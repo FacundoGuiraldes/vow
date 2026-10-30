@@ -2,6 +2,7 @@
 // Todo va en texto plano (sin Markdown) para que ningún carácter del epígrafe rompa el mensaje.
 import { LIMITE_MENSAJE } from "./telegram.js";
 import { fechaLegible, sumarDias } from "./fechas.js";
+import { resumenCalidad, revisarPieza } from "../agents/calidad-instagram.js";
 
 export const DIAS_RECORDATORIO = 3;
 
@@ -43,6 +44,7 @@ export function textoPieza(fila, { titulo = "" } = {}) {
     p.produccion ? `🛠️ Cómo hacerla: ${PRODUCCION_LEGIBLE[produccionDe(p)]}` : "",
     `Gancho: ${p.gancho}`,
     p.epigrafe ? `Epígrafe: ${p.epigrafe}` : "",
+    resumenCalidad(revisarPieza(p)),
     p.guion ? `Guion: ${recortar(p.guion, 900)}` : "",
     bloqueIA(p),
     material(fila).length ? `${tituloDeMaterial(p)}\n${lista(material(fila))}\nTe aviso el ${fechaLegible(fechaDeAviso(fila.fecha))}.` : "",
