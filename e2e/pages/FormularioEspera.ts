@@ -22,7 +22,7 @@ export class FormularioEspera {
     this.enviar = this.seccion.getByRole("button");
     this.mensaje = this.seccion.getByRole("status");
     this.consentimiento = this.seccion.getByRole("checkbox");
-    this.linkPrivacidad = this.seccion.getByRole("link", { name: textos.regiones.privacidad, exact: true });
+    this.linkPrivacidad = this.seccion.getByRole("link", { name: textos.privacidad, exact: true });
   }
 
   async completar(email: string, instagram?: string) {

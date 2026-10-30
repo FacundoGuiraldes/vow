@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="Botón de arrepentimiento de VOW." />
+  <meta name="theme-color" content="#0A0A0A" />
+  <link rel="icon" type="image/svg+xml" href="/assets/logo-black.svg" />
+  <title>Botón de arrepentimiento | VOW</title>
+</head>
+<body class="pagina-legal">
+  <a class="skip-link" href="#contenido">Saltar al contenido</a>
+  <header class="legal-cabecera">
+    <a class="legal-volver" href="/"><span aria-hidden="true">←</span> Volver a VOW</a>
+  </header>
+  <main id="contenido" class="legal-main">
+    <p class="kicker">Legal</p>
+    <h1 class="title-large">Botón de arrepentimiento</h1>
+    <div class="privacy-body">
+        <p class="privacy-intro">Completá el formulario y te damos un código en el momento. No hace falta registrarte.</p>
+        <form id="arrepentimiento-form" class="form-claro" novalidate>
+          <label>Nombre y apellido<input name="nombre" autocomplete="name" required maxlength="80"></label>
+          <label>Mail con el que compraste<input name="email" type="email" autocomplete="email" inputmode="email" required maxlength="120"></label>
+          <label>Número de pedido (opcional)<input name="pedido" maxlength="40" autocomplete="off"></label>
+          <button type="submit" class="hero-btn" id="arrepentimiento-enviar">Solicitar arrepentimiento</button>
+          <p id="arrepentimiento-msg" class="form-claro__msg" role="status" aria-live="polite"></p>
+        </form>
+    </div>
+    <nav class="legal-otros" aria-label="Otros documentos legales"><span>Otros documentos</span><a href="/privacidad/">Política de privacidad</a><a href="/terminos/">Términos y condiciones</a><a href="/reembolsos/">Reembolsos y devoluciones</a><a href="/cookies/">Política de cookies</a></nav>
+  </main>
+  <footer>
+    <div class="footer-fila">
+      <a class="footer-logo" href="/" aria-label="VOW, volver al inicio"></a>
+      <div class="footer-contacto">
+        <a href="https://www.instagram.com/vow_ar" class="ig-link" target="_blank" rel="noopener noreferrer"
+           aria-label="@vow_ar en Instagram (se abre en otra pestaña)">@vow_ar</a>
+        <a href="mailto:vow2026ar@gmail.com" class="ig-link">vow2026ar@gmail.com</a>
+      </div>
+    </div>
+    <nav class="footer-legal" aria-label="Legal">
+      <a href="/privacidad/" class="ig-link">Privacidad</a>
+      <a href="/terminos/" class="ig-link">Términos</a>
+      <a href="/reembolsos/" class="ig-link">Reembolsos</a>
+      <a href="/cookies/" class="ig-link">Cookies</a>
+      <a href="/arrepentimiento/" class="boton-arrepentimiento">Botón de arrepentimiento</a>
+    </nav>
+    <p>© 2026 VOW · Argentina</p>
+  </footer>
+  <script type="module" src="/src/legal.js"></script>
+</body>
+</html>

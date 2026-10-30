@@ -15,8 +15,8 @@ export const textos = {
     drop: "Drop 01",
     resumenDrop: "Resumen del Drop 01",
     acceso: "ACCESO",
-    privacidad: "Política de privacidad",
   },
+  privacidad: "Política de privacidad",
   // Los textos del catálogo viven dentro de web/src/main.js (no se exportan), por eso van acá.
   instagramInvalido: MENSAJE_INSTAGRAM_INVALIDO,
 };
