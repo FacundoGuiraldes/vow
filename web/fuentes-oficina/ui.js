@@ -167,11 +167,11 @@ function actualizarEstado(){
   var av=$('sinCon'),vivo=conectado==='vivo';
   av.hidden=vivo||conectado==='vacio';
   if(!vivo){
-    av.textContent='';av.appendChild(el('span',null,conectado==='error'?'No llega al bot'+(ERR_TXT?' ('+ERR_TXT+')':'')+'. Lo que ves son solo los documentos del repo: no incluye las piezas nuevas ni se guarda nada.':conectado==='clave'?'La clave no es válida. Sin conexión no se guarda nada.':'Sin conexión con el bot: ves solo los documentos del repo y no se guarda nada.'));
+    av.textContent='';av.appendChild(el('span',null,conectado==='error'?'No llega al bot'+(ERR_TXT?' ('+ERR_TXT+')':'')+'. No se ve ni se guarda nada hasta que conecte.':conectado==='clave'?'La clave no es válida. Sin conexión no se guarda nada.':'Sin conexión con el bot: no se ve ni se guarda nada.'));
     if(conectado==='clave'||conectado==='no'){var b=el('button','ck sec','Poner clave');b.type='button';b.addEventListener('click',function(){pedirClave('Ingresá la clave de la oficina.')});av.appendChild(b)}
   }
   var e=$('est'),l=$('luz');l.className='';
-  if(conectado==='no')e.textContent=leerClave()?'conectando con el bot…':'solo documentos (sin clave)';
+  if(conectado==='no')e.textContent=leerClave()?'conectando con el bot…':'bloqueado: falta la clave';
   else if(conectado==='error')e.textContent='sin conexión con el bot · '+(ERR_TXT||'error');
   else if(conectado==='clave')e.textContent='falta la clave de la oficina';
   else if(conectado==='vacio')e.textContent='todavía no hay datos';
