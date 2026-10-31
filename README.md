@@ -74,7 +74,7 @@ Lo que se hace en el juego y lo que se dice en el chat del bot es lo mismo: las 
 - **Lectura:** el juego consulta `GET /api/programacion/oficina?v=<versión>` cada 3 segundos (piezas con sus archivos, charla reciente con el bot, novedades, lo marcado en el juego y rendimiento de Instagram). Si no cambió nada, el servidor contesta cortito.
 - **Acciones:** `POST /api/programacion/oficina/accion` con `aprobar_pieza`, `cambiar_pieza`, `editar_pieza`, `quitar_archivos`, `cumplir`, `deshacer`, `nota`, `quitar_nota`, `inventario` (`entrada`, `ajuste`, `venta`, `anular_venta`) y `operacion` (tipos `estrategia_*` y datos editables).
 - **Archivos:** `POST /api/programacion/oficina/archivo?id=<pieza>` recibe como cuerpo la foto JPEG o el video MP4/MOV (hasta 40 MB) que se va a publicar.
-- **Documentos del repo:** `scripts/generar-oficina.js` arma en cada build de la web los datos de estrategia, piezas y depósito; el estado de tests y evals sale de la API pública de GitHub.
+- **Documentos del repo:** `scripts/generar-oficina.js` arma los datos de estrategia, piezas y depósito, y la API los entrega solo con clave (`GET /api/programacion/oficina/documentos`); no están en la web pública; el estado de tests y evals sale de la API pública de GitHub.
 - **CORS:** la web tiene que estar en `ALLOWED_ORIGINS`.
 - **Cómo se edita el juego:** las fuentes están en [`web/fuentes-oficina/`](web/fuentes-oficina/) (partes JS y HTML) y se ensamblan con `python3 web/fuentes-oficina/asm.py`, que regenera `web/public/oficina/index.html`. Ese archivo es generado: no se edita a mano. Necesita three.js r128, que se carga desde cdnjs.
 

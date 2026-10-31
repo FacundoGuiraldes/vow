@@ -123,6 +123,23 @@ describe("rutas de la publicación programada", () => {
     assert.equal(llamadas.fallos.at(-1).error, "El paso planificar no pasó");
   });
 
+  test("los documentos de la oficina y sus archivos no se ven sin clave", async () => {
+    assert.equal((await pedir("/oficina/documentos")).status, 401);
+    assert.equal((await pedir("/oficina/documentos", { clave: "otra" })).status, 401);
+    const ok = await pedir("/oficina/documentos", { clave: CLAVE });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.headers.get("cache-control"), "no-store");
+    const { D, MED } = await ok.json();
+    assert.ok(Array.isArray(D.piezas));
+    assert.equal(JSON.stringify(MED).includes('"medios/'), false, "los archivos no salen con rutas abiertas");
+    // Un archivo sin firma, o con la firma de otro, no se entrega
+    assert.equal((await pedir("/oficina/medios/2026-10-19_carrusel/1.png")).status, 404);
+    assert.equal((await pedir(`/oficina/medios/2026-10-19_carrusel/1.png?e=${Date.now() + 1000}&f=${"a".repeat(64)}`)).status, 404);
+    // Con el enlace firmado que entrega la API (si hay archivos en docs/), sí
+    const enlace = Object.values(MED.piezas).flatMap((m) => m.imgs ?? [])[0];
+    if (enlace) assert.equal((await pedir(enlace.replace("/api/programacion", ""))).status, 200);
+  });
+
   test("/oficina y /oficina/accion piden clave y devuelven lo que muestra el juego", async () => {
     assert.equal((await pedir("/oficina")).status, 401);
     assert.equal((await pedir("/oficina", { clave: "otra" })).status, 401);

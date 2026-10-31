@@ -1399,11 +1399,11 @@ function actualizarEstado(){
   var av=$('sinCon'),vivo=conectado==='vivo';
   av.hidden=vivo||conectado==='vacio';
   if(!vivo){
-    av.textContent='';av.appendChild(el('span',null,conectado==='error'?'No llega al bot'+(ERR_TXT?' ('+ERR_TXT+')':'')+'. Lo que ves son solo los documentos del repo: no incluye las piezas nuevas ni se guarda nada.':conectado==='clave'?'La clave no es válida. Sin conexión no se guarda nada.':'Sin conexión con el bot: ves solo los documentos del repo y no se guarda nada.'));
+    av.textContent='';av.appendChild(el('span',null,conectado==='error'?'No llega al bot'+(ERR_TXT?' ('+ERR_TXT+')':'')+'. No se ve ni se guarda nada hasta que conecte.':conectado==='clave'?'La clave no es válida. Sin conexión no se guarda nada.':'Sin conexión con el bot: no se ve ni se guarda nada.'));
     if(conectado==='clave'||conectado==='no'){var b=el('button','ck sec','Poner clave');b.type='button';b.addEventListener('click',function(){pedirClave('Ingresá la clave de la oficina.')});av.appendChild(b)}
   }
   var e=$('est'),l=$('luz');l.className='';
-  if(conectado==='no')e.textContent=leerClave()?'conectando con el bot…':'solo documentos (sin clave)';
+  if(conectado==='no')e.textContent=leerClave()?'conectando con el bot…':'bloqueado: falta la clave';
   else if(conectado==='error')e.textContent='sin conexión con el bot · '+(ERR_TXT||'error');
   else if(conectado==='clave')e.textContent='falta la clave de la oficina';
   else if(conectado==='vacio')e.textContent='todavía no hay datos';
@@ -2247,11 +2247,11 @@ function juntar(){
 var PEND_H={},PEND_N={},ERR_TXT='';
 function refrescar(){juntar();aplicar()}
 function leerVivo(forzar){
-  if(!leerClave()){conectado='no';refrescar();pedirClave('Ingresá la clave de la oficina para ver el estado del bot en vivo. Mientras tanto ves lo que dicen los documentos.');return Promise.resolve()}
+  if(!leerClave()){conectado='no';vaciarDocs();VIVO=null;refrescar();pedirClave('Ingresá la clave de la oficina.');return Promise.resolve()}
   return api('/oficina'+(VIVO&&!forzar?'?v='+VIVO.version:'')).then(function(j){
     if(j.sin_cambios&&VIVO){if(conectado!=='vivo'){conectado='vivo';refrescar()}return}
     VIVO=j;conectado='vivo';ERR_TXT='';$('clave').classList.remove('on');revisarCambios();refrescar()}).catch(function(e){
-    if(e.estado===401){conectado='clave';VIVO=null;refrescar();pedirClave('La clave no es válida.')}
+    if(e.estado===401){conectado='clave';VIVO=null;vaciarDocs();refrescar();pedirClave('La clave no es válida.')}
     else{console.error('oficina:',e);conectado='error';ERR_TXT=e.estado?'el servidor respondió '+e.estado:'no llega a la API: revisá ALLOWED_ORIGINS en Render';refrescar()}
   });
 }
@@ -2306,17 +2306,26 @@ function quitarNota(k){
   PEND_N[k]=null;refrescar();var fin=function(){delete PEND_N[k];refrescar()};
   enviar({accion:'quitar_nota',clave:k},function(){leerVivo().then(fin)},fin);
 }
+/* Los documentos (piezas, estrategia, depósito, archivos) salen solo de la API y con clave: nada de esto está en la web pública. Sin clave válida no se ve nada. */
+function vaciarDocs(){DOCS={D:{},MED:{piezas:{}}}}
 function cargarDocs(){
-  return fetch('/oficina/datos.json',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('sin datos');return r.json()}).then(function(j){DOCS=j}).catch(function(){conectado='error'});
+  if(!leerClave()){vaciarDocs();return Promise.resolve(false)}
+  return api('/oficina/documentos').then(function(j){
+    var pre=function(u){return /^https?:/.test(u)?u:API+u},M=(j&&j.MED&&j.MED.piezas)||{};
+    Object.keys(M).forEach(function(k){if(M[k].imgs)M[k].imgs=M[k].imgs.map(pre);if(M[k].vid)M[k].vid=pre(M[k].vid)});
+    DOCS=j;return true
+  }).catch(function(e){vaciarDocs();if(e.estado===401){conectado='clave';pedirClave('La clave no es válida.')}else conectado='error';return false});
 }
 async function conectar(){
-  $('claveForm').addEventListener('submit',function(e){e.preventDefault();var v=$('claveIn').value.trim();if(!v)return;guardarClave(v);$('clave').classList.remove('on');leerVivo()});
+  var entrar=function(){return cargarDocs().then(function(ok){refrescar();if(ok)return leerVivo()})};
+  $('claveForm').addEventListener('submit',function(e){e.preventDefault();var v=$('claveIn').value.trim();if(!v)return;guardarClave(v);$('clave').classList.remove('on');entrar()});
   $('claveCerrar').addEventListener('click',function(){$('clave').classList.remove('on')});
-  await cargarDocs();refrescar();
-  leerVivo();cargarCI();
-  setInterval(function(){if(!document.hidden&&leerClave())leerVivo()},3000);
+  refrescar();
+  if(leerClave())await entrar();else pedirClave('Ingresá la clave de la oficina.');
+  cargarCI();
+  setInterval(function(){if(document.hidden||!leerClave()||conectado==='clave')return;if(DOCS.D&&DOCS.D.actualizado)leerVivo();else entrar()},3000);
   setInterval(function(){if(!document.hidden)cargarCI()},300000);
-  document.addEventListener('visibilitychange',function(){if(!document.hidden){leerVivo()}});
+  document.addEventListener('visibilitychange',function(){if(!document.hidden&&leerClave()&&conectado!=='clave'){if(DOCS.D&&DOCS.D.actualizado)leerVivo();else entrar()}});
 }
 
 bucle();
