@@ -32,6 +32,9 @@ export async function medirCuentaPropia(meta, { limite = LIMITE_PROPIAS } = {}) 
   };
 }
 
+// Los #hashtags del texto, en minúscula y sin repetir
+export const etiquetasDe = (texto = "") => [...new Set((String(texto ?? "").match(/#[\p{L}\p{N}_]+/gu) ?? []).map((t) => t.toLowerCase()))];
+
 const dividir = (a, b) => (Number.isFinite(a) && Number.isFinite(b) && b > 0 ? a / b : null);
 
 // Cada publicación propia con las mismas cuentas que las de referencia, más las métricas que solo hay para VOW
@@ -49,6 +52,9 @@ export function analizarPropias(cuenta, { hoy = new Date() } = {}) {
       compartidos: metricas?.shares ?? null,
       interacciones: metricas?.total_interactions ?? null,
       interaccionesPorAlcance: dividir(metricas?.total_interactions, alcance),
+      // Guardar y mandar a alguien es lo que Instagram más premia para llegar a gente nueva
+      enviosPorAlcance: dividir((metricas?.saved ?? 0) + (metricas?.shares ?? 0), alcance),
+      etiquetas: etiquetasDe(publicaciones[i].caption),
       alcancePorSeguidor: dividir(alcance, cuenta.seguidores),
       reciente: Number.isFinite(dias) && dias < DIAS_RECIENTE,
     };
@@ -68,6 +74,7 @@ export function resumirPropiasPorTipo(analizadas) {
         medianaVistasPorSeguidor: mediana(lista.map((p) => p.vistasPorSeguidor)),
         medianaAlcancePorSeguidor: mediana(lista.map((p) => p.alcancePorSeguidor)),
         medianaInteraccionesPorAlcance: mediana(lista.map((p) => p.interaccionesPorAlcance)),
+        medianaEnviosPorAlcance: mediana(lista.map((p) => p.enviosPorAlcance)),
         guardados: suma(lista, "guardados"),
         compartidos: suma(lista, "compartidos"),
       },
@@ -116,6 +123,66 @@ export function compararConReferencias(propioPorTipo, referenciasPorTipo) {
   return filas;
 }
 
+// ---------- Mejor horario, formatos y hashtags (adaptado de las ideas de pp-instagram: best-time, formats, hashtag-perf) ----------
+// Todo se calcula con las publicaciones propias y con código. Con pocas publicaciones es una señal, no una conclusión.
+const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+const FRANJAS = [
+  { nombre: "madrugada (0 a 6 h)", desde: 0, hasta: 6 },
+  { nombre: "mañana (6 a 12 h)", desde: 6, hasta: 12 },
+  { nombre: "tarde (12 a 18 h)", desde: 12, hasta: 18 },
+  { nombre: "noche (18 a 24 h)", desde: 18, hasta: 24 },
+];
+const ARGENTINA_UTC = -3;
+
+// Día y hora de Argentina (sin horario de verano) de un timestamp de Meta
+export function momentoArgentino(timestamp) {
+  const t = new Date(timestamp);
+  if (Number.isNaN(t.getTime())) return null;
+  const local = new Date(t.getTime() + ARGENTINA_UTC * 3_600_000);
+  return { dia: DIAS[local.getUTCDay()], hora: local.getUTCHours() };
+}
+
+// Lo que se compara entre grupos: cuánto de la gente alcanzada hizo algo (interacciones por alcance)
+const MEDIDA_GRUPOS = "interaccionesPorAlcance";
+
+function resumirGrupo(clave, lista) {
+  return {
+    clave,
+    cantidad: lista.length,
+    medianaInteraccionesPorAlcance: mediana(lista.map((p) => p[MEDIDA_GRUPOS])),
+    medianaAlcancePorSeguidor: mediana(lista.map((p) => p.alcancePorSeguidor)),
+    muestraSuficiente: lista.length >= MUESTRA_MINIMA,
+  };
+}
+
+const ordenarGrupos = (grupos) =>
+  grupos.sort((a, b) => (b.medianaInteraccionesPorAlcance ?? -1) - (a.medianaInteraccionesPorAlcance ?? -1));
+
+export function mejorHorario(publicaciones) {
+  const conMomento = publicaciones.map((p) => ({ p, m: momentoArgentino(p.fecha) })).filter(({ m }) => m);
+  const porFranja = FRANJAS.map((f) => resumirGrupo(f.nombre, conMomento.filter(({ m }) => m.hora >= f.desde && m.hora < f.hasta).map(({ p }) => p))).filter((g) => g.cantidad > 0);
+  const porDia = DIAS.map((d) => resumirGrupo(d, conMomento.filter(({ m }) => m.dia === d).map(({ p }) => p))).filter((g) => g.cantidad > 0);
+  const elegir = (grupos) => ordenarGrupos([...grupos]).find((g) => g.muestraSuficiente && Number.isFinite(g.medianaInteraccionesPorAlcance)) ?? null;
+  return { porFranja: ordenarGrupos(porFranja), porDia: ordenarGrupos(porDia), mejorFranja: elegir(porFranja), mejorDia: elegir(porDia) };
+}
+
+// Los formatos ordenados por lo que más premia Instagram: guardados y envíos por alcance, y después interacción por alcance
+export function rankingDeFormatos(porTipo) {
+  return Object.entries(porTipo)
+    .map(([tipo, d]) => ({ tipo, cantidad: d.cantidad, enviosPorAlcance: d.medianaEnviosPorAlcance, interaccionesPorAlcance: d.medianaInteraccionesPorAlcance, muestraSuficiente: d.cantidad >= MUESTRA_MINIMA }))
+    .sort((a, b) => (b.enviosPorAlcance ?? -1) - (a.enviosPorAlcance ?? -1) || (b.interaccionesPorAlcance ?? -1) - (a.interaccionesPorAlcance ?? -1));
+}
+
+// Cada hashtag contra las publicaciones sin hashtags. Con una cuenta chica casi nunca hay muestra: se avisa.
+export function rendimientoDeHashtags(publicaciones) {
+  const sin = publicaciones.filter((p) => p.etiquetas.length === 0);
+  const por = new Map();
+  for (const p of publicaciones) for (const t of p.etiquetas) por.set(t, [...(por.get(t) ?? []), p]);
+  const base = resumirGrupo("sin hashtags", sin);
+  const etiquetas = ordenarGrupos([...por].map(([t, lista]) => resumirGrupo(t, lista)));
+  return { sinHashtags: base, etiquetas };
+}
+
 const mejorPor = (lista, campo) =>
   lista.filter((p) => Number.isFinite(p[campo])).reduce((mejor, p) => (!mejor || p[campo] > mejor[campo] ? p : mejor), null);
 
@@ -125,6 +192,9 @@ export function armarInforme({ fecha, cuenta, referencias = [], fallas = [], hoy
   const porTipo = resumirPropiasPorTipo(publicaciones);
   const referenciasPorTipo = resumirReferenciasPorTipo(referencias);
   const comparacion = referencias.length ? compararConReferencias(porTipo, referenciasPorTipo) : [];
+  const horarios = mejorHorario(publicaciones);
+  const formatos = rankingDeFormatos(porTipo);
+  const hashtags = rendimientoDeHashtags(publicaciones);
 
   const avisos = [];
   if (Number.isFinite(cuenta.seguidos) && Number.isFinite(cuenta.seguidores) && cuenta.seguidos > cuenta.seguidores * 2) {
@@ -140,6 +210,8 @@ export function armarInforme({ fecha, cuenta, referencias = [], fallas = [], hoy
   if (recientes) avisos.push(`${recientes} de ${publicaciones.length} publicaciones tienen menos de ${DIAS_RECIENTE} días y todavía suman alcance.`);
   const chicos = Object.entries(porTipo).filter(([, d]) => d.cantidad < MUESTRA_MINIMA).map(([tipo, d]) => `${tipo} (${d.cantidad})`);
   if (chicos.length) avisos.push(`Muestra muy chica en: ${chicos.join(", ")}. Con menos de ${MUESTRA_MINIMA} publicaciones de un tipo, tomalo como señal y no como conclusión.`);
+  if (!horarios.mejorFranja) avisos.push(`Todavía no alcanza para decir cuál es el mejor horario: hace falta al menos ${MUESTRA_MINIMA} publicaciones en una misma franja. Hasta entonces, un horario de buena actividad es una apuesta y no un dato.`);
+  if (hashtags.etiquetas.every((e) => !e.muestraSuficiente)) avisos.push(`Con menos de ${MUESTRA_MINIMA} publicaciones por hashtag no se puede decir cuáles ayudan: no se saca ninguna conclusión de hashtags todavía.`);
   const sinMetricas = cuenta.publicaciones.filter((p) => p.metricas === null).length;
   if (sinMetricas) avisos.push(`${sinMetricas} publicaciones no trajeron métricas de Meta y quedan sin alcance ni guardados.`);
   for (const { marca, motivo } of fallas) avisos.push(`No se pudo bajar ${marca}: ${motivo}`);
@@ -151,6 +223,9 @@ export function armarInforme({ fecha, cuenta, referencias = [], fallas = [], hoy
     porTipo,
     referenciasPorTipo,
     comparacion,
+    horarios,
+    formatos,
+    hashtags,
     destacadas: {
       masInteraccionPorAlcance: mejorPor(publicaciones, "interaccionesPorAlcance"),
       masGuardada: mejorPor(publicaciones.filter((p) => p.guardados > 0), "guardados"),
@@ -187,6 +262,42 @@ export function informeAMarkdown(informe) {
       "| Tipo | Medida | VOW | Referencias (mediana) | Resultado |",
       "|---|---|---|---|---|",
       ...comparacion.map((f) => `| ${f.tipo} | ${f.medida} | ${porcentaje(f.vow)} | ${porcentaje(f.referencias)} | ${f.veredicto} |`)
+    );
+  }
+  const {horarios, formatos, hashtags} = informe;
+  if (formatos?.length) {
+    lineas.push(
+      "",
+      "## Qué formato lleva más gente a guardar y mandar",
+      "",
+      "Instagram premia más los guardados y los envíos que los likes. Ordenado por guardados y envíos sobre alcance (mediana).",
+      "",
+      "| Formato | Cantidad | Guardados y envíos por alcance | Interacciones por alcance | Muestra |",
+      "|---|---|---|---|---|",
+      ...formatos.map((f) => `| ${f.tipo} | ${f.cantidad} | ${porcentaje(f.enviosPorAlcance)} | ${porcentaje(f.interaccionesPorAlcance)} | ${f.muestraSuficiente ? "suficiente" : "chica (señal)"} |`)
+    );
+  }
+  if (horarios && (horarios.porFranja.length || horarios.porDia.length)) {
+    const tabla = (titulo, grupos) => [
+      "",
+      `Por ${titulo} (hora de Argentina, interacciones por alcance, mediana):`,
+      "",
+      `| ${titulo[0].toUpperCase()}${titulo.slice(1)} | Publicaciones | Interacciones por alcance | Muestra |`,
+      "|---|---|---|---|",
+      ...grupos.map((g) => `| ${g.clave} | ${g.cantidad} | ${porcentaje(g.medianaInteraccionesPorAlcance)} | ${g.muestraSuficiente ? "suficiente" : "chica (señal)"} |`),
+    ];
+    lineas.push("", "## Mejor horario", "", horarios.mejorFranja || horarios.mejorDia ? `Con muestra suficiente, mejor franja: ${horarios.mejorFranja?.clave ?? "sin dato"}; mejor día: ${horarios.mejorDia?.clave ?? "sin dato"}.` : "Todavía no hay muestra suficiente en ninguna franja ni día: lo que sigue es una señal y no una conclusión.", ...tabla("franja", horarios.porFranja), ...tabla("día", horarios.porDia));
+  }
+  if (hashtags?.etiquetas.length) {
+    lineas.push(
+      "",
+      "## Hashtags",
+      "",
+      `Contra las publicaciones sin hashtags (${hashtags.sinHashtags.cantidad}, interacciones por alcance ${porcentaje(hashtags.sinHashtags.medianaInteraccionesPorAlcance)}).`,
+      "",
+      "| Hashtag | Publicaciones | Interacciones por alcance | Muestra |",
+      "|---|---|---|---|",
+      ...hashtags.etiquetas.slice(0, 10).map((g) => `| ${g.clave} | ${g.cantidad} | ${porcentaje(g.medianaInteraccionesPorAlcance)} | ${g.muestraSuficiente ? "suficiente" : "chica (señal)"} |`)
     );
   }
   const destacada = (titulo, p, detalle) => (p ? [`- **${titulo}:** ${p.tipo} del ${p.fecha?.slice(0, 10)}, ${detalle(p)}. "${String(p.primeraLinea).trim()}" ${p.enlace}`] : []);

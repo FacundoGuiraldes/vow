@@ -10,6 +10,11 @@ import {
   armarInforme,
   informeAMarkdown,
   MUESTRA_MINIMA,
+  etiquetasDe,
+  momentoArgentino,
+  mejorHorario,
+  rankingDeFormatos,
+  rendimientoDeHashtags,
 } from "./rendimiento.js";
 
 const HOY = new Date("2026-10-21T18:00:00Z");
@@ -222,4 +227,55 @@ test("el markdown no rompe la tabla si un texto trae una barra vertical y muestr
   cuenta.publicaciones[0].caption = "Antes | después";
   const md = informeAMarkdown(armarInforme({ fecha: "2026-10-21", cuenta, hoy: HOY }));
   assert.match(md, /\| — \| — \| 20 \| 2 \| — \| — \| — \| Antes \/ después \|/);
+});
+
+// ---------- Mejor horario, formatos y hashtags ----------
+const pub = (extra) => ({ tipo: "reel", fecha: "2026-10-20T22:00:00+0000", interaccionesPorAlcance: 0.05, alcancePorSeguidor: 1, etiquetas: [], ...extra });
+
+test("la hora se pasa a la de Argentina (UTC-3)", () => {
+  assert.deepEqual(momentoArgentino("2026-10-20T02:16:22+0000"), { dia: "lunes", hora: 23 });
+  assert.deepEqual(momentoArgentino("2026-10-19T15:02:25+0000"), { dia: "lunes", hora: 12 });
+  assert.equal(momentoArgentino("no es una fecha"), null);
+});
+
+test("el mejor horario solo se elige con muestra suficiente", () => {
+  const noche = (n, i) => pub({ fecha: `2026-10-2${i}T23:00:00+0000`, interaccionesPorAlcance: n }); // 20 h en Argentina
+  const mediodia = (n, i) => pub({ fecha: `2026-10-1${i}T15:00:00+0000`, interaccionesPorAlcance: n }); // 12 h
+  const poca = mejorHorario([noche(0.2, 0), mediodia(0.01, 1)]);
+  assert.equal(poca.mejorFranja, null);
+  assert.equal(poca.porFranja[0].clave, "noche (18 a 24 h)");
+  const mucha = mejorHorario([noche(0.2, 0), noche(0.25, 1), noche(0.3, 2), mediodia(0.01, 1), mediodia(0.02, 2), mediodia(0.03, 3)]);
+  assert.equal(mucha.mejorFranja.clave, "noche (18 a 24 h)");
+});
+
+test("los formatos se ordenan por guardados y envíos sobre alcance", () => {
+  const ranking = rankingDeFormatos({
+    reel: { cantidad: 2, medianaEnviosPorAlcance: 0.001, medianaInteraccionesPorAlcance: 0.03 },
+    carrusel: { cantidad: 3, medianaEnviosPorAlcance: 0.02, medianaInteraccionesPorAlcance: 0.05 },
+  });
+  assert.deepEqual(ranking.map((f) => f.tipo), ["carrusel", "reel"]);
+  assert.equal(ranking[0].muestraSuficiente, true);
+  assert.equal(ranking[1].muestraSuficiente, false);
+});
+
+test("los hashtags se extraen en minúscula y sin repetir, y se comparan con los posts sin hashtags", () => {
+  assert.deepEqual(etiquetasDe("Hola #Gym #gym #Entrená_hoy"), ["#gym", "#entrená_hoy"]);
+  const r = rendimientoDeHashtags([pub({ etiquetas: ["#gym"], interaccionesPorAlcance: 0.1 }), pub({ interaccionesPorAlcance: 0.05 }), pub({ interaccionesPorAlcance: 0.03 })]);
+  assert.equal(r.sinHashtags.cantidad, 2);
+  assert.equal(r.etiquetas[0].clave, "#gym");
+  assert.equal(r.etiquetas[0].muestraSuficiente, false);
+});
+
+test("el informe trae horarios, formatos y hashtags y avisa cuando no hay muestra", () => {
+  const cuenta = { usuario: "vow_ar", seguidores: 40, seguidos: 100, publicaciones: [{ ...REEL, metricas: METRICAS_REEL }, { ...CARRUSEL, caption: "Una promesa #gym", metricas: METRICAS_CARRUSEL }] };
+  const informe = armarInforme({ fecha: "2026-10-21", cuenta, hoy: HOY });
+  assert.equal(informe.horarios.mejorFranja, null);
+  assert.deepEqual(informe.formatos.map((f) => f.tipo).sort(), ["carrusel", "reel"]);
+  assert.ok(informe.avisos.some((a) => /mejor horario/.test(a)));
+  assert.ok(informe.avisos.some((a) => /hashtag/.test(a)));
+  const md = informeAMarkdown(informe);
+  assert.match(md, /## Qué formato lleva más gente a guardar y mandar/);
+  assert.match(md, /## Mejor horario/);
+  assert.match(md, /## Hashtags/);
+  assert.match(md, /#gym/);
 });
