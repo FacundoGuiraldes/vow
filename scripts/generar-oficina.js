@@ -1,8 +1,9 @@
 // Arma lo que la oficina (el juego de VOW HQ) sabe de los documentos del repo: piezas, estrategia, depósito, pendientes y archivos.
-// Corre en cada build de la web (web/package.json) y escribe web/public/oficina/datos.json + los archivos de las piezas.
+// Ya NO corre en el build de la web: lo que arma es privado. La API lo usa (src/programacion/oficina-documentos.js) y lo entrega solo con clave.
 // Todo se deduce de los documentos con reglas fijas, sin IA: si un documento cambia, el juego cambia en el próximo deploy.
 // Lo que depende de la base (estado de cada pieza, charla, lo que se marca en el juego) lo trae el juego en vivo de /api/programacion/oficina.
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -143,6 +144,6 @@ export function generar({ raiz, destino, hoy = new Date().toISOString().slice(0,
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const raiz = resolve(fileURLToPath(import.meta.url), "..", "..");
-  const { D } = generar({ raiz, destino: join(raiz, "web", "public", "oficina") });
+  const { D } = generar({ raiz, destino: join(tmpdir(), "vow-oficina-prueba") });
   console.log(`Oficina: ${D.piezas.length} piezas, ${D.pendientes.length} pendientes, ${D.agenda.length} fechas.`);
 }
