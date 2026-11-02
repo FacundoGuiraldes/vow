@@ -8,12 +8,13 @@ const VALORES = { fase: "base", producto: false, gente: false, notas: "", piezas
 const respuesta = (cuerpo, status = 200) => new Response(JSON.stringify(cuerpo), { status, headers: { "Content-Type": "application/json" } });
 
 // Servicio falso: anota lo que le mandan
-function servicioFalso({ novedades = [], estadoPlan = 201 } = {}) {
+function servicioFalso({ novedades = [], estadoPlan = 201, planExistente = 0 } = {}) {
   const pedidos = [];
   const fetchFn = async (url, opciones) => {
     const ruta = new URL(url).pathname.replace("/api/programacion/", "");
     pedidos.push({ ruta, metodo: opciones.method, autorizacion: opciones.headers.Authorization, cuerpo: opciones.body ? JSON.parse(opciones.body) : null });
     if (ruta === "novedades") return respuesta({ novedades });
+    if (ruta.startsWith("plan/")) return respuesta({ existe: planExistente > 0, piezas: planExistente });
     return respuesta(estadoPlan === 201 ? { piezas: 1, urgentes: 0 } : { error: "no" }, estadoPlan);
   };
   return { pedidos, fetchFn };
@@ -45,9 +46,9 @@ test("trae las novedades, arma el plan y lo manda al servicio con las novedades 
   const r = await correrPlanDelLunes({ valores: VALORES, env: ENTORNO, hoy: "2026-10-26", log: (t) => logs.push(t), fetchFn: servicio.fetchFn, crearCliente: async () => cliente });
 
   assert.equal(r.enviado, true);
-  assert.deepEqual(servicio.pedidos.map((p) => `${p.metodo} ${p.ruta}`), ["GET novedades", "POST plan"]);
+  assert.deepEqual(servicio.pedidos.map((p) => `${p.metodo} ${p.ruta}`), ["GET novedades", "GET plan/2026-10-26", "POST plan"]);
   assert.ok(servicio.pedidos.every((p) => p.autorizacion === "Bearer secreto"));
-  const enviado = servicio.pedidos[1].cuerpo;
+  const enviado = servicio.pedidos.find((p) => p.ruta === "plan" && p.metodo === "POST").cuerpo;
   assert.equal(enviado.semana, "2026-10-26");
   assert.equal(enviado.plan.piezas.length, 1);
   assert.deepEqual(enviado.novedades_usadas, [7]);
@@ -57,7 +58,7 @@ test("trae las novedades, arma el plan y lo manda al servicio con las novedades 
 test("no manda una aprobación: el plan sale solo planificado y revisado", async () => {
   const servicio = servicioFalso();
   const r = await correrPlanDelLunes({ valores: VALORES, env: ENTORNO, hoy: "2026-10-26", log: () => {}, fetchFn: servicio.fetchFn, crearCliente: async () => crearClienteSimulado("2026-10-26") });
-  assert.ok(!("aprobado" in servicio.pedidos[1].cuerpo));
+  assert.ok(!("aprobado" in servicio.pedidos.find((p) => p.metodo === "POST").cuerpo));
   assert.equal(r.plan.piezas.length, 1);
 });
 
@@ -112,4 +113,56 @@ test("el foco y las notas de estrategia del juego llegan al Estratega como notas
   assert.match(o.notas, /FOCO DE LA SEMANA.*Suspenso del Drop 00/);
   assert.match(o.notas, /Más stories/);
   assert.equal(opcionesDelPlan({ valores: VALORES, hoy: "2026-10-26" }).notas, VALORES.notas ?? "");
+});
+
+test("sin cantidad fija, la IA decide cuántas piezas arma (auto)", async () => {
+  assert.equal(opcionesDelPlan({ valores: { ...VALORES, piezas: "auto" }, hoy: "2026-10-26" }).piezas, "auto");
+  assert.equal(opcionesDelPlan({ valores: { ...VALORES, piezas: undefined }, hoy: "2026-10-26" }).piezas, "auto");
+  assert.equal(opcionesDelPlan({ valores: { ...VALORES, piezas: "3" }, hoy: "2026-10-26" }).piezas, 3);
+  const cliente = clienteQueAnota("2026-10-26");
+  await correrPlanDelLunes({ valores: { ...VALORES, piezas: "auto", "sin-enviar": true }, env: { ANTHROPIC_API_KEY: "clave" }, hoy: "2026-10-26", log: () => {}, crearCliente: async () => cliente });
+  assert.match(cliente.pedidos[0].messages[0].content, /la decidís vos/);
+});
+
+test("si la semana ya tiene plan, no arma otro (el workflow se programa varias veces el lunes)", async () => {
+  const servicio = servicioFalso({ planExistente: 3 });
+  const cliente = clienteQueAnota("2026-10-26");
+  const r = await correrPlanDelLunes({ valores: VALORES, env: ENTORNO, hoy: "2026-10-26", log: () => {}, fetchFn: servicio.fetchFn, crearCliente: async () => cliente });
+  assert.equal(r.omitido, true);
+  assert.equal(r.enviado, false);
+  assert.equal(cliente.pedidos.length, 0, "no se gasta la IA");
+  assert.ok(!servicio.pedidos.some((p) => p.metodo === "POST"));
+});
+
+test("--forzar arma el plan aunque la semana ya tenga uno", async () => {
+  const servicio = servicioFalso({ planExistente: 3 });
+  const r = await correrPlanDelLunes({ valores: { ...VALORES, forzar: true }, env: ENTORNO, hoy: "2026-10-26", log: () => {}, fetchFn: servicio.fetchFn, crearCliente: async () => crearClienteSimulado("2026-10-26") });
+  assert.equal(r.enviado, true);
+});
+
+test("si el servicio todavía no tiene la ruta del plan, planifica igual", async () => {
+  const servicio = servicioFalso();
+  const fetchFn = async (url, opciones) => (new URL(url).pathname.includes("/plan/") ? respuesta({ error: "no existe" }, 404) : servicio.fetchFn(url, opciones));
+  const r = await correrPlanDelLunes({ valores: VALORES, env: ENTORNO, hoy: "2026-10-26", log: () => {}, fetchFn, crearCliente: async () => crearClienteSimulado("2026-10-26") });
+  assert.equal(r.enviado, true);
+});
+
+test("reintenta el plan hasta 3 veces antes de avisar del fallo", async () => {
+  const servicio = servicioFalso();
+  let llamadas = 0;
+  const base = crearClienteSimulado("2026-10-26");
+  // Las dos primeras corridas vuelven sin plan (solo texto); la tercera trae el plan
+  const cliente = { messages: { create: async (a) => (++llamadas <= 4 ? { content: [{ type: "text", text: "hola" }], stop_reason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } } : base.messages.create(a)) } };
+  const logs = [];
+  const r = await correrPlanDelLunes({ valores: VALORES, env: ENTORNO, hoy: "2026-10-26", log: (t) => logs.push(t), fetchFn: servicio.fetchFn, crearCliente: async () => cliente });
+  assert.equal(r.enviado, true);
+  assert.equal(logs.filter((l) => l.startsWith("Intento")).length, 2);
+  assert.ok(!servicio.pedidos.some((p) => p.cuerpo?.error), "no se avisó de ningún fallo");
+});
+
+test("si los 3 intentos fallan, avisa del fallo una sola vez", async () => {
+  const servicio = servicioFalso();
+  const cliente = { messages: { create: async () => ({ content: [{ type: "text", text: "hola" }], stop_reason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } }) } };
+  await assert.rejects(() => correrPlanDelLunes({ valores: VALORES, env: ENTORNO, hoy: "2026-10-26", log: () => {}, fetchFn: servicio.fetchFn, crearCliente: async () => cliente }), /no pasó/);
+  assert.equal(servicio.pedidos.filter((p) => p.cuerpo?.error).length, 1);
 });

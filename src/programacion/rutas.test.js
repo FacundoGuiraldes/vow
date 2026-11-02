@@ -201,6 +201,14 @@ describe("rutas de la publicación programada", () => {
     assert.ok((await r.json()).novedades.some((n) => n.texto === "Llegaron las gorras"));
   });
 
+  test("/plan/:semana dice si la semana ya tiene plan, con clave", async () => {
+    assert.equal((await pedir("/plan/2026-12-07")).status, 401);
+    assert.equal((await pedir("/plan/mañana", { clave: CLAVE })).status, 400);
+    assert.deepEqual(await (await pedir("/plan/2026-12-07", { clave: CLAVE })).json(), { existe: false, piezas: 0 });
+    await repo.crearPiezas("2026-12-07", [{ fecha: "2026-12-08", hora: "19:00", pieza: { formato: "story", gancho: "x" } }]);
+    assert.deepEqual(await (await pedir("/plan/2026-12-07", { clave: CLAVE })).json(), { existe: true, piezas: 1 });
+  });
+
   test("/novedades también trae el foco de la semana que fijó Facundo", async () => {
     await repo.guardarEstado("operacion", { campos: { "estrategia.foco": "Suspenso del Drop 00" } });
     const datos = await (await pedir("/novedades", { clave: CLAVE })).json();

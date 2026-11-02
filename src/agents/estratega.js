@@ -20,6 +20,7 @@ const LARGO_MAXIMO_GANCHO = 140;
 export const PALABRAS_MAXIMAS_GANCHO = 12; // un gancho fuerte es corto
 export const ALTERNATIVAS_PEDIDAS = 4;
 const ALTERNATIVAS_MINIMAS = 3;
+export const PIEZAS_AUTO = "auto"; // la IA decide cuántas piezas según lo que necesita la semana
 export const PIEZAS_POR_DEFECTO = 2; // sin producto, mejor pocas y buenas que rellenar
 // Rango de horas de publicación: el mensaje de confirmación sale a las 8, así que nunca se publica antes de las 9
 export const HORA_MINIMA_PUBLICACION = "09:00";
@@ -102,6 +103,17 @@ export const HERRAMIENTA_PLAN = {
 
 // A veces la IA escribe el salto de línea como los dos caracteres "\n" en vez de un salto real, y se publicaría tal cual.
 // Se convierte en un salto verdadero en todos los textos de la pieza.
+// A veces la IA manda la lista de piezas como un texto con JSON en vez de como lista: se recupera sin gastar otra llamada.
+export function recuperarPiezasEnTexto(input) {
+  if (!input || typeof input.piezas !== "string") return input;
+  try {
+    const lista = JSON.parse(input.piezas);
+    return Array.isArray(lista) ? { ...input, piezas: lista } : input;
+  } catch {
+    return input;
+  }
+}
+
 export function normalizarSaltos(valor) {
   if (typeof valor === "string") return valor.replace(/\\(?:r\\n|n)/g, "\n");
   if (Array.isArray(valor)) return valor.map(normalizarSaltos);
@@ -190,7 +202,7 @@ export function validarPlan(plan, { semanaInicio, recursos = {}, cifrasPermitida
     return { ok: false, errores: [...errores, "El plan no tiene piezas."] };
   }
   if (plan.piezas.length > MAXIMO_PIEZAS) errores.push(`Hay más de ${MAXIMO_PIEZAS} piezas.`);
-  if (plan.piezas.length > piezas) errores.push(`Se pidieron ${piezas} piezas y el plan trae ${plan.piezas.length}.`);
+  if (piezas !== PIEZAS_AUTO && plan.piezas.length > piezas) errores.push(`Se pidieron ${piezas} piezas y el plan trae ${plan.piezas.length}.`);
 
   const desde = semanaInicio;
   const hasta = semanaInicio ? sumarDias(semanaInicio, 6) : null;
@@ -420,7 +432,9 @@ export async function planificarSemana({ semanaInicio, fase, recursos = {}, nota
     `Fase del proyecto: ${fase}.`,
     definidasEnLaSemana.length ? `Esa semana ya hay definidas: ${definidasEnLaSemana.map((p) => `${p.formato} del ${p.fecha} (pilar ${p.pilar})`).join("; ")}. No las repitas.` : "",
     `Recursos disponibles: producto físico: ${recursos.producto ? "sí" : "no"}; personas que entrenan confirmadas: ${recursos.gente ? "sí" : "no"}.`,
-    `Cantidad de piezas: ${piezas}. Mezclá stories y piezas de feed; cada una con algo concreto para mostrar o preguntar (ver el método).`,
+    piezas === PIEZAS_AUTO
+      ? `Cantidad de piezas: la decidís vos, entre 1 y ${MAXIMO_PIEZAS}, según lo que necesita esta semana: cuánto material real hay (producto, gente, novedades), si hay un foco, qué se publicó hace poco y qué rindió. Con poco para mostrar, pocas y buenas; con un lanzamiento o un foco fuerte, más. No rellenes para llegar a un número. Decí en el resumen por qué elegiste esa cantidad. Mezclá stories y piezas de feed; cada una con algo concreto para mostrar o preguntar (ver el método).`
+      : `Cantidad de piezas: ${piezas}. Mezclá stories y piezas de feed; cada una con algo concreto para mostrar o preguntar (ver el método).`,
     notas ? `Notas: ${notas}` : "",
   ].filter(Boolean).join("\n");
 
@@ -465,9 +479,37 @@ export async function planificarSemana({ semanaInicio, fase, recursos = {}, nota
     return { ok: false, plan: null, errores: [motivo], uso, intentos };
   }
 
-  bloque = { ...bloque, input: normalizarSaltos(bloque.input) };
+  bloque = { ...bloque, input: normalizarSaltos(recuperarPiezasEnTexto(bloque.input)) };
   const opcionesValidacion = { semanaInicio, recursos, piezas, ganchosConocidos, piezasDefinidas };
-  const { ok, errores, advertencias } = validarPlan(bloque.input, opcionesValidacion);
+  let validacion = validarPlan(bloque.input, opcionesValidacion);
+  if (!validacion.ok) {
+    // Un plan que no pasa las reglas tiene una segunda oportunidad: se le devuelven los errores a la IA para que lo corrija
+    try {
+      const respuesta = await cliente.messages.create({
+        model: modelo,
+        max_tokens: maxTokens,
+        system,
+        messages: [...mensajes, { role: "assistant", content: [{ type: "tool_use", id: bloque.id, name: HERRAMIENTA_PLAN.name, input: bloque.input }] }, { role: "user", content: [{ type: "tool_result", tool_use_id: bloque.id, is_error: true, content: `El plan no pasó las reglas. Corregilo y mandalo de nuevo con la herramienta (piezas tiene que ser una lista, no un texto):\n- ${validacion.errores.join("\n- ")}` }] }],
+        tools: [HERRAMIENTA_PLAN],
+        tool_choice: { type: "auto" },
+      });
+      uso.entrada += respuesta.usage?.input_tokens ?? 0;
+      uso.salida += respuesta.usage?.output_tokens ?? 0;
+      intentos++;
+      const corregido = respuesta.stop_reason === "max_tokens" ? null : respuesta.content?.find((b) => b.type === "tool_use" && b.name === HERRAMIENTA_PLAN.name);
+      if (corregido) {
+        const input = normalizarSaltos(recuperarPiezasEnTexto(corregido.input));
+        const nueva = validarPlan(input, opcionesValidacion);
+        if (nueva.ok) {
+          bloque = { ...corregido, input };
+          validacion = nueva;
+        }
+      }
+    } catch {
+      // Si el reintento falla (red, crédito) se informan los errores del primer intento
+    }
+  }
+  const { ok, errores, advertencias } = validacion;
   if (!ok || !criticar) return { ok, plan: ok ? bloque.input : null, errores, uso, propuesta: bloque.input, intentos };
 
   // Generar, criticar, mejorar: un editor crítico puntúa el plan y, si hay piezas flojas, el Estratega las reescribe una vez.
