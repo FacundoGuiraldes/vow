@@ -24,9 +24,11 @@ _Ninguno._
 ## Piezas de los documentos que se quitaron del juego
 
 - 2026-10-27 · carrusel
+- 2026-11-02 · reel
 
 ## Últimos cambios
 
+- 2026-11-02 17:45 UTC · juego · Quitó del juego la pieza reel del 2026-11-02
 - 2026-10-28 15:38 UTC · bot · Quitó del juego la pieza carrusel del 2026-10-27
 - 2026-10-26 21:45 UTC · juego · Shakers (entrega y estado): 10 blancos y 10 negros
 - 2026-10-26 21:44 UTC · juego · Medias (entrega y estado): Pedido de medias VOW (Mar Textil): 11 docenas, 132 pares. Negro, 5 docenas (60 pares): 30 pares Grande (37-40) y 30 pares Súper (41-44). Hueso, 3 docenas (36 pares): 18 pare
