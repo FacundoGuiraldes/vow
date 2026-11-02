@@ -5,11 +5,16 @@ name: Plan del lunes
 # Usa la API de Anthropic (gasta plata, unos centavos de dólar por plan). También se puede lanzar a mano.
 #
 # GitHub programa en UTC y no conoce el horario de verano: Argentina es UTC-3 todo el año, así que 8:00 son las 11:00 UTC.
-# Los horarios programados de GitHub pueden atrasarse unos minutos.
+# Los horarios programados de GitHub se atrasan (a veces horas) y a veces se saltean, sobre todo en punto, cuando hay más carga.
+# Por eso se programa tres veces el lunes y en minutos "raros": la primera corrida arma el plan y las otras, si la semana ya
+# tiene plan, no hacen nada (el servicio lo informa). Si la primera falla, la siguiente lo vuelve a intentar.
+# La cantidad de piezas la decide la IA según la semana ("auto"); se puede fijar a mano al lanzar el workflow.
 
 on:
   schedule:
-    - cron: "0 11 * * 1"
+    - cron: "7 11 * * 1" # 8:07 en Argentina
+    - cron: "37 12 * * 1" # 9:37, respaldo
+    - cron: "17 14 * * 1" # 11:17, respaldo
   workflow_dispatch:
     inputs:
       semana:
@@ -18,16 +23,22 @@ on:
         type: string
         default: ""
       piezas:
-        description: "Cantidad de piezas de la semana"
+        description: "Cantidad de piezas de la semana (auto: la decide la IA según la semana)"
         required: true
         type: choice
-        default: "4"
+        default: "auto"
         options:
+          - "auto"
           - "1"
           - "2"
           - "3"
           - "4"
           - "5"
+      forzar:
+        description: "Armar el plan aunque la semana ya tenga uno"
+        required: false
+        type: boolean
+        default: false
       producto:
         description: "Ya hay producto físico para mostrar"
         required: true
@@ -56,7 +67,7 @@ jobs:
     # Las claves solo se usan desde main
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       INSTAGRAM_TOKEN: ${{ secrets.INSTAGRAM_TOKEN }}
@@ -65,7 +76,8 @@ jobs:
       PROGRAMACION_SECRETO: ${{ secrets.PROGRAMACION_SECRETO }}
       # Lo que escribe una persona pasa por variables de entorno, no dentro del script
       SEMANA: ${{ inputs.semana }}
-      PIEZAS: ${{ inputs.piezas || '4' }}
+      PIEZAS: ${{ inputs.piezas || 'auto' }}
+      FORZAR: ${{ inputs.forzar || 'false' }}
       PRODUCTO: ${{ inputs.producto || 'false' }}
       GENTE: ${{ inputs.gente || 'false' }}
       NOTAS: ${{ inputs.notas }}
@@ -104,6 +116,7 @@ jobs:
         run: |
           args=(--piezas "$PIEZAS")
           if [ -n "$SEMANA" ]; then args+=(--semana "$SEMANA"); fi
+          if [ "$FORZAR" = "true" ]; then args+=(--forzar); fi
           if [ "$PRODUCTO" = "true" ]; then args+=(--producto); fi
           if [ "$GENTE" = "true" ]; then args+=(--gente); fi
           if [ -n "$NOTAS" ]; then args+=(--notas "$NOTAS"); fi

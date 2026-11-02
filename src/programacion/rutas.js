@@ -119,6 +119,17 @@ export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOfic
     }
   });
 
+  // ¿La semana ya tiene plan? Lo usa el workflow del lunes, que se programa varias veces, para no armar dos
+  router.get("/plan/:semana", conClave, async (req, res, siguiente) => {
+    try {
+      if (!esFechaISO(req.params.semana)) return res.status(400).json({ error: "La semana tiene que ser AAAA-MM-DD." });
+      const filas = await repo.piezasDeSemana(req.params.semana);
+      return res.json({ existe: filas.length > 0, piezas: filas.length });
+    } catch (error) {
+      return siguiente(error);
+    }
+  });
+
   router.get("/novedades", conClave, async (req, res, siguiente) => {
     try {
       // El foco y las notas de estrategia que Facundo fijó en el juego o con el bot también son para el Estratega

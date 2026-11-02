@@ -3,6 +3,8 @@
 //
 //   npm run plan:lunes                          planifica la semana de hoy (o la próxima, si hoy no es lunes) y la envía
 //   npm run plan:lunes -- --semana 2026-11-02   una semana puntual
+//   npm run plan:lunes -- --piezas 3           fija la cantidad de piezas (por defecto la IA decide cuántas, según la semana)
+//   npm run plan:lunes -- --forzar              arma el plan aunque la semana ya tenga uno
 //   npm run plan:lunes -- --simulado            sin gastar plata: usa el plan de ejemplo y lo muestra (nunca lo manda a Telegram)
 //   npm run plan:lunes -- --sin-enviar          arma el plan con la IA real y lo muestra, sin mandarlo
 import "dotenv/config";
@@ -11,8 +13,11 @@ import { parseArgs } from "node:util";
 import { crearClienteReal } from "../cliente-real.js";
 import { crearClienteSimulado } from "../agents/cliente-simulado.js";
 import { ejecutarFlujo, registroNuevo } from "../orquestador/orquestador.js";
+import { PIEZAS_AUTO } from "../agents/estratega.js";
 import { armarPasos } from "../orquestador/flujo-semanal.js";
 import { ahoraArgentina, esFechaISO, lunesDe } from "./fechas.js";
+
+export const INTENTOS_DEL_PLAN = 3;
 
 export function opcionesDelPlan({ valores, hoy, novedades = [], foco = "", notasEstrategia = "" }) {
   const semana = valores.semana ?? lunesDe(hoy, { siguiente: true });
@@ -23,7 +28,7 @@ export function opcionesDelPlan({ valores, hoy, novedades = [], foco = "", notas
     fase: valores.fase,
     recursos: { producto: valores.producto, gente: valores.gente },
     notas: [valores.notas, notasDelJuego, notasDeNovedades].filter(Boolean).join("\n"),
-    piezas: Number(valores.piezas),
+    piezas: valores.piezas === undefined || valores.piezas === "" || valores.piezas === PIEZAS_AUTO ? PIEZAS_AUTO : Number(valores.piezas),
   };
 }
 
@@ -77,15 +82,30 @@ export async function correrPlanDelLunes({
   const opciones = opcionesDelPlan({ valores, hoy, novedades, foco, notasEstrategia });
   if (!esFechaISO(opciones.semana)) throw new Error("--semana tiene que ser AAAA-MM-DD.");
 
+  // El workflow se programa varias veces el lunes (GitHub atrasa o saltea horarios): si la semana ya tiene plan, no se arma otro
+  if (puedeHablarConElServicio && !valores["sin-enviar"] && !valores.forzar) {
+    const existente = await llamarServicio(`plan/${opciones.semana}`, { env, fetchFn, intentos: 1 }).catch(() => null); // un servicio sin esta ruta no impide planificar
+    if (existente?.existe) {
+      log(`La semana del ${opciones.semana} ya tiene plan (${existente.piezas} ${existente.piezas === 1 ? "pieza" : "piezas"}): no se arma otro. Para rehacerlo, usá --forzar.`);
+      return { plan: null, enviado: false, omitido: true };
+    }
+  }
+
   let cliente = crearClienteSimulado(opciones.semana);
   if (!valores.simulado) {
     if (!env.ANTHROPIC_API_KEY) throw new Error("Falta ANTHROPIC_API_KEY. Para probar sin gastar, agregá --simulado.");
     cliente = await crearCliente("plan-lunes");
   }
 
-  // Solo planificar y revisar: la aprobación no es un paso de acá, es de Facundo en Telegram
+  // Solo planificar y revisar: la aprobación no es un paso de acá, es de Facundo en Telegram.
+  // Si la IA arma un plan que no pasa las reglas se vuelve a intentar (hasta INTENTOS_DEL_PLAN veces) antes de avisar del fallo.
   const pasos = armarPasos({ opciones, cliente, escribir: async () => {} }).filter((paso) => ["planificar", "revisar"].includes(paso.nombre));
-  const resultado = await ejecutarFlujo({ pasos, registro: registroNuevo(opciones.semana) });
+  let resultado;
+  for (let intento = 1; intento <= INTENTOS_DEL_PLAN; intento++) {
+    resultado = await ejecutarFlujo({ pasos, registro: registroNuevo(opciones.semana) });
+    if (resultado.estado === "completo") break;
+    log(`Intento ${intento} de ${INTENTOS_DEL_PLAN}: el paso "${resultado.fallo}" no pasó (${(resultado.registro.pasos[resultado.fallo]?.errores ?? ["motivo desconocido"]).join("; ")}).`);
+  }
 
   if (resultado.estado !== "completo") {
     const motivo = (resultado.registro.pasos[resultado.fallo]?.errores ?? ["motivo desconocido"]).join("; ");
@@ -119,7 +139,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       producto: { type: "boolean", default: false },
       gente: { type: "boolean", default: false },
       notas: { type: "string", default: "" },
-      piezas: { type: "string", default: "4" },
+      piezas: { type: "string", default: "auto" },
+      forzar: { type: "boolean", default: false },
       simulado: { type: "boolean", default: false },
       "sin-enviar": { type: "boolean", default: false },
     },

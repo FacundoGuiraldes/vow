@@ -476,7 +476,7 @@ El `.env` no se crea solo: hay que copiarlo de `.env.example` y completarlo, com
 | `npm run investigar` y `npm run analizar` | Bajan datos de las cuentas de referencia y los analizan con la IA (`analizar` gasta). |
 | `npm run gasto` | Muestra cuánto se gastó este mes contra el tope. |
 | `npm run rendimiento` | Mide las publicaciones de @vow_ar contra las cuentas de referencia (sin IA). |
-| `npm run plan:lunes` | Arma el plan de la semana y lo manda por Telegram (lo usa el workflow `plan-lunes.yml`). |
+| `npm run plan:lunes` | Arma el plan de la semana y lo manda por Telegram (lo usa el workflow `plan-lunes.yml`). La IA decide cuántas piezas según la semana (`--piezas N` lo fija) y, si la semana ya tiene plan, no arma otro (`--forzar` lo rehace). El workflow se programa tres veces el lunes (8:07, 9:37 y 11:17 en Argentina) porque GitHub atrasa o saltea horarios. |
 | `npm run telegram:webhook` | Registra en Telegram la dirección y el secreto del webhook del bot. |
 | `npm run mcp:instagram` | Levanta el servidor MCP de Instagram a mano (normalmente lo levanta Claude Code desde `.mcp.json`). |
 | `npm run laminas`, `npm run reel`, `npm run reel:logo`, `npm run foto-perfil` | Generan las láminas de los carruseles, los reels y la foto de perfil de Instagram. |

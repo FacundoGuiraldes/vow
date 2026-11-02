@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { planificarSemana, normalizarSaltos, validarPlan, MAX_TOKENS_ESTRATEGA, construirSistema, leerUltimoInforme, leerUltimoRendimiento, extraerGanchosConocidos, HERRAMIENTA_PLAN, PALABRAS_MAXIMAS_GANCHO } from "./estratega.js";
+import { planificarSemana, normalizarSaltos, recuperarPiezasEnTexto, PIEZAS_AUTO, validarPlan, MAX_TOKENS_ESTRATEGA, construirSistema, leerUltimoInforme, leerUltimoRendimiento, extraerGanchosConocidos, HERRAMIENTA_PLAN, PALABRAS_MAXIMAS_GANCHO } from "./estratega.js";
 import { revisarReglas } from "./reglas-marca.js";
 
 const SEMANA = "2026-10-19";
@@ -727,4 +727,42 @@ test("un plan de varias piezas donde ninguna pide anotarse se rechaza", () => {
 test("un cta que junta dos acciones se rechaza", () => {
   const { errores } = validarPlan(planValido([piezaValida({ cta: "Guardalo y anotate en la lista de espera." })]), { semanaInicio: SEMANA });
   assert.match(errores.join(" "), /junta dos acciones/);
+});
+
+test("recupera la lista de piezas cuando la IA la manda como texto JSON", async () => {
+  const plan = planValido();
+  const comoTexto = { ...plan, piezas: JSON.stringify(plan.piezas) };
+  assert.deepEqual(recuperarPiezasEnTexto(comoTexto).piezas, plan.piezas);
+  assert.deepEqual(recuperarPiezasEnTexto({ resumen: "x", piezas: "no es json" }).piezas, "no es json");
+  const cliente = clienteEnSecuencia([{ input: comoTexto }]);
+  const r = await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
+  assert.equal(r.ok, true, r.errores?.join(" | "));
+  assert.equal(cliente.pedidos.length, 1, "no hizo falta otra llamada");
+});
+
+test("un plan que no pasa las reglas tiene una segunda oportunidad con los errores a la vista", async () => {
+  const cliente = clienteEnSecuencia([{ input: { resumen: "x", piezas: [] } }, { input: planValido() }]);
+  const r = await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
+  assert.equal(r.ok, true, r.errores?.join(" | "));
+  assert.equal(r.intentos, 2);
+  const segundo = cliente.pedidos[1].messages.at(-1).content[0];
+  assert.equal(segundo.type, "tool_result");
+  assert.match(segundo.content, /El plan no tiene piezas/);
+  // y si tampoco la corrige, se informan los errores
+  const sinArreglo = await planificarSemana(pedido, { cliente: clienteEnSecuencia([{ input: { resumen: "x", piezas: [] } }]), leer: leerFalso, listar: async () => [] });
+  assert.equal(sinArreglo.ok, false);
+  assert.match(sinArreglo.errores.join(" "), /no tiene piezas/);
+});
+
+test("con cantidad automática, la IA decide cuántas piezas (hasta el máximo)", async () => {
+  const cliente = clienteEnSecuencia([{ input: planValido() }]);
+  await planificarSemana({ ...pedido, piezas: PIEZAS_AUTO }, { cliente, leer: leerFalso, listar: async () => [] });
+  assert.match(cliente.pedidos[0].messages[0].content, /la decidís vos, entre 1 y 5/);
+  const piezas = [0, 1, 2].map((i) => piezaValida({ fecha: `2026-10-${20 + i}` }));
+  const tres = validarPlan(planValido(piezas), { semanaInicio: SEMANA, piezas: PIEZAS_AUTO });
+  assert.ok(!tres.errores.some((e) => e.includes("Se pidieron")), tres.errores.join(" | "));
+  const fija = validarPlan(planValido(piezas), { semanaInicio: SEMANA, piezas: 2 });
+  assert.ok(fija.errores.some((e) => e.includes("Se pidieron 2 piezas")));
+  const seis = validarPlan(planValido([...piezas, ...piezas]), { semanaInicio: SEMANA, piezas: PIEZAS_AUTO });
+  assert.ok(seis.errores.some((e) => e.includes("Hay más de 5 piezas")));
 });
