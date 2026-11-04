@@ -120,14 +120,18 @@ export function textoResumenDiario(fila, { faltaArchivo = null } = {}) {
 
 // `conIA`: la pieza es una imagen y el generador está configurado, así que se ofrece el botón de generarla
 const filaIA = (id) => [{ texto: "🎨 Generar con IA", dato: `ia:${id}` }];
+// Para lo que lleva algo que la API de Instagram no puede poner (caja de preguntas, links): el bot no publica y te manda el archivo a la hora
+const filaManual = (id) => [{ texto: "✋ La publico yo", dato: `manual:${id}` }];
 export const botonesPlan = (id, { conIA = false } = {}) => [
   [{ texto: "✅ Aprobar", dato: `aprobar:${id}` }, { texto: "✏️ Modificar", dato: `modificar:${id}` }],
   ...(conIA ? [filaIA(id)] : []),
+  filaManual(id),
 ];
 export const botonesDia = (id, hora, { conIA = false } = {}) => [
   [{ texto: `✅ Confirmar ${hora} hs`, dato: `confirmar:${id}` }],
   [{ texto: "✏️ Modificar", dato: `modificar:${id}` }, { texto: "🚫 Cancelar", dato: `cancelar:${id}` }],
   ...(conIA ? [filaIA(id)] : []),
+  filaManual(id),
 ];
 // Debajo de la imagen que generó la IA
 export const botonesImagenIA = (id) => [
