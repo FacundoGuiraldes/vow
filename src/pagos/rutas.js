@@ -6,11 +6,11 @@
 //   POST /mercadopago    aviso de Mercado Pago cuando cambia un pago (se valida con la firma)
 import { Router } from "express";
 import { rateLimit } from "express-rate-limit";
-import { CATALOGO } from "../programacion/inventario.js";
 import { alCambiarElStock } from "../programacion/stock-eventos.js";
 import { firmaValida } from "./mercadopago.js";
 import { ErrorCodigo } from "../descuentos/codigos.js";
 import { ErrorArrepentimiento } from "./arrepentimiento.js";
+import { disponibilidadDe } from "./disponibilidad.js";
 import { ErrorPedido, confirmarPago, crearPedido, stockDisponible } from "./pedidos.js";
 
 export function crearRutasVentas({ repo, mp, secretoWebhook, ventaAbierta = false, cotizarEnvio = null, codigos = null, consultaCodigo = null, arrepentimientos = null, urlPublica, urlLanding, intervaloEventosMs = 10_000 }) {
@@ -24,18 +24,8 @@ export function crearRutasVentas({ repo, mp, secretoWebhook, ventaAbierta = fals
   // Lo que ve la web: qué hay y de qué color, sin cantidades. Descuenta lo que otros pedidos sin pagar tienen apartado.
   async function armarEstado() {
     if (!ventaAbierta) return { abierta: false };
-    const stock = await stockDisponible(repo);
-    const disponible = (producto) => CATALOGO[producto].usa.every(([grupo, n]) => Object.entries(stock).filter(([sku]) => sku.startsWith(grupo)).reduce((a, [, c]) => a + c, 0) >= n);
-    const hay = (sku) => stock[sku] > 0;
-    return {
-      abierta: true,
-      envio: Boolean(cotizarEnvio),
-      codigos: Boolean(codigos),
-      consultaCodigo: Boolean(codigos && consultaCodigo),
-      // Qué colores hay (sí o no, sin cantidades) para cada cosa que pide color
-      colores: { gorra: { negra: hay("gorra-negra"), beige: hay("gorra-beige") }, shaker: { negro: hay("shaker-negro"), claro: hay("shaker-claro") } },
-      productos: Object.entries(CATALOGO).map(([id, p]) => ({ id, nombre: p.nombre, precio: p.precio, pide: p.usa.map(([g]) => g).filter((g) => g !== "medias"), disponible: disponible(id) })),
-    };
+    const { colores, maximos, productos } = disponibilidadDe(await stockDisponible(repo));
+    return { abierta: true, envio: Boolean(cotizarEnvio), codigos: Boolean(codigos), consultaCodigo: Boolean(codigos && consultaCodigo), colores, maximos, productos };
   }
 
   router.get("/estado", async (req, res, siguiente) => {
