@@ -4,10 +4,13 @@
 import { randomBytes } from "node:crypto";
 import { ErrorCodigo } from "../descuentos/codigos.js";
 import { ErrorInventario, PRODUCTOS, aplicarInventario, leerInventario, lineaDeVenta } from "../programacion/inventario.js";
+import { avisarCambioDeStock } from "../programacion/stock-eventos.js";
 
 const CLAVE = "pedidos";
 const MAX_PEDIDOS = 300;
 const MAX_LINEAS = 10;
+// Un pedido sin pagar aparta su stock este rato: así dos personas no pagan lo último que queda
+export const RESERVA_MS = 30 * 60_000;
 const FORMATO_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FORMATO_CP = /^[A-Za-z]?\d{4}[A-Za-z]{0,3}$/;
 
@@ -35,6 +38,28 @@ async function guardarPedidos(repo, pedidos) {
   const ids = Object.keys(pedidos).sort((a, b) => pedidos[a].creado.localeCompare(pedidos[b].creado));
   for (const id of ids.slice(0, Math.max(0, ids.length - MAX_PEDIDOS))) delete pedidos[id];
   await repo.guardarEstado(CLAVE, { pedidos });
+  avisarCambioDeStock();
+}
+
+// Lo que tienen apartado los pedidos pendientes que todavía no vencieron: { sku: unidades }
+export function reservadoEn(pedidos, ahora = Date.now()) {
+  const total = {};
+  for (const p of Object.values(pedidos)) {
+    if (p.estado !== "pendiente" || !(Date.parse(p.creado) + RESERVA_MS > ahora)) continue;
+    for (const l of p.lineas ?? []) {
+      try {
+        for (const [sku, n] of Object.entries(lineaDeVenta(l).descuenta)) total[sku] = (total[sku] ?? 0) + n;
+      } catch { /* una línea vieja que ya no se entiende no aparta nada */ }
+    }
+  }
+  return total;
+}
+
+// Stock real menos lo apartado: lo que de verdad se puede ofrecer ahora. Sin cantidades negativas.
+export async function stockDisponible(repo, ahora = Date.now()) {
+  const inv = await leerInventario(repo);
+  const apartado = reservadoEn(await leerPedidos(repo), ahora);
+  return Object.fromEntries(Object.entries(inv.stock).map(([sku, n]) => [sku, Math.max(0, n - (apartado[sku] ?? 0))]));
 }
 
 export function validarComprador(c) {
@@ -70,12 +95,6 @@ export async function crearPedido({ repo, mp, cuerpo, cotizarEnvio = null, codig
     if (error instanceof ErrorInventario) throw new ErrorPedido(error.message);
     throw error;
   }
-  const inv = await leerInventario(repo);
-  const total = {};
-  for (const l of lineas) for (const [sku, n] of Object.entries(l.descuenta)) total[sku] = (total[sku] ?? 0) + n;
-  const faltan = Object.entries(total).filter(([sku, n]) => inv.stock[sku] < n).map(([sku]) => PRODUCTOS[sku].nombre.toLowerCase());
-  if (faltan.length) throw new ErrorPedido(`No hay stock suficiente de: ${faltan.join(", ")}.`, 409);
-
   let envio = { costo: 0, servicio: "Retiro en persona" };
   if (entrega.tipo === "envio") {
     if (!cotizarEnvio) throw new ErrorPedido("Por ahora solo hay retiro en persona: el envío todavía no está disponible.", 503);
@@ -85,6 +104,26 @@ export async function crearPedido({ repo, mp, cuerpo, cotizarEnvio = null, codig
   }
 
   const id = randomBytes(12).toString("hex");
+  // Aparta el stock ya, en la misma cola que los pagos: lo que otro pedido sin pagar tiene apartado no se ofrece de nuevo
+  const total = {};
+  for (const l of lineas) for (const [sku, n] of Object.entries(l.descuenta)) total[sku] = (total[sku] ?? 0) + n;
+  const lineasGuardadas = crudos.map((c) => ({ producto: c.producto, cantidad: c.cantidad ?? 1, ...(c.gorra ? { gorra: c.gorra } : {}), ...(c.shaker ? { shaker: c.shaker } : {}), ...(c.color ? { color: c.color } : {}) }));
+  await enCola(async () => {
+    const pedidos = await leerPedidos(repo);
+    const inv = await leerInventario(repo);
+    const apartado = reservadoEn(pedidos, ahora);
+    const faltan = Object.entries(total).filter(([sku, n]) => inv.stock[sku] - (apartado[sku] ?? 0) < n).map(([sku]) => PRODUCTOS[sku].nombre.toLowerCase());
+    if (faltan.length) throw new ErrorPedido(`No hay stock suficiente de: ${faltan.join(", ")}.`, 409);
+    pedidos[id] = { creado: new Date(ahora).toISOString(), estado: "pendiente", comprador, entrega, envio, lineas: lineasGuardadas };
+    await guardarPedidos(repo, pedidos);
+  });
+  const soltar = () => enCola(async () => {
+    const pedidos = await leerPedidos(repo);
+    if (pedidos[id]?.estado === "pendiente") {
+      pedidos[id] = { ...pedidos[id], estado: "cancelado" };
+      await guardarPedidos(repo, pedidos);
+    }
+  });
   // Código de descuento (opcional): se aparta para este pedido mientras se paga. El descuento es solo sobre los productos, no sobre el envío.
   const codigo = String(cuerpo?.codigo ?? "").trim();
   let porcentaje = 0;
@@ -93,6 +132,7 @@ export async function crearPedido({ repo, mp, cuerpo, cotizarEnvio = null, codig
     try {
       ({ porcentaje } = await codigos.reservar(codigo, id));
     } catch (error) {
+      await soltar();
       if (error instanceof ErrorCodigo) throw new ErrorPedido(error.message, error.estado);
       throw error;
     }
@@ -115,12 +155,13 @@ export async function crearPedido({ repo, mp, cuerpo, cotizarEnvio = null, codig
     });
   } catch (error) {
     if (codigo) await codigos.liberar(codigo, id);
+    await soltar();
     throw error;
   }
   const importe = subtotalConDescuento + envio.costo;
   await enCola(async () => {
     const pedidos = await leerPedidos(repo);
-    pedidos[id] = { creado: new Date(ahora).toISOString(), estado: "pendiente", comprador, entrega, envio, importe, ...(codigo ? { codigo, descuento: { porcentaje, ahorro: subtotal - subtotalConDescuento } } : {}), lineas: crudos.map((c) => ({ producto: c.producto, cantidad: c.cantidad ?? 1, ...(c.gorra ? { gorra: c.gorra } : {}), ...(c.shaker ? { shaker: c.shaker } : {}), ...(c.color ? { color: c.color } : {}) })) };
+    pedidos[id] = { ...pedidos[id], importe, ...(codigo ? { codigo, descuento: { porcentaje, ahorro: subtotal - subtotalConDescuento } } : {}) };
     await guardarPedidos(repo, pedidos);
   });
   return { id, importe, envio, ...(codigo ? { descuento: { porcentaje, ahorro: subtotal - subtotalConDescuento } } : {}), link: preferencia.init_point };

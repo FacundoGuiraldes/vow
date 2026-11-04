@@ -79,31 +79,57 @@ export async function iniciarTienda(apiUrl) {
     botonPagar.disabled = carrito.length === 0;
   }
 
-  for (const p of estado.productos) {
-    const selects = p.pide.map(grupo => {
-      const select = el('select', { 'aria-label': `Color de ${grupo === 'gorra' ? 'la gorra' : 'el shaker'}`, name: grupo },
-        COLORES[grupo].map(color => el('option', { value: color, disabled: !estado.colores[grupo][color] }, estado.colores[grupo][color] ? color : `${color} (agotado)`)));
-      const primero = COLORES[grupo].find(c => estado.colores[grupo][c]);
-      if (primero) select.value = primero;
-      return select;
-    });
-    const cantidad = el('input', { type: 'number', min: '1', max: '5', value: '1', 'aria-label': `Cantidad de ${p.nombre}` });
-    const agregar = el('button', {
-      type: 'button', class: 'tienda__agregar', disabled: !p.disponible,
-      onclick: () => {
-        const n = Number(cantidad.value);
-        if (!Number.isInteger(n) || n < 1 || n > 5) { cantidad.value = '1'; return; }
-        const linea = { producto: p.id, nombre: p.nombre, precio: p.precio, cantidad: n };
-        for (const s of selects) linea[s.name] = s.value;
-        const igual = carrito.find(l => l.producto === linea.producto && l.gorra === linea.gorra && l.shaker === linea.shaker);
-        if (igual) igual.cantidad = Math.min(5, igual.cantidad + n);
-        else carrito.push(linea);
-        dibujarCarrito();
-      }
-    }, p.disponible ? 'Sumar' : 'Agotado');
-    lista.append(el('li', { class: 'tienda__producto' },
-      el('div', {}, el('h3', {}, p.nombre), el('p', { class: 'tienda__precio' }, pesos(p.precio))),
-      el('div', { class: 'tienda__opciones' }, selects, cantidad, agregar)));
+  // Se dibuja de nuevo cada vez que llega un estado (al cargar y en vivo). Se conserva lo que la persona ya eligió.
+  function dibujarProductos() {
+    const elegido = {};
+    for (const s of lista.querySelectorAll('select[data-producto]')) elegido[`${s.dataset.producto}:${s.name}`] = s.value;
+    const cantidades = {};
+    for (const c of lista.querySelectorAll('input[data-producto]')) cantidades[c.dataset.producto] = c.value;
+    lista.replaceChildren();
+    for (const p of estado.productos) {
+      const selects = p.pide.map(grupo => {
+        const select = el('select', { 'aria-label': `Color de ${grupo === 'gorra' ? 'la gorra' : 'el shaker'}`, name: grupo, 'data-producto': p.id },
+          COLORES[grupo].map(color => el('option', { value: color, disabled: !estado.colores[grupo][color] }, estado.colores[grupo][color] ? color : `${color} (agotado)`)));
+        const primero = COLORES[grupo].find(c => estado.colores[grupo][c]);
+        if (primero) select.value = primero;
+        const previo = elegido[`${p.id}:${grupo}`];
+        if (previo && estado.colores[grupo][previo]) select.value = previo;
+        return select;
+      });
+      const cantidad = el('input', { type: 'number', min: '1', max: '5', value: cantidades[p.id] || '1', 'data-producto': p.id, 'aria-label': `Cantidad de ${p.nombre}` });
+      const agregar = el('button', {
+        type: 'button', class: 'tienda__agregar', disabled: !p.disponible,
+        onclick: () => {
+          const n = Number(cantidad.value);
+          if (!Number.isInteger(n) || n < 1 || n > 5) { cantidad.value = '1'; return; }
+          const linea = { producto: p.id, nombre: p.nombre, precio: p.precio, cantidad: n };
+          for (const s of selects) linea[s.name] = s.value;
+          const igual = carrito.find(l => l.producto === linea.producto && l.gorra === linea.gorra && l.shaker === linea.shaker);
+          if (igual) igual.cantidad = Math.min(5, igual.cantidad + n);
+          else carrito.push(linea);
+          dibujarCarrito();
+        }
+      }, p.disponible ? 'Sumar' : 'Agotado');
+      lista.append(el('li', { class: 'tienda__producto' },
+        el('div', {}, el('h3', {}, p.nombre), el('p', { class: 'tienda__precio' }, pesos(p.precio))),
+        el('div', { class: 'tienda__opciones' }, selects, cantidad, agregar)));
+    }
+  }
+  dibujarProductos();
+
+  // En vivo: el servidor avisa apenas cambia el stock (venta, Almacén, bot o un pedido que aparta unidades). Si se corta, el navegador reconecta solo.
+  if ('EventSource' in window) {
+    try {
+      const vivo = new EventSource(`${apiUrl}/api/programacion/ventas/eventos`);
+      vivo.addEventListener('estado', (e) => {
+        try {
+          const nuevo = JSON.parse(e.data);
+          if (!nuevo.abierta) return;
+          estado = nuevo;
+          dibujarProductos();
+        } catch { /* un mensaje roto no tira la tienda */ }
+      });
+    } catch { /* sin stream queda el estado de cuando cargó la página; al pagar el servidor revalida */ }
   }
 
   codigoInput.addEventListener('input', () => { descuento = 0; codigoMsg.textContent = ''; dibujarCarrito(); });
