@@ -70,6 +70,13 @@ function calcularTareas(){
   ORDEN.forEach(function(k){ESTADO_EDIF[k]={alta:T[k].filter(function(x){return x.alta}).length,media:T[k].filter(function(x){return !x.alta}).length}});
   var ta=0,tm=0;ORDEN.forEach(function(k){if(k!=='hq'){ta+=ESTADO_EDIF[k].alta;tm+=ESTADO_EDIF[k].media}});ESTADO_EDIF.hq={alta:ta,media:tm};
 }
+function puedeManual(p){return !!(p._id&&(p._est==='propuesta'||p._est==='aprobada'||p._est==='confirmada'))}
+/* «La publico yo»: el bot no la publica; a la hora manda el archivo por Telegram para subirla a mano (caja de preguntas, links) */
+function manualPieza(pz){
+  if(conectado!=='vivo'){aviso('Sin conexión con el bot: no se puede cambiar ahora.',6000);return}
+  if(!confirm('¿La publicás vos «'+(pz.titulo||'la pieza')+'»? El bot no la publica: a la hora te manda el archivo por Telegram.'))return;
+  api('/oficina/accion',{body:{accion:'manual_pieza',id:pz._id}}).then(function(){aviso('Listo: la publicás vos. Te avisé por Telegram',5000)}).catch(function(e){aviso(e.estado===409?e.message:'No se pudo cambiar: '+(e.message||'error'),7000);if(e.estado===401)pedirClave('La clave no es válida.')}).then(function(){return leerVivo(true)});
+}
 function esConfirmable(p){var d=pd(p.fecha);return !!(p._id&&d&&dias(d)===0&&(p._est==='aprobada'||p._est==='propuesta'))}
 function cumplirTarea(t){if(t.pieza)aprobarPieza(t.pieza);else if(t.p)cumplirPend(t.p)}
 
@@ -344,6 +351,7 @@ function estadoCarta(e){
   var raw=e._est||({'por aprobar':'propuesta','programado':'aprobada','publicado':'publicada'})[e.estado]||'propuesta';
   if(raw==='propuesta')return {k:'propuesta',t:'POR APROBAR',ico:'borrador'};
   if(raw==='aprobada')return {k:'aprobada',t:'APROBADA',ico:'ok'};
+  if(raw==='manual')return {k:'aprobada',t:'LA PUBLICÁS VOS',ico:'ok'};
   if(raw==='confirmada'||raw==='preparada')return {k:'confirmada',t:'CONFIRMADA',ico:'candado'};
   if(raw==='publicada')return {k:'publicada',t:'PUBLICADA',ico:'enviar'};
   return {k:'propuesta',t:String(e.estado||raw).toUpperCase(),ico:'borrador'};
@@ -524,6 +532,7 @@ function tarjetaPieza(e){
   if(pv)a.appendChild(pv.boton);
   if(e.estado==='por aprobar'&&!ap&&!esConfirmable(e))a.appendChild(botonIco('ok','Aprobar','ck si',function(){if(conectado!=='vivo'){aviso('Sin conexión con el bot: no se puede aprobar ahora.',6000);return}aprobarPieza(e)}));
   if(esConfirmable(e)&&!CAMBIANDO['c'+e._id])a.appendChild(botonIco('enviar','Confirmar publicación','ck si',function(){confirmarPieza(e)}));
+  if(puedeManual(e)&&!cambiandoAhora(e))a.appendChild(botonIco('ok','La publico yo','ck sec',function(){manualPieza(e)}));
   if(e.estado!=='publicado'&&!cambiandoAhora(e)){
     var kc=String(e._id||kPieza(e)),cf=null,fe=null;
     function abrirForm(foco){cf=formCambio(e);var inp=cf.querySelector('input');inp.value=CFTXT[kc]||'';inp.addEventListener('input',function(){CFTXT[kc]=inp.value});f.appendChild(cf);if(foco)inp.focus()}

@@ -1204,3 +1204,75 @@ describe("recuperación de mensajes de Telegram que no se terminaron de procesar
     assert.equal(await e.servicio.recuperarActualizaciones({ minutos: -1 }), 0); // ya está marcado
   });
 });
+
+describe("publicar a mano (historias con caja de preguntas, links o menciones)", () => {
+  const historia = (e) => e.cargarPieza({ formato: "story", pilar: "proceso", epigrafe: "", material_a_producir: [] });
+
+  test("las tarjetas del plan ofrecen el botón «La publico yo»", async () => {
+    const e = crearEscenario({ fecha: "2026-10-26" });
+    await e.servicio.recibirPlan({ semana: "2026-10-26", plan: crearPlan([crearPieza({ fecha: "2026-11-01", formato: "story", pilar: "proceso", material_a_producir: [] })]) });
+    const tarjeta = e.telegram.enviados.find((m) => m.botones?.flat().some((b) => b.dato.startsWith("aprobar:")));
+    assert.ok(tarjeta.botones.flat().some((b) => b.dato.startsWith("manual:")));
+  });
+
+  test("pasarla a manual no publica nada: a la hora manda la imagen una sola vez", async () => {
+    const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00" });
+    const fila = await historia(e);
+    await e.mandar(e.actualizacion.boton(`aprobar:${fila.id}`));
+    await e.servicio.adjuntarDesdeJuego(fila.id, { mime: "image/jpeg", datos: Buffer.from("foto-de-la-historia") });
+    await e.mandar(e.actualizacion.boton(`manual:${fila.id}`));
+    assert.match(e.telegram.ultimo().texto, /la publicás vos/);
+    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "manual");
+
+    for (const hora of ["18:50", "18:59"]) { e.mover(hora); await e.servicio.tick(); }
+    assert.equal(e.telegram.enviados.filter((m) => m.foto).length, 0); // antes de la hora no manda nada
+    for (const hora of ["19:00", "19:01", "20:00"]) { e.mover(hora); await e.servicio.tick(); }
+
+    const fotos = e.telegram.enviados.filter((m) => m.foto);
+    assert.equal(fotos.length, 1);
+    assert.match(fotos[0].texto, /te toca publicar a vos/);
+    assert.deepEqual(e.telegram.archivos.get(fotos[0].fileId), Buffer.from("foto-de-la-historia"));
+    assert.equal(e.meta.llamadas.length, 0); // el bot no toca Instagram
+    assert.equal(e.telegram.cantidad("no confirmaste"), 0);
+    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "manual");
+  });
+
+  test("también se puede pasar a manual el mismo día, antes o después de confirmarla", async () => {
+    const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00" });
+    const fila = await historia(e);
+    await e.mandar(e.actualizacion.boton(`aprobar:${fila.id}`));
+    await e.servicio.adjuntarDesdeJuego(fila.id, { mime: "image/jpeg", datos: Buffer.from("foto") });
+    await e.mandar(e.actualizacion.boton(`confirmar:${fila.id}`));
+    await e.mandar(e.actualizacion.boton(`manual:${fila.id}`));
+    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "manual");
+    e.mover("19:00");
+    await e.servicio.tick();
+    assert.equal(e.meta.llamadas.length, 0);
+  });
+
+  test("una pieza ya publicada o cancelada no se puede pasar a manual", async () => {
+    const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00" });
+    const fila = await historia(e);
+    await e.mandar(e.actualizacion.boton(`cancelar:${fila.id}`));
+    await e.mandar(e.actualizacion.boton(`manual:${fila.id}`));
+    assert.match(e.telegram.ultimo().texto, /ya no se puede pasar a manual/);
+    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "cancelada");
+  });
+
+  test("si la pieza manual no tiene imagen, igual avisa a la hora", async () => {
+    const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00" });
+    const fila = await historia(e);
+    await e.mandar(e.actualizacion.boton(`manual:${fila.id}`));
+    e.mover("19:00");
+    await e.servicio.tick();
+    assert.match(e.telegram.buscar("te toca publicar a vos").texto, /no tiene archivo cargado/);
+  });
+
+  test("una pieza manual se puede cancelar", async () => {
+    const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00" });
+    const fila = await historia(e);
+    await e.mandar(e.actualizacion.boton(`manual:${fila.id}`));
+    await e.mandar(e.actualizacion.boton(`cancelar:${fila.id}`));
+    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "cancelada");
+  });
+});

@@ -278,6 +278,27 @@ describe("cambiar una pieza desde la oficina", () => {
     assert.ok(e.telegram.buscar("Confirmaste desde la oficina"));
   });
 
+  test("«La publico yo» desde el juego deja la pieza para publicar a mano y avisa por Telegram", async () => {
+    const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00" });
+    const fila = await e.cargarPieza();
+    await aplicarAccion(e, { accion: "aprobar_pieza", id: fila.id });
+    const r = await aplicarAccion(e, { accion: "manual_pieza", id: fila.id });
+    assert.equal(r.estado, "manual");
+    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "manual");
+    assert.ok(e.telegram.buscar("Desde la oficina"));
+    e.mover("19:00");
+    await e.servicio.tick();
+    assert.equal(e.meta.llamadas.length, 0); // el bot no publica nada
+    assert.ok(e.telegram.buscar("te toca publicar a vos"));
+    await assert.rejects(aplicarAccion(e, { accion: "manual_pieza", id: fila.id }), (error) => error instanceof ErrorAccion && error.estado === 409);
+  });
+
+  test("«La publico yo» pide el id y rechaza una pieza que no existe", async () => {
+    const e = crearEscenario();
+    await assert.rejects(aplicarAccion(e, { accion: "manual_pieza" }), (error) => error instanceof ErrorAccion && error.estado === 400);
+    await assert.rejects(aplicarAccion(e, { accion: "manual_pieza", id: 999 }), (error) => error instanceof ErrorAccion && error.estado === 409);
+  });
+
   test("confirmar una pieza de otro día se rechaza", async () => {
     const e = crearEscenario({ fecha: "2026-10-28", hora: "08:00" });
     const fila = await e.cargarPieza();

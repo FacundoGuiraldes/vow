@@ -184,6 +184,14 @@ export async function aplicarAccion(deps, accion, ahora = Date.now()) {
     return { ok: true, estado: resultado.estado, detalle: resultado.detalle };
   }
 
+  // "La publico yo": la pieza queda para publicar a mano (caja de preguntas, links); el bot no la publica y a la hora manda el archivo
+  if (tipo === "manual_pieza") {
+    if (!Number.isInteger(accion.id)) throw new ErrorAccion("Falta el id de la pieza.");
+    const resultado = await servicio.manualDesdeJuego(accion.id);
+    if (!resultado.ok) throw new ErrorAccion(resultado.motivo, 409);
+    return { ok: true, estado: resultado.estado };
+  }
+
   if (tipo === "cambiar_pieza" && !Number.isInteger(accion.id) && typeof accion.fecha === "string") {
     // La pieza solo está en los documentos: la IA arma la nueva en el momento y queda propuesta para aprobar
     return lanzarCambio(deps, `f:${accion.fecha}`, ahora, async (alAvanzar) => {

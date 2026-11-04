@@ -139,6 +139,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
       return responder("Listo, la dejo como está.");
     }
     if (accion === "cancelar") return cancelar(fila, responder, mensajeId);
+    if (accion === "manual") return marcarManual(fila, responder, mensajeId);
     if (accion === "publicar_ahora") return publicarAhora(fila, responder, mensajeId);
     return responder("No entendí ese botón.");
   }
@@ -195,8 +196,53 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     return responder(`✅ Confirmada. Se publica hoy a las ${fila.hora}.${permitirPublicar ? "" : "\n🧪 Modo simulación: no se publica de verdad."}`);
   }
 
+  // "La publico yo": la pieza queda aprobada pero el bot no la publica. A la hora te manda el archivo para que la subas vos desde
+  // Instagram con lo que la API no puede poner (caja de preguntas, links, menciones). No hace falta confirmarla.
+  const PASABLES_A_MANUAL = ["propuesta", "aprobada", "confirmada"];
+  async function pasarAManual(fila) {
+    await repo.actualizarPieza(fila.id, { estado: "manual", confirmada_el: null, contenedor: null, error: null });
+    return `✋ Listo: esta pieza la publicás vos. A las ${fila.hora} hs del ${fechaLegible(fila.fecha)} te mando el archivo por acá. El bot no publica nada.`;
+  }
+
+  async function marcarManual(fila, responder, mensajeId) {
+    if (!PASABLES_A_MANUAL.includes(fila.estado)) return responder(`Esa pieza está ${ESTADOS_LEGIBLES[fila.estado]}: ya no se puede pasar a manual.`);
+    const aviso = await pasarAManual(fila);
+    if (mensajeId) telegram.quitarBotones(mensajeId);
+    return responder(aviso);
+  }
+
+  // Lo mismo desde la oficina (el juego): el bot lo cuenta por Telegram y a la hora manda el archivo
+  async function manualDesdeJuego(id) {
+    const fila = await repo.obtenerPieza(id);
+    if (!fila) return { ok: false, motivo: "Esa pieza no existe." };
+    if (!PASABLES_A_MANUAL.includes(fila.estado)) return { ok: false, motivo: `Esa pieza está ${ESTADOS_LEGIBLES[fila.estado]}: ya no se puede pasar a manual.` };
+    const aviso = await pasarAManual(fila);
+    await decir(`✋ Desde la oficina: "${fila.pieza.gancho}" (${fechaLegible(fila.fecha)}) la publicás vos. ${aviso.replace(/^✋ Listo: esta pieza la publicás vos\.\s*/, "")}`).catch((error) => console.error(`No se pudo avisar por Telegram: ${error.message}`));
+    return { ok: true, estado: "manual" };
+  }
+
+  // A la hora de una pieza manual: manda la imagen (o avisa) una sola vez
+  async function avisarManual(fila, hoy) {
+    if (!(await repo.tomarEstado(`manual-aviso:${fila.id}`, hoy))) return null;
+    const texto = [
+      `✋ Son las ${fila.hora} hs: te toca publicar a vos (${fila.pieza.formato}).`,
+      `"${fila.pieza.gancho}"`,
+      "Subila desde Instagram y agregale lo que necesites (caja de preguntas, link, mención). El bot no la publica.",
+    ].join("\n\n");
+    const [medio] = await repo.mediosDePieza(fila.id);
+    const archivo = medio && medio.tipo === "imagen" ? await repo.medioPorToken(medio.token) : null;
+    if (archivo) {
+      const { id } = await telegram.enviarFoto(archivo.datos, { texto });
+      await repo.agregarMensaje(fila.id, id);
+    } else {
+      const nota = medio ? "(El archivo es un video: ya lo tenés vos, el bot no lo reenvía.)" : "(Esta pieza no tiene archivo cargado.)";
+      await avisar(fila, `${texto}\n${nota}`);
+    }
+    return "manual-aviso";
+  }
+
   async function cancelar(fila, responder, mensajeId) {
-    if (!VIVAS.includes(fila.estado) && fila.estado !== "fallida") return responder(`Esa pieza está ${ESTADOS_LEGIBLES[fila.estado]}: no se puede cancelar.`);
+    if (!VIVAS.includes(fila.estado) && !["fallida", "manual"].includes(fila.estado)) return responder(`Esa pieza está ${ESTADOS_LEGIBLES[fila.estado]}: no se puede cancelar.`);
     await repo.actualizarPieza(fila.id, { estado: "cancelada", confirmada_el: null });
     await repo.borrarRecordatoriosPendientes(fila.id);
     await repo.borrarMedios(fila.id);
@@ -873,7 +919,7 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     if (nombre === "pedir_cancelacion") {
       const fila = await piezaDe(argumentos.id);
       if (!fila) return noExiste;
-      if (!VIVAS.includes(fila.estado) && fila.estado !== "fallida") return { error: `La pieza está ${ESTADOS_LEGIBLES[fila.estado]}: no se puede cancelar.` };
+      if (!VIVAS.includes(fila.estado) && !["fallida", "manual"].includes(fila.estado)) return { error: `La pieza está ${ESTADOS_LEGIBLES[fila.estado]}: no se puede cancelar.` };
       await decirDePieza(fila, `¿Cancelo la pieza del ${fechaLegible(fila.fecha)} a las ${fila.hora} ("${fila.pieza.gancho}")? No se publica y se borran sus archivos.`, { botones: botonesCancelar(fila.id) });
       return { ok: true, nota: "Le mandé el botón para cancelar. Falta que Facundo lo toque: vos no podés cancelar." };
     }
@@ -1029,6 +1075,8 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
       return null;
     }
 
+    if (fila.estado === "manual") return faltan <= 0 ? avisarManual(fila, hoy) : null;
+
     if (fila.estado === "confirmada") {
       if (fila.confirmada_el !== hoy) return null;
       if (faltan > MINUTOS_PARA_PREPARAR) return null;
@@ -1102,5 +1150,5 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     return { fecha: hoy, hora, acciones };
   }
 
-  return { recibirPlan, avisarFalloDelPlan, manejarActualizacion, aprobarDesdeJuego, confirmarDesdeJuego, sugerirCambio, cambiarSinFila, editarDesdeJuego, adjuntarDesdeJuego, quitarArchivosDesdeJuego, eliminarDesdeJuego, conversarDesdeJuego, charla, tick, recuperarActualizaciones, enviarResumenDiario: () => enviarResumenDiario(ahora().fecha) };
+  return { recibirPlan, avisarFalloDelPlan, manejarActualizacion, aprobarDesdeJuego, confirmarDesdeJuego, manualDesdeJuego, sugerirCambio, cambiarSinFila, editarDesdeJuego, adjuntarDesdeJuego, quitarArchivosDesdeJuego, eliminarDesdeJuego, conversarDesdeJuego, charla, tick, recuperarActualizaciones, enviarResumenDiario: () => enviarResumenDiario(ahora().fecha) };
 }
