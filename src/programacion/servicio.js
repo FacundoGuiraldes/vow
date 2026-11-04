@@ -198,11 +198,27 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
 
   // "La publico yo": la pieza queda aprobada pero el bot no la publica. A la hora te manda el archivo para que la subas vos desde
   // Instagram con lo que la API no puede poner (caja de preguntas, links, menciones). No hace falta confirmarla.
-  async function marcarManual(fila, responder, mensajeId) {
-    if (!["propuesta", "aprobada", "confirmada"].includes(fila.estado)) return responder(`Esa pieza está ${ESTADOS_LEGIBLES[fila.estado]}: ya no se puede pasar a manual.`);
+  const PASABLES_A_MANUAL = ["propuesta", "aprobada", "confirmada"];
+  async function pasarAManual(fila) {
     await repo.actualizarPieza(fila.id, { estado: "manual", confirmada_el: null, contenedor: null, error: null });
+    return `✋ Listo: esta pieza la publicás vos. A las ${fila.hora} hs del ${fechaLegible(fila.fecha)} te mando el archivo por acá. El bot no publica nada.`;
+  }
+
+  async function marcarManual(fila, responder, mensajeId) {
+    if (!PASABLES_A_MANUAL.includes(fila.estado)) return responder(`Esa pieza está ${ESTADOS_LEGIBLES[fila.estado]}: ya no se puede pasar a manual.`);
+    const aviso = await pasarAManual(fila);
     if (mensajeId) telegram.quitarBotones(mensajeId);
-    return responder(`✋ Listo: esta pieza la publicás vos. A las ${fila.hora} hs del ${fechaLegible(fila.fecha)} te mando el archivo por acá. El bot no publica nada.`);
+    return responder(aviso);
+  }
+
+  // Lo mismo desde la oficina (el juego): el bot lo cuenta por Telegram y a la hora manda el archivo
+  async function manualDesdeJuego(id) {
+    const fila = await repo.obtenerPieza(id);
+    if (!fila) return { ok: false, motivo: "Esa pieza no existe." };
+    if (!PASABLES_A_MANUAL.includes(fila.estado)) return { ok: false, motivo: `Esa pieza está ${ESTADOS_LEGIBLES[fila.estado]}: ya no se puede pasar a manual.` };
+    const aviso = await pasarAManual(fila);
+    await decir(`✋ Desde la oficina: "${fila.pieza.gancho}" (${fechaLegible(fila.fecha)}) la publicás vos. ${aviso.replace(/^✋ Listo: esta pieza la publicás vos\.\s*/, "")}`).catch((error) => console.error(`No se pudo avisar por Telegram: ${error.message}`));
+    return { ok: true, estado: "manual" };
   }
 
   // A la hora de una pieza manual: manda la imagen (o avisa) una sola vez
@@ -1134,5 +1150,5 @@ export function crearServicio({ repo, telegram, meta = null, editor = null, gene
     return { fecha: hoy, hora, acciones };
   }
 
-  return { recibirPlan, avisarFalloDelPlan, manejarActualizacion, aprobarDesdeJuego, confirmarDesdeJuego, sugerirCambio, cambiarSinFila, editarDesdeJuego, adjuntarDesdeJuego, quitarArchivosDesdeJuego, eliminarDesdeJuego, conversarDesdeJuego, charla, tick, recuperarActualizaciones, enviarResumenDiario: () => enviarResumenDiario(ahora().fecha) };
+  return { recibirPlan, avisarFalloDelPlan, manejarActualizacion, aprobarDesdeJuego, confirmarDesdeJuego, manualDesdeJuego, sugerirCambio, cambiarSinFila, editarDesdeJuego, adjuntarDesdeJuego, quitarArchivosDesdeJuego, eliminarDesdeJuego, conversarDesdeJuego, charla, tick, recuperarActualizaciones, enviarResumenDiario: () => enviarResumenDiario(ahora().fecha) };
 }
