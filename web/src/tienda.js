@@ -1,5 +1,7 @@
 // Tienda del Drop 00: aparece solo si la API dice que la venta está abierta (VENTA_ABIERTA=1 en el servidor).
 // El navegador solo manda qué quiere y a dónde: el precio lo calcula el servidor, y el pago se hace en Mercado Pago.
+import { TOPE_POR_LINEA, ajustarCarrito, maximoParaSumar } from './stock-carrito.js';
+
 const pesos = n => `$${n.toLocaleString('es-AR')}`;
 const COLORES = { gorra: ['negra', 'beige'], shaker: ['negro', 'claro'] };
 const REQUEST_TIMEOUT_MS = 15000;
@@ -60,6 +62,7 @@ export async function iniciarTienda(apiUrl) {
   const consulta = document.getElementById('tienda-consulta');
   if (estado.consultaCodigo) consulta.hidden = false;
 
+  let refrescadores = []; // uno por producto: ajusta cantidad máxima y botón según stock y carrito
   function dibujarCarrito() {
     carritoEl.replaceChildren();
     if (!carrito.length) {
@@ -77,33 +80,79 @@ export async function iniciarTienda(apiUrl) {
       );
     }
     botonPagar.disabled = carrito.length === 0;
+    for (const refrescar of refrescadores) refrescar(); // lo que queda para sumar depende de lo que ya está en el carrito
   }
 
-  for (const p of estado.productos) {
-    const selects = p.pide.map(grupo => {
-      const select = el('select', { 'aria-label': `Color de ${grupo === 'gorra' ? 'la gorra' : 'el shaker'}`, name: grupo },
-        COLORES[grupo].map(color => el('option', { value: color, disabled: !estado.colores[grupo][color] }, estado.colores[grupo][color] ? color : `${color} (agotado)`)));
-      const primero = COLORES[grupo].find(c => estado.colores[grupo][c]);
-      if (primero) select.value = primero;
-      return select;
-    });
-    const cantidad = el('input', { type: 'number', min: '1', max: '5', value: '1', 'aria-label': `Cantidad de ${p.nombre}` });
-    const agregar = el('button', {
-      type: 'button', class: 'tienda__agregar', disabled: !p.disponible,
-      onclick: () => {
-        const n = Number(cantidad.value);
-        if (!Number.isInteger(n) || n < 1 || n > 5) { cantidad.value = '1'; return; }
-        const linea = { producto: p.id, nombre: p.nombre, precio: p.precio, cantidad: n };
-        for (const s of selects) linea[s.name] = s.value;
-        const igual = carrito.find(l => l.producto === linea.producto && l.gorra === linea.gorra && l.shaker === linea.shaker);
-        if (igual) igual.cantidad = Math.min(5, igual.cantidad + n);
-        else carrito.push(linea);
-        dibujarCarrito();
+  // Se dibuja de nuevo cada vez que llega un estado (al cargar y en vivo). Se conserva lo que la persona ya eligió.
+  function dibujarProductos() {
+    const elegido = {};
+    for (const s of lista.querySelectorAll('select[data-producto]')) elegido[`${s.dataset.producto}:${s.name}`] = s.value;
+    const cantidades = {};
+    for (const c of lista.querySelectorAll('input[data-producto]')) cantidades[c.dataset.producto] = c.value;
+    lista.replaceChildren();
+    refrescadores = [];
+    for (const p of estado.productos) {
+      const selects = p.pide.map(grupo => {
+        const select = el('select', { 'aria-label': `Color de ${grupo === 'gorra' ? 'la gorra' : 'el shaker'}`, name: grupo, 'data-producto': p.id },
+          COLORES[grupo].map(color => el('option', { value: color, disabled: !estado.colores[grupo][color] }, estado.colores[grupo][color] ? color : `${color} (agotado)`)));
+        const primero = COLORES[grupo].find(c => estado.colores[grupo][c]);
+        if (primero) select.value = primero;
+        const previo = elegido[`${p.id}:${grupo}`];
+        if (previo && estado.colores[grupo][previo]) select.value = previo;
+        return select;
+      });
+      const cantidad = el('input', { type: 'number', min: '1', max: String(TOPE_POR_LINEA), value: cantidades[p.id] || '1', 'data-producto': p.id, 'aria-label': `Cantidad de ${p.nombre}` });
+      const agregar = el('button', {
+        type: 'button', class: 'tienda__agregar', disabled: !p.disponible,
+        onclick: () => {
+          const colores = Object.fromEntries(selects.map(s => [s.name, s.value]));
+          const tope = maximoParaSumar(p, colores, estado.maximos, carrito, estado.productos);
+          const n = Number(cantidad.value);
+          if (tope < 1) { refrescar(); return; }
+          if (!Number.isInteger(n) || n < 1) { cantidad.value = '1'; return; }
+          const sumar = Math.min(n, tope); // nunca más de lo que queda
+          const linea = { producto: p.id, nombre: p.nombre, precio: p.precio, cantidad: sumar, ...colores };
+          const igual = carrito.find(l => l.producto === linea.producto && l.gorra === linea.gorra && l.shaker === linea.shaker);
+          if (igual) igual.cantidad += sumar;
+          else carrito.push(linea);
+          dibujarCarrito();
+        }
+      }, p.disponible ? 'Sumar' : 'Agotado');
+      // Cuánto se puede sumar ahora de este producto, con estos colores y lo que ya hay en el carrito
+      function refrescar() {
+        const colores = Object.fromEntries(selects.map(s => [s.name, s.value]));
+        const tope = maximoParaSumar(p, colores, estado.maximos, carrito, estado.productos);
+        cantidad.max = String(Math.max(1, tope));
+        if (Number(cantidad.value) > tope && tope >= 1) cantidad.value = String(tope);
+        agregar.disabled = tope < 1;
+        agregar.textContent = tope >= 1 ? 'Sumar' : (p.disponible ? 'Ya sumaste todo lo que hay' : 'Agotado');
       }
-    }, p.disponible ? 'Sumar' : 'Agotado');
-    lista.append(el('li', { class: 'tienda__producto' },
-      el('div', {}, el('h3', {}, p.nombre), el('p', { class: 'tienda__precio' }, pesos(p.precio))),
-      el('div', { class: 'tienda__opciones' }, selects, cantidad, agregar)));
+      for (const s of selects) s.addEventListener('change', refrescar);
+      refrescadores.push(refrescar);
+      lista.append(el('li', { class: 'tienda__producto' },
+        el('div', {}, el('h3', {}, p.nombre), el('p', { class: 'tienda__precio' }, pesos(p.precio))),
+        el('div', { class: 'tienda__opciones' }, selects, cantidad, agregar)));
+    }
+  }
+  dibujarProductos();
+  for (const refrescar of refrescadores) refrescar();
+
+  // En vivo: el servidor avisa apenas cambia el stock (venta, Almacén, bot o un pedido que aparta unidades). Si se corta, el navegador reconecta solo.
+  if ('EventSource' in window) {
+    try {
+      const vivo = new EventSource(`${apiUrl}/api/programacion/ventas/eventos`);
+      vivo.addEventListener('estado', (e) => {
+        try {
+          const nuevo = JSON.parse(e.data);
+          if (!nuevo.abierta) return;
+          estado = nuevo;
+          const recortado = ajustarCarrito(carrito, estado.productos, estado.maximos);
+          dibujarProductos();
+          dibujarCarrito();
+          mensaje.textContent = recortado ? 'Cambió el stock mientras elegías: ajustamos tu carrito a lo que queda.' : mensaje.textContent;
+        } catch { /* un mensaje roto no tira la tienda */ }
+      });
+    } catch { /* sin stream queda el estado de cuando cargó la página; al pagar el servidor revalida */ }
   }
 
   codigoInput.addEventListener('input', () => { descuento = 0; codigoMsg.textContent = ''; dibujarCarrito(); });

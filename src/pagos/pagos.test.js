@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import express from "express";
 import { firmaValida } from "./mercadopago.js";
-import { confirmarPago, crearPedido, ErrorPedido } from "./pedidos.js";
+import { confirmarPago, crearPedido, ErrorPedido, RESERVA_MS, stockDisponible } from "./pedidos.js";
+import { alCambiarElStock } from "../programacion/stock-eventos.js";
 import { crearRutasVentas } from "./rutas.js";
 import { aplicarInventario, leerInventario } from "../programacion/inventario.js";
 import { crearRepositorioMemoria } from "../programacion/repositorio-memoria.js";
@@ -91,14 +92,56 @@ describe("confirmarPago", () => {
     assert.ok((await repo.novedadesPendientes()).some((n) => /no coincide/.test(n.texto)));
   });
 
-  test("si ya no queda stock, avisa para devolver el dinero", async () => {
+  test("si el stock se corrige a mano antes del pago, avisa para devolver el dinero", async () => {
     const { repo, mp } = await armar({ "shaker-claro": 1, medias: 5 });
     const a = await pedirUno(repo, mp);
-    const b = await pedirUno(repo, mp);
-    assert.equal(await confirmarPago({ repo, pago: pagoDe(a) }), "venta registrada");
-    assert.equal(await confirmarPago({ repo, pago: pagoDe(b, { id: 556 }) }), "pagado sin stock");
+    await aplicarInventario(repo, { tipo: "ajuste", sku: "shaker-claro", cantidad: 0 }, { origen: "juego" });
+    assert.equal(await confirmarPago({ repo, pago: pagoDe(a) }), "pagado sin stock");
     assert.equal((await leerInventario(repo)).stock["shaker-claro"], 0);
     assert.ok((await repo.novedadesPendientes()).some((n) => /devolverle el dinero/.test(n.texto)));
+  });
+});
+
+describe("reserva de stock", () => {
+  const pedirUno = (repo, mp, ahora) => crearPedido({ repo, mp, ...base, ahora, cuerpo: { items: [{ producto: "kept", cantidad: 1, shaker: "claro" }], comprador: COMPRADOR, entrega: { tipo: "retiro" } } });
+
+  test("un pedido sin pagar aparta el stock: el segundo no puede pedir lo último", async () => {
+    const { repo, mp } = await armar({ "shaker-claro": 1, medias: 5 });
+    await pedirUno(repo, mp, Date.now());
+    await assert.rejects(pedirUno(repo, mp, Date.now()), (e) => e instanceof ErrorPedido && e.estado === 409);
+    assert.equal((await stockDisponible(repo))["shaker-claro"], 0);
+    assert.equal((await leerInventario(repo)).stock["shaker-claro"], 1); // el stock real no se tocó
+  });
+
+  test("dos pedidos al mismo tiempo: solo uno se queda con la última unidad", async () => {
+    const { repo, mp } = await armar({ "shaker-claro": 1, medias: 5 });
+    const r = await Promise.allSettled([pedirUno(repo, mp, Date.now()), pedirUno(repo, mp, Date.now())]);
+    assert.equal(r.filter((x) => x.status === "fulfilled").length, 1);
+  });
+
+  test("la reserva vence a los 30 minutos y el stock vuelve a estar disponible", async () => {
+    const { repo, mp } = await armar({ "shaker-claro": 1, medias: 5 });
+    const hace = Date.now() - RESERVA_MS - 1000;
+    await pedirUno(repo, mp, hace);
+    assert.equal((await stockDisponible(repo))["shaker-claro"], 1);
+    await pedirUno(repo, mp, Date.now());
+  });
+
+  test("si falla Mercado Pago, la reserva se libera", async () => {
+    const { repo } = await armar({ "shaker-claro": 1, medias: 5 });
+    const mpRoto = { crearPreferencia: async () => { throw new Error("caído"); } };
+    await assert.rejects(pedirUno(repo, mpRoto, Date.now()), /caído/);
+    assert.equal((await stockDisponible(repo))["shaker-claro"], 1);
+  });
+
+  test("cada cambio de stock o de pedidos avisa", async () => {
+    const { repo, mp } = await armar({ "shaker-claro": 3, medias: 5 });
+    let avisos = 0;
+    const dejar = alCambiarElStock(() => avisos++);
+    await pedirUno(repo, mp, Date.now());
+    await aplicarInventario(repo, { tipo: "entrada", sku: "medias", cantidad: 1 });
+    dejar();
+    assert.ok(avisos >= 2);
   });
 });
 
@@ -125,6 +168,36 @@ describe("rutas de ventas", () => {
     assert.deepEqual(await (await fetch(`${url}/estado`)).json(), { abierta: false });
     const r = await fetch(`${url}/pedidos`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
     assert.equal(r.status, 503);
+    servidor.closeAllConnections(); servidor.close();
+  });
+
+  test("en vivo: manda el estado al conectarse y de nuevo cuando cambia el stock", async () => {
+    await levantar({ ventaAbierta: true, intervaloEventosMs: 60_000 });
+    const control = new AbortController();
+    const r = await fetch(`${url}/eventos`, { signal: control.signal });
+    assert.match(r.headers.get("content-type"), /text\/event-stream/);
+    const lector = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    const proximoEstado = async () => {
+      for (;;) {
+        const m = buffer.match(/event: estado\ndata: (.*)\n\n/);
+        if (m) { buffer = buffer.slice(m.index + m[0].length); return JSON.parse(m[1]); }
+        const { value, done } = await lector.read();
+        if (done) throw new Error("se cerró el stream");
+        buffer += decoder.decode(value);
+      }
+    };
+    const primero = await proximoEstado();
+    assert.deepEqual(primero.colores.gorra, { negra: true, beige: false });
+    assert.ok(!JSON.stringify(primero).includes("stock"));
+    await aplicarInventario(repo, { tipo: "entrada", sku: "gorra-beige", cantidad: 2 }, { origen: "juego" });
+    const segundo = await proximoEstado();
+    assert.deepEqual(segundo.colores.gorra, { negra: true, beige: true });
+    // Un pedido que aparta lo último de un color también se nota en vivo
+    await aplicarInventario(repo, { tipo: "ajuste", sku: "gorra-negra", cantidad: 0 }, { origen: "bot" });
+    assert.deepEqual((await proximoEstado()).colores.gorra, { negra: false, beige: true });
+    control.abort();
     servidor.closeAllConnections(); servidor.close();
   });
 

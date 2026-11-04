@@ -2,6 +2,7 @@
 // Todo se guarda en la base ("inventario"). Cada cambio deja un movimiento (quién, cuándo, qué) y una novedad para el Estratega.
 // Los precios los define el sistema (acá, según docs/productos/stock-inicial.md): ni el juego ni el bot los cambian al vender.
 import { esFechaISO } from "./fechas.js";
+import { avisarCambioDeStock } from "./stock-eventos.js";
 
 // Lo que hay en el Almacén. "medias" va sin desglose de color y talle hasta que Facundo confirme el reparto.
 export const PRODUCTOS = {
@@ -148,6 +149,7 @@ export function aplicarInventario(repo, cambio, { origen = "juego", ahora = Date
     const ids = Object.keys(inv.ventas).sort((a, b) => inv.ventas[a].en.localeCompare(inv.ventas[b].en));
     for (const id of ids.slice(0, Math.max(0, ids.length - MAX_VENTAS))) delete inv.ventas[id];
     await repo.guardarEstado("inventario", inv);
+    avisarCambioDeStock();
     await repo.agregarNovedad(`${cambio.tipo === "venta" || cambio.tipo === "anular_venta" ? "Caja" : "Almacén"} (${origen === "juego" ? "oficina" : origen === "web" ? "tienda web" : "chat"}): ${resumen}`.slice(0, 1000));
     return { inventario: inv, resumen, ...(ventaId ? { id: ventaId } : {}) };
   });

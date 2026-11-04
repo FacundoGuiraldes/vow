@@ -1,17 +1,19 @@
 // Rutas de la venta propia, bajo /api/programacion/ventas:
 //   GET  /estado         si la venta está abierta y qué se vende (público: sin stock exacto)
+//   GET  /eventos        lo mismo que /estado, en vivo (text/event-stream): llega solo cada vez que cambia el stock o una reserva
 //   POST /pedidos        arma un pedido y devuelve el link de pago de Mercado Pago (público, solo si la venta está abierta)
 //   POST /arrepentimiento  botón de arrepentimiento: devuelve el código de revocación (público, funciona aunque la venta esté cerrada)
 //   POST /mercadopago    aviso de Mercado Pago cuando cambia un pago (se valida con la firma)
 import { Router } from "express";
 import { rateLimit } from "express-rate-limit";
-import { CATALOGO, leerInventario } from "../programacion/inventario.js";
+import { alCambiarElStock } from "../programacion/stock-eventos.js";
 import { firmaValida } from "./mercadopago.js";
 import { ErrorCodigo } from "../descuentos/codigos.js";
 import { ErrorArrepentimiento } from "./arrepentimiento.js";
-import { ErrorPedido, confirmarPago, crearPedido } from "./pedidos.js";
+import { disponibilidadDe } from "./disponibilidad.js";
+import { ErrorPedido, confirmarPago, crearPedido, stockDisponible } from "./pedidos.js";
 
-export function crearRutasVentas({ repo, mp, secretoWebhook, ventaAbierta = false, cotizarEnvio = null, codigos = null, consultaCodigo = null, arrepentimientos = null, urlPublica, urlLanding }) {
+export function crearRutasVentas({ repo, mp, secretoWebhook, ventaAbierta = false, cotizarEnvio = null, codigos = null, consultaCodigo = null, arrepentimientos = null, urlPublica, urlLanding, intervaloEventosMs = 10_000 }) {
   const router = Router();
   const limitePedidos = rateLimit({ windowMs: 60_000, limit: 10, standardHeaders: true, legacyHeaders: false, message: { error: "Demasiados pedidos. Probá en un minuto." } });
 
@@ -19,24 +21,52 @@ export function crearRutasVentas({ repo, mp, secretoWebhook, ventaAbierta = fals
   const limiteConsulta = rateLimit({ windowMs: 60_000, limit: 5, standardHeaders: true, legacyHeaders: false, message: { error: "Demasiados intentos. Probá en un minuto." } });
   const limiteCodigos = rateLimit({ windowMs: 60_000, limit: 15, standardHeaders: true, legacyHeaders: false, message: { error: "Demasiados intentos. Probá en un minuto." } });
 
+  // Lo que ve la web: qué hay y de qué color, sin cantidades. Descuenta lo que otros pedidos sin pagar tienen apartado.
+  async function armarEstado() {
+    if (!ventaAbierta) return { abierta: false };
+    const { colores, maximos, productos } = disponibilidadDe(await stockDisponible(repo));
+    return { abierta: true, envio: Boolean(cotizarEnvio), codigos: Boolean(codigos), consultaCodigo: Boolean(codigos && consultaCodigo), colores, maximos, productos };
+  }
+
   router.get("/estado", async (req, res, siguiente) => {
     try {
-      if (!ventaAbierta) return res.json({ abierta: false });
-      const inv = await leerInventario(repo);
-      const disponible = (producto) => CATALOGO[producto].usa.every(([grupo, n]) => Object.entries(inv.stock).filter(([sku]) => sku.startsWith(grupo)).reduce((a, [, c]) => a + c, 0) >= n);
-      const hay = (sku) => inv.stock[sku] > 0;
-      return res.json({
-        abierta: true,
-        envio: Boolean(cotizarEnvio),
-        codigos: Boolean(codigos),
-        consultaCodigo: Boolean(codigos && consultaCodigo),
-        // Qué colores hay (sí o no, sin cantidades) para cada cosa que pide color
-        colores: { gorra: { negra: hay("gorra-negra"), beige: hay("gorra-beige") }, shaker: { negro: hay("shaker-negro"), claro: hay("shaker-claro") } },
-        productos: Object.entries(CATALOGO).map(([id, p]) => ({ id, nombre: p.nombre, precio: p.precio, pide: p.usa.map(([g]) => g).filter((g) => g !== "medias"), disponible: disponible(id) })),
-      });
+      return res.set("Cache-Control", "no-store").json(await armarEstado());
     } catch (error) {
       return siguiente(error);
     }
+  });
+
+  // En vivo: manda el estado al conectarse y de nuevo apenas cambia algo. Además revisa cada tanto (vencen las reservas con el tiempo, y otro proceso puede haber movido el stock).
+  router.get("/eventos", async (req, res) => {
+    res.set({ "Content-Type": "text/event-stream", "Cache-Control": "no-store", Connection: "keep-alive", "X-Accel-Buffering": "no" });
+    res.flushHeaders?.();
+    let ultimo = "";
+    let ocupado = false;
+    let pendiente = false;
+    const enviar = async () => {
+      if (ocupado) { pendiente = true; return; }
+      ocupado = true;
+      try {
+        do {
+          pendiente = false;
+          const texto = JSON.stringify(await armarEstado());
+          if (texto !== ultimo) {
+            ultimo = texto;
+            res.write(`event: estado\ndata: ${texto}\n\n`);
+          }
+        } while (pendiente);
+      } catch (error) {
+        console.error(`Error armando el estado en vivo: ${error.message}`);
+      } finally {
+        ocupado = false;
+      }
+    };
+    const dejarDeEscuchar = alCambiarElStock(enviar);
+    const revisar = setInterval(enviar, intervaloEventosMs);
+    const latido = setInterval(() => res.write(": latido\n\n"), 25_000);
+    req.on("close", () => { dejarDeEscuchar(); clearInterval(revisar); clearInterval(latido); });
+    res.write("retry: 3000\n\n");
+    await enviar();
   });
 
   // Para que quien compra vea cuánto descuenta su código antes de pagar (no lo gasta: eso pasa al pagar)
