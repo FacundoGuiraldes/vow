@@ -1,0 +1,129 @@
+name: Investigación semanal
+
+# Cada domingo a la noche (hora de Argentina) estudia las cuentas de referencia y mide @vow_ar con la API oficial de Meta
+# (solo lectura, gratis) y guarda los resultados en el repo (docs/investigacion/ y docs/rendimiento/). Así el plan del lunes
+# arranca con datos frescos y queda el historial de lo que funcionó semana a semana.
+# Nunca publica nada ni usa la API de Anthropic (el análisis con Claude sigue siendo opcional, a mano).
+#
+# Si Instagram no responde (casi siempre porque el INSTAGRAM_TOKEN venció), esta corrida FALLA a propósito: GitHub te
+# avisa por mail el domingo y alcanza para renovarlo antes de que el lunes se arme el plan a ciegas.
+#
+# GitHub programa en UTC: Argentina es UTC-3 todo el año, así que domingo 23:23 son las 02:23 UTC del lunes.
+
+on:
+  schedule:
+    - cron: "23 2 * * 1" # domingo 23:23 en Argentina
+  workflow_dispatch:
+    inputs:
+      limite:
+        description: "Publicaciones a leer por cuenta"
+        required: true
+        type: choice
+        default: "25"
+        options:
+          - "10"
+          - "25"
+          - "50"
+      analizar:
+        description: "Que Claude analice los datos y pruebe las ideas (gasta unos centavos)"
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: investigacion-semanal
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  investigar:
+    # Las claves solo se usan desde main
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      INSTAGRAM_TOKEN: ${{ secrets.INSTAGRAM_TOKEN }}
+      INSTAGRAM_USER_ID: ${{ secrets.INSTAGRAM_USER_ID }}
+      LIMITE: ${{ inputs.limite || '25' }}
+      ANALIZAR: ${{ inputs.analizar || 'false' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Secretos de Instagram configurados
+        run: |
+          if [ -z "$INSTAGRAM_TOKEN" ] || [ -z "$INSTAGRAM_USER_ID" ]; then
+            echo "::error title=Faltan secretos::Cargá INSTAGRAM_TOKEN e INSTAGRAM_USER_ID en Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      # Los pasos no cortan la corrida: lo que haya salido bien se guarda, y al final se avisa de lo que falló
+      - name: Estudiar las cuentas de referencia
+        id: investigar
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run investigar -- --limite "$LIMITE" 2>&1 | tee salida-investigar.txt
+
+      - name: Medir el rendimiento de @vow_ar
+        id: rendimiento
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npm run rendimiento -- --limite "$LIMITE" 2>&1 | tee salida-rendimiento.txt
+
+      - name: Analizar con Claude (opcional)
+        id: analizar
+        if: env.ANALIZAR == 'true' && steps.investigar.outcome == 'success'
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -o pipefail
+          npm run analizar 2>&1 | tee salida-analisis.txt
+
+      - name: Guardar en el repo si cambió
+        run: |
+          # Se conservan los últimos 8 de cada tipo: el historial completo queda en git
+          for patron in "docs/investigacion/patrones-*.md" "docs/rendimiento/rendimiento-*.md" "docs/rendimiento/rendimiento-*.json"; do
+            ls -1 $patron 2>/dev/null | grep -v simulado | sort | head -n -8 | xargs -r git rm -q --
+          done
+          git add docs/investigacion docs/rendimiento
+          if git diff --cached --quiet; then
+            echo "Nada para guardar."
+            exit 0
+          fi
+          git config user.name "vow-investigador"
+          git config user.email "actions@users.noreply.github.com"
+          git commit -m "Investigación semanal: patrones y rendimiento actualizados"
+          git pull --rebase origin main
+          git push origin HEAD:main
+
+      - name: Resumen de la corrida
+        if: always()
+        run: |
+          {
+            echo "## Investigación semanal"
+            echo
+            echo "- Cuentas de referencia: ${{ steps.investigar.outcome }}"
+            echo "- Rendimiento de @vow_ar: ${{ steps.rendimiento.outcome }}"
+            echo
+            echo '```'
+            cat salida-investigar.txt salida-rendimiento.txt 2>/dev/null || echo "Sin salida."
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Falla a propósito si algo no se pudo leer, para que GitHub avise por mail antes del lunes
+      - name: Avisar si Instagram no respondió
+        if: steps.investigar.outcome == 'failure' || steps.rendimiento.outcome == 'failure'
+        run: |
+          echo "::error title=Instagram no respondió::Casi seguro venció INSTAGRAM_TOKEN. Generá uno nuevo en Meta y cargalo en Settings > Secrets and variables > Actions (y en Render). Mirá el resumen de la corrida para el detalle."
+          exit 1

@@ -102,15 +102,24 @@ jobs:
 
       # Cada lunes se estudian las cuentas de referencia con datos reales (solo lectura, gratis): el plan se apoya en lo que mejor rindió
       - name: Estudiar las cuentas de referencia
+        id: investigar
         if: env.INSTAGRAM_TOKEN != '' && env.INSTAGRAM_USER_ID != ''
         continue-on-error: true
         run: npm run investigar -- --limite 25
 
       # Los datos de la cuenta propia mejoran el plan, pero si Instagram no responde el plan sale igual
       - name: Medir el rendimiento de @vow_ar
+        id: rendimiento
         if: env.INSTAGRAM_TOKEN != '' && env.INSTAGRAM_USER_ID != ''
         continue-on-error: true
         run: npm run rendimiento
+
+      # continue-on-error deja el paso en verde aunque falle: acá se deja a la vista que el plan salió sin esos datos
+      - name: Avisar si el plan salió sin datos de Instagram
+        if: steps.investigar.outcome == 'failure' || steps.rendimiento.outcome == 'failure'
+        run: |
+          echo "::warning title=Plan sin datos de Instagram::Las cuentas de referencia o @vow_ar no respondieron (casi seguro venció INSTAGRAM_TOKEN). El plan se arma igual, pero sin lo que mejor rindió."
+          echo "> **Ojo:** este plan se armó sin datos de Instagram (investigar: ${{ steps.investigar.outcome }}, rendimiento: ${{ steps.rendimiento.outcome }}). Revisá INSTAGRAM_TOKEN." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Planificar y enviar a Telegram
         run: |
