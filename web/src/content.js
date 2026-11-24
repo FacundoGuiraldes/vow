@@ -1,5 +1,5 @@
 export const content = {
-  marquee: "DROP 01 EN DESARROLLO · 7 PRODUCTOS · LANZAMIENTO EN 2027 · SUMATE A LA LISTA DE ESPERA · ",
+  marquee: "DROP 00 · LUNES 30 DE NOVIEMBRE · GORRAS, SHAKERS Y MEDIAS · DROP 01 EN 2027 · SUMATE A LA LISTA · ",
   hero: {
     title: "Tu promesa.\nTu fuerza.",
     cta: "UNIRSE"

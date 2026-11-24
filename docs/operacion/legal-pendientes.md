@@ -28,7 +28,7 @@ Los datos del vendedor se cargan en `web/src/negocio.js`; lo que está en `null`
 5. **Responder los arrepentimientos**: cada uno llega por mail a la cuenta de VOW con su código; hay que contestar por mail y coordinar la devolución.
 6. **Derechos de las imágenes**: confirmar el origen de `web/public/img/coming-soon.webp` (¿imagen generada con IA, diseño propio o de un tercero?) y del logo. Si es de IA, revisar los términos de la herramienta para uso comercial. Cuando haya fotos reales de producto, tener la autorización de quien las saque y de las personas que aparezcan.
 7. **Marca**: buscar y registrar "VOW" en el INPI (clases 25 y 35) para evitar un conflicto con una marca existente. *Actualización 24/11/2026: el trámite ya está solicitado y está en curso; se vende mientras tanto.*
-8. **Fecha de lanzamiento**: la web dice "lanzamiento en 2027" (cinta y preguntas) y "Drop 01 en desarrollo". Si cambia el plan, actualizar `web/src/content.js` y la sección de preguntas.
+8. **Fecha de lanzamiento**: la web anuncia el Drop 00 para el lunes 30 de noviembre de 2026 (cinta, etiqueta del hero, nota del hero, preguntas y descripción para redes) y el Drop 01 en 2027. *Después del lanzamiento hay que quitar el "lunes 30 de noviembre" de esos textos.* Si cambia el plan, actualizar `web/src/content.js` y `web/index.html`.
 9. **Promesa del descuento**: la web dice que anotarse da un código para la primera compra. Hay que cumplirlo (ver `docs/lanzamiento.md`).
 10. **Mails**: ya llevan opción de baja. Atender las bajas a tiempo y sacar de la lista a quien las pida.
 11. **Si algún día se agrega analítica, píxeles o videos embebidos**: hay que actualizar la política de cookies y pedir consentimiento antes de activarlos.
