@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { armarPlan, ejecutarCaso, ejecutarEvals, ejecutarFrases, leerConjunto, leerFrases, reglasSinCaso } from "./ejecutar.js";
-import { NOMBRES_DE_REGLAS } from "../src/agents/reglas-marca.js";
+import { NOMBRES_DE_REGLAS, NOMBRES_DE_REGLAS_DURAS } from "../src/agents/reglas-marca.js";
 
 test("todos los casos del Revisor dan el resultado esperado", async () => {
   const { resultados } = await ejecutarEvals(await leerConjunto());
@@ -9,7 +9,7 @@ test("todos los casos del Revisor dan el resultado esperado", async () => {
   assert.deepEqual(fallidos, []);
 });
 
-test("cada regla de marca tiene al menos un caso que la dispara", async () => {
+test("cada regla dura de marca tiene al menos un caso que la dispara", async () => {
   assert.deepEqual(reglasSinCaso(await leerConjunto()), []);
 });
 
@@ -35,16 +35,22 @@ test("el ejecutor detecta un caso mal esperado (si no, las evals no servirían)"
 test("reglasSinCaso avisa cuando una regla no tiene caso", async () => {
   const conjunto = await leerConjunto();
   // Sacamos todos los casos que apuntan a esa regla
-  const sinPapel = { ...conjunto, casos: conjunto.casos.filter((c) => ![...c.esperado.problemas_contienen, ...(c.esperado.avisos_contienen ?? [])].includes("promesa en papel")) };
-  assert.deepEqual(reglasSinCaso(sinPapel), ["promesa en papel"]);
+  const sinUrgencia = { ...conjunto, casos: conjunto.casos.filter((c) => ![...c.esperado.problemas_contienen, ...(c.esperado.avisos_contienen ?? [])].includes("urgencia falsa")) };
+  assert.deepEqual(reglasSinCaso(sinUrgencia), ["urgencia falsa"]);
 });
 
-test("armarPlan combina la pieza base con los cambios", async () => {
+test("armarPlan combina el día base con los cambios", async () => {
   const conjunto = await leerConjunto();
-  const plan = armarPlan(conjunto, { pieza: { gancho: "Otro." }, plan: { resumen: "R" } });
-  assert.equal(plan.piezas[0].gancho, "Otro.");
-  assert.equal(plan.piezas[0].formato, conjunto.base.formato);
-  assert.equal(plan.resumen, "R");
+  const plan = armarPlan(conjunto, { dia: { formato: "story" }, plan: { nota: "R" } });
+  assert.equal(plan.dias[0].formato, "story");
+  assert.equal(plan.dias[0].fecha, conjunto.base.fecha);
+  assert.equal(plan.nota, "R");
+  assert.equal(armarPlan(conjunto, { dias: [{}, {}] }).dias.length, 2);
+});
+
+test("las reglas duras son un subconjunto de las reglas de marca", () => {
+  assert.ok(NOMBRES_DE_REGLAS_DURAS.length > 0);
+  assert.ok(NOMBRES_DE_REGLAS_DURAS.every((r) => NOMBRES_DE_REGLAS.includes(r)));
 });
 
 test("cada regla de marca detecta todas las frases de ejemplo y ninguna frase común dispara una regla", async () => {
@@ -65,6 +71,6 @@ test("ejecutarFrases detecta una frase mal clasificada", () => {
 });
 
 test("el verbo \"pesa\" no se confunde con las pesas del gimnasio (falso positivo corregido)", async () => {
-  const r = await ejecutarCaso(await leerConjunto(), { id: "x", pieza: { texto_en_pantalla: ["Lo que pesa, se sostiene.", "Sin apuro."] }, esperado: { aprobada: true, problemas_contienen: [] } });
+  const r = await ejecutarCaso(await leerConjunto(), { id: "x", dia: { contenido: "Texto sobre fondo hueso: lo que pesa, se sostiene. Una frase por vez, sin música." }, esperado: { aprobada: true, problemas_contienen: [] } });
   assert.equal(r.ok, true, r.motivos.join("; "));
 });

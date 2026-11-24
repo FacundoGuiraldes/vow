@@ -46,6 +46,8 @@ const REGLAS = [
 
 // Los nombres de las reglas, para que las evals comprueben que cada una tiene al menos un caso que la dispara
 export const NOMBRES_DE_REGLAS = REGLAS.map((r) => r.regla);
+// Las que frenan un flujo (el Revisor solo aplica estas): cada una necesita un caso fijo en las evals
+export const NOMBRES_DE_REGLAS_DURAS = REGLAS.filter((r) => !r.blanda).map((r) => r.regla);
 
 const MAXIMO_EMOJIS = 1;
 

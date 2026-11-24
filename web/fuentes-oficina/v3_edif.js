@@ -76,7 +76,7 @@ function hq(){
 }
 function banderaMast(g){cy(g,.12,.12,.9,BEIGE,0,5.55,0,6,{borde:false});bandera(g,0,5.8,0,BORDO,1.7)}
 
-/* ================= Taller de diseño: estudio de ropa y gráfica ================= */
+/* ================= Flujo semanal: el estudio de ropa y gráfica donde se ve qué sale cada día ================= */
 function taller(){
   var g=nuevo('diseno');
   bx(g,4.4,.3,4.0,adoqM(),0,0,0,{dn:.5});
@@ -105,7 +105,7 @@ function taller(){
   [-.8,.8].forEach(function(z){var cl=bx(g,.9,.07,.8,new THREE.MeshLambertMaterial({color:0x9fc0c8,emissive:0xffe3b0,emissiveIntensity:0}),1.0,2.95,z,{borde:false});cl.rotation.z=-.5;LUZ_MAT.push(cl.material);})
   chimenea(g,-1.2,3.0,-.9);
   toldo(g,2.1,.55,-.8,2.12,1.7,0,0x151413,0xece8e1);
-  /* caballete con una pieza, maniquí, rollos de tela y banderines */
+  /* caballete con una tela, maniquí, rollos de tela y banderines */
   bx(g,.08,1.5,.08,0x4a3b2a,-1.9,0,2.5);bx(g,.08,1.5,.08,0x4a3b2a,-1.1,0,2.5);bx(g,1.2,1.0,.1,0xf3efe7,-1.5,.7,2.5);bx(g,.9,.66,.12,BORDO,-1.5,.9,2.53,{borde:false});logoMini(g,-1.5,.95,2.6,.38);
   var mn=new THREE.Group();mn.position.set(1.65,0,2.4);g.add(mn);cy(mn,.05,.05,1.0,0x24221f,0,0,0,6,{borde:false});cy(mn,.3,.22,.7,BORDO,0,.8,0,10);esf(mn,.2,0xe4d3b9,0,1.62,0,{borde:false});cy(mn,.28,.28,.12,BORDO,0,1.4,0,10,{borde:false});cy(mn,.2,.22,.06,0x24221f,0,0,0,10,{borde:false});
   [[BORDO,.0,.0],[BEIGE,.0,.36],[0x151413,.0,.72]].forEach(function(r,i){var rl=cy(g,.2,.2,.9,r[0],0,0,0,14);rl.rotation.z=Math.PI/2;rl.position.set(2.45+(i%2?.12:0),.22+(i===2?.4:0),2.55-(i===1?.38:0)+(i===2?-.2:0))});

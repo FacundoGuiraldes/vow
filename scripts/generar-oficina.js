@@ -1,52 +1,15 @@
-// Arma lo que la oficina (el juego de VOW HQ) sabe de los documentos del repo: piezas, estrategia, depósito, pendientes y archivos.
+// Arma lo que la oficina (el juego de VOW HQ) sabe de los documentos del repo: estrategia, depósito y pendientes.
 // Ya NO corre en el build de la web: lo que arma es privado. La API lo usa (src/programacion/oficina-documentos.js) y lo entrega solo con clave.
 // Todo se deduce de los documentos con reglas fijas, sin IA: si un documento cambia, el juego cambia en el próximo deploy.
-// Lo que depende de la base (estado de cada pieza, charla, lo que se marca en el juego) lo trae el juego en vivo de /api/programacion/oficina.
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+// Lo que depende de la base (flujo semanal, charla, lo que se marca en el juego) lo trae el juego en vivo de /api/programacion/oficina.
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const iso = (dmy) => dmy.split("/").reverse().join("-");
 const leer = (ruta) => readFileSync(ruta, "utf8");
 const listar = (dir) => (existsSync(dir) ? readdirSync(dir).sort() : []);
-
-// "publicado" si el Estado dice que salió; "por filmar" si falta filmar; "programado" si ya está cargado; si no, "por aprobar"
-export function clasificarEstado(texto) {
-  const t = String(texto).toLowerCase();
-  if (/publicad/.test(t)) return "publicado";
-  if (/falta filmar|por filmar/.test(t)) return "por filmar";
-  if (/programad|cargado en el bot/.test(t)) return "programado";
-  return "por aprobar";
-}
-
-// Del Estado de la pieza queda solo la primera frase, sin enlaces, rutas ni marcas de formato
-export function notaCorta(estado) {
-  const limpio = String(estado).replace(/\*\*/g, "").replace(/`[^`]*`/g, "").replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").replace(/\s+([.:;,])/g, "$1").trim();
-  const pub = /^publicado el \d{2}\/\d{2}\/\d{4}/i.exec(limpio);
-  if (pub) return `P${pub[0].slice(1)}`;
-  const frase = limpio.split(/(?<=[.;])\s/)[0] ?? "";
-  return (frase.length > 140 ? `${frase.slice(0, 137).trim()}…` : frase).replace(/[:;,]\s*$/, "").trim();
-}
-
-// Una pieza sale de su .md: "# Formato · dd/mm/aaaa · pilar" más **Título:** y **Estado:**
-export function leerPieza(md) {
-  const cab = /^#\s+(.+?)\s+·\s+(\d{2}\/\d{2}\/\d{4})(?:\s+·\s+(.+))?$/m.exec(md);
-  if (!cab) return null;
-  const campo = (nombre) => new RegExp(`^\\*\\*${nombre}:\\*\\*\\s*(.+)$`, "m").exec(md)?.[1].trim() ?? "";
-  const estado = campo("Estado");
-  const cuerpo = md.split("\n").filter((l) => !/^# |^\*\*(Título|Estado):\*\*/.test(l)).join("\n").replace(/^\s+/, "");
-  const pieza = {
-    fecha: iso(cab[2]),
-    formato: cab[1].trim().toLowerCase(),
-    titulo: campo("Título") || cab[1].trim(),
-    estado: clasificarEstado(estado),
-    nota: notaCorta(estado),
-    texto: cuerpo.trim().slice(0, 3000),
-  };
-  const pendientes = /^## Pendiente\s*\n((?:- .+\n?)+)/m.exec(md)?.[1].split("\n").filter((l) => l.startsWith("- ")).map((l) => l.slice(2).trim()) ?? [];
-  return { pieza, pendientes };
-}
 
 // Las tablas "| Dato | Valor |" de cada producto del stock: entrega y pendientes
 export function leerStock(md) {
@@ -69,48 +32,17 @@ export function leerStock(md) {
   return { deposito, agenda, pendientes: pend };
 }
 
-const lista = (valor) => (Array.isArray(valor) ? valor.join(", ") : String(valor ?? ""));
+// El flujo de la semana como texto legible: un renglón por publicación
 export function textoDelPlan(plan, nombre) {
-  const sal = [`# Plan ${nombre}`, "", plan.resumen ?? ""];
-  for (const p of plan.piezas ?? []) {
-    sal.push("", `## ${p.fecha} · ${p.formato} · ${p.pilar}`, `**Gancho:** ${p.gancho}`);
-    const filas = [["Ganchos alternativos", lista(p.ganchos_alternativos)], ["Guion", p.guion], ["Texto en pantalla", lista(p.texto_en_pantalla)], ["Epígrafe", p.epigrafe], ["Palabras clave", lista(p.palabras_clave)], ["CTA", p.cta], ["Recursos", lista(p.recursos)], ["Por qué", p.justificacion], ["Referencias", lista((p.referencias ?? []).map((r) => (typeof r === "string" ? r : r.url ?? r.cuenta ?? "")))]];
-    for (const [k, v] of filas) if (v) sal.push(`**${k}:** ${v}`);
-  }
+  const sal = [`# Flujo de la semana del ${nombre}`, ""];
+  for (const d of plan.dias ?? []) sal.push(`- ${d.fecha} · ${d.formato}: ${d.contenido}`);
   return sal.join("\n");
 }
 
 // Lunes a las 8: el Estratega arma el plan solo. Se calcula la próxima fecha desde "hoy" en el navegador, no acá.
 export function generar({ raiz, destino, hoy = new Date().toISOString().slice(0, 10) }) {
   const docs = join(raiz, "docs");
-  const D = { actualizado: hoy, piezas: [], agenda: [], pendientes: [], deposito: {}, bot: { modo: "simulación", publica: false }, sistema: { tests: "sin datos", evals: "sin datos" }, recepcion: { productos: "" }, estrategia: {}, planTexto: "", informeTexto: "" };
-  const MED = { piezas: {} };
-
-  rmSync(join(destino, "medios"), { recursive: true, force: true });
-  mkdirSync(join(destino, "medios"), { recursive: true });
-
-  for (const nombre of listar(join(docs, "piezas")).filter((n) => n.endsWith(".md"))) {
-    const r = leerPieza(leer(join(docs, "piezas", nombre)));
-    if (!r) continue;
-    D.piezas.push(r.pieza);
-    if (r.pieza.estado !== "publicado") D.agenda.push({ f: r.pieza.fecha, h: "", sala: "diseno", t: `${r.pieza.titulo} (${r.pieza.formato})` });
-    // Los archivos: la carpeta con el mismo nombre que el .md, o "<fecha>-laminas"
-    const base = nombre.replace(/\.md$/, "");
-    const carpeta = [join(docs, "piezas", base), join(docs, "piezas", `${r.pieza.fecha}-laminas`)].find((c) => existsSync(c) && statSync(c).isDirectory());
-    if (!carpeta) continue;
-    const clave = `${r.pieza.fecha}_${r.pieza.formato}`;
-    const sub = join(destino, "medios", clave);
-    mkdirSync(sub, { recursive: true });
-    const imgs = [], vids = [];
-    for (const arch of listar(carpeta)) {
-      const ext = arch.split(".").pop().toLowerCase();
-      if (!["png", "jpg", "jpeg", "mp4"].includes(ext)) continue;
-      copyFileSync(join(carpeta, arch), join(sub, basename(arch)));
-      (ext === "mp4" ? vids : imgs).push(`medios/${clave}/${arch}`);
-    }
-    MED.piezas[clave] = { ...(imgs.length ? { imgs: imgs.sort((a, b) => a.localeCompare(b, "es", { numeric: true })) } : {}), ...(vids.length ? { vid: vids[0] } : {}), md: r.pieza.texto };
-  }
-  D.piezas.sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const D = { actualizado: hoy, agenda: [], pendientes: [], deposito: {}, bot: { modo: "simulación", publica: false }, sistema: { tests: "sin datos", evals: "sin datos" }, recepcion: { productos: "" }, estrategia: {}, planTexto: "", informeTexto: "" };
 
   const stock = join(docs, "productos", "stock-inicial.md");
   if (existsSync(stock)) {
@@ -125,11 +57,14 @@ export function generar({ raiz, destino, hoy = new Date().toISOString().slice(0,
     D.recepcion.productos = `${n} en estado concepto (Drop 01, 2027)`;
   }
 
-  const plan = listar(join(docs, "planes")).filter((n) => /^plan-\d{4}-\d{2}-\d{2}\.json$/.test(n)).at(-1);
-  if (plan) {
-    const nombre = plan.slice(5, 15);
-    D.estrategia.plan = nombre;
-    D.planTexto = textoDelPlan(JSON.parse(leer(join(docs, "planes", plan))), nombre);
+  // Solo valen los flujos nuevos (con "dias"): los planes viejos con piezas ya no se muestran
+  const planes = listar(join(docs, "planes")).filter((n) => /^plan-\d{4}-\d{2}-\d{2}\.json$/.test(n));
+  for (const plan of planes.reverse()) {
+    const contenido = JSON.parse(leer(join(docs, "planes", plan)));
+    if (!Array.isArray(contenido.dias)) continue;
+    D.estrategia.plan = plan.slice(5, 15);
+    D.planTexto = textoDelPlan(contenido, D.estrategia.plan);
+    break;
   }
   const informe = listar(join(docs, "investigacion")).filter((n) => /^informe-\d{4}-\d{2}-\d{2}\.md$/.test(n)).at(-1);
   if (informe) {
@@ -138,12 +73,12 @@ export function generar({ raiz, destino, hoy = new Date().toISOString().slice(0,
   }
   D.agenda.sort((a, b) => a.f.localeCompare(b.f));
   mkdirSync(destino, { recursive: true });
-  writeFileSync(join(destino, "datos.json"), JSON.stringify({ D, MED }));
-  return { D, MED };
+  writeFileSync(join(destino, "datos.json"), JSON.stringify({ D }));
+  return { D };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const raiz = resolve(fileURLToPath(import.meta.url), "..", "..");
   const { D } = generar({ raiz, destino: join(tmpdir(), "vow-oficina-prueba") });
-  console.log(`Oficina: ${D.piezas.length} piezas, ${D.pendientes.length} pendientes, ${D.agenda.length} fechas.`);
+  console.log(`Oficina: ${D.pendientes.length} pendientes, ${D.agenda.length} fechas.`);
 }

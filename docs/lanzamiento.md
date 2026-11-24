@@ -14,7 +14,7 @@ Guía viva del lanzamiento: qué está listo, qué falta y en qué orden se hace
 | Código de descuento de la lista de espera | Terminado: 10 %, un solo uso, personal, vence a los `DESCUENTO_LISTA_DIAS` días (14) de generado. Cada código pertenece a un drop. |
 | Mail con el código | Terminado, por la API de Gmail desde la cuenta de VOW. Técnicamente perfecto (10/10 en mail-tester), pero **cae en spam** porque el remitente es nuevo. |
 | "Consultá tu código" en la tienda | Terminado: quien se anotó escribe su mail y ve su código sin depender del mail. Solo funciona con la venta abierta. |
-| Publicación automática de Instagram | Reloj armado en cron-job.org (cada minuto, con respaldo en GitHub Actions) y `INSTAGRAM_PERMITIR_PUBLICAR=1`. Falta confirmar con una publicación real. |
+| Instagram | El sistema ya **no publica**: el bot de Telegram manda el flujo semanal (día, formato y de qué trata) y Facundo publica a mano. |
 | Envío | Por ahora retiro en persona o costo fijo (`ENVIO_COSTO_FIJO`). Cotización automática con MiCorreo pendiente. |
 
 ## Cómo funcionan los códigos
@@ -34,7 +34,7 @@ Pendientes que bloquean o conviene cerrar antes de vender:
 - [ ] **Fotos reales** de los productos para la tienda.
 - [ ] **Stock real cargado** y ventas de prueba anuladas, para que el Almacén coincida con lo que hay en mano.
 - [ ] **Precios finales** en el sistema (el servidor nunca toma precios del navegador).
-- [ ] **Publicación de Instagram confirmada** con una publicación real (el token de Meta vence cada 60 días).
+- [ ] **`INSTAGRAM_TOKEN` vigente** (vence cada 60 días): hace falta para leer el rendimiento y las referencias.
 
 ## El día del lanzamiento
 

@@ -1,8 +1,6 @@
-// Arma el servicio de publicación programada con la configuración del entorno (Render).
+// Arma el servicio del bot de Telegram y la oficina con la configuración del entorno (Render).
 // Si falta alguna variable obligatoria, no se monta nada: la API sigue funcionando igual y el log dice qué falta.
 import { crearClienteMeta } from "../mcp/instagram/api.js";
-import { crearEditor, crearValidadorEdicion } from "./editor.js";
-import { crearGeneradorImagen } from "./imagen-ia.js";
 import { crearLLMGemini } from "./llm-gemini.js";
 import { crearRepositorio } from "./repositorio.js";
 import { crearRendimientoJuego } from "./rendimiento-juego.js";
@@ -24,26 +22,10 @@ export async function construirProgramacion({ pool, env = process.env, fetchFn =
 
   const repo = crearRepositorio(pool);
   const telegram = crearClienteTelegram({ token: env.TELEGRAM_TOKEN, chatId: env.TELEGRAM_CHAT_ID, fetchFn });
+  // Instagram solo se lee (rendimiento para el juego): el sistema no publica
   const meta = env.INSTAGRAM_TOKEN && env.INSTAGRAM_USER_ID ? crearClienteMeta({ token: env.INSTAGRAM_TOKEN, idCuenta: env.INSTAGRAM_USER_ID, fetchFn }) : null;
-  // Publicar de verdad exige pedirlo explícitamente: mientras tanto el sistema corre completo pero en simulación
-  const permitirPublicar = env.INSTAGRAM_PERMITIR_PUBLICAR === "1" && meta !== null;
 
-  let editor = null;
-  if (env.ANTHROPIC_API_KEY) {
-    const { default: Anthropic } = await import("@anthropic-ai/sdk");
-    editor = crearEditor({ cliente: new Anthropic() });
-  }
-
-  // Imágenes con IA: opcional, sin claves las piezas se arman con archivos que manda Facundo.
-  // Cloudflare (FLUX, con cupo gratis diario) tiene prioridad; Gemini solo sirve con plan pago de Google.
-  let generadorImagen = null;
-  if (env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN) {
-    generadorImagen = crearGeneradorImagen({ proveedor: "cloudflare", accountId: env.CLOUDFLARE_ACCOUNT_ID, apiToken: env.CLOUDFLARE_API_TOKEN, fetchFn });
-  } else if (env.GEMINI_API_KEY) {
-    generadorImagen = crearGeneradorImagen({ proveedor: "gemini", apiKey: env.GEMINI_API_KEY, modelo: env.GEMINI_MODELO || undefined, fetchFn });
-  }
-
-  // Chat con la IA (Gemini, plan gratis): opcional. Sin la clave, responder a una pieza usa el editor con Claude y lo demás son novedades.
+  // Chat con la IA (Gemini, plan gratis): opcional. Sin la clave, lo que escribe Facundo queda como novedad.
   const llm = env.GEMINI_API_KEY ? crearLLMGemini({ apiKey: env.GEMINI_API_KEY, modelo: env.GEMINI_MODELO_CHAT || undefined, fetchFn }) : null;
 
   // Códigos de descuento para la lista de espera: los códigos funcionan siempre; el envío de mails exige la cuenta de Gmail de VOW
@@ -83,7 +65,7 @@ export async function construirProgramacion({ pool, env = process.env, fetchFn =
     });
   }
 
-  const servicio = crearServicio({ repo, telegram, meta, editor, generadorImagen, llm, validarEdicion: llm ? crearValidadorEdicion() : null, urlPublica: env.URL_PUBLICA, permitirPublicar, descuentos });
+  const servicio = crearServicio({ repo, telegram, llm, descuentos });
   // Venta propia con Mercado Pago: con las claves puestas se arma, pero no se abre hasta que VENTA_ABIERTA sea "1"
   let ventas = null;
   if (env.MERCADOPAGO_ACCESS_TOKEN && env.MERCADOPAGO_WEBHOOK_SECRETO && env.URL_LANDING) {
@@ -101,8 +83,8 @@ export async function construirProgramacion({ pool, env = process.env, fetchFn =
       urlLanding: env.URL_LANDING.replace(/\/$/, ""),
     });
   }
-  const router = crearRutasProgramacion({ servicio, repo, ventas, secretoApi: env.PROGRAMACION_SECRETO, secretoOficina: env.OFICINA_SECRETO || null, secretoWebhook: env.TELEGRAM_WEBHOOK_SECRETO, permitirPublicar, rendimiento: meta ? crearRendimientoJuego({ meta }) : null });
+  const router = crearRutasProgramacion({ servicio, repo, ventas, secretoApi: env.PROGRAMACION_SECRETO, secretoOficina: env.OFICINA_SECRETO || null, secretoWebhook: env.TELEGRAM_WEBHOOK_SECRETO, rendimiento: meta ? crearRendimientoJuego({ meta }) : null });
   // Al arrancar se revisa la bandeja de Telegram (un poco después, para no pisar a la copia anterior mientras termina de cerrar)
   setTimeout(() => servicio.recuperarActualizaciones().catch((error) => console.error(`No se pudo revisar la bandeja de Telegram: ${error.message}`)), 90_000).unref();
-  return { router, servicio, telegram, permitirPublicar, edicionConIA: editor !== null, imagenesConIA: generadorImagen !== null, chatConIA: llm !== null };
+  return { router, servicio, telegram, chatConIA: llm !== null };
 }

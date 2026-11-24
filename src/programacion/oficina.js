@@ -1,19 +1,15 @@
 // Lo que muestra y hace "la oficina" (el juego de VOW HQ). Todo pasa por acá y con clave: la charla con el bot es privada.
-//   armarEstadoOficina → lo que el juego lee (piezas, medios, novedades, charla, lo que marcaste, rendimiento de Instagram)
-//   aplicarAccion      → lo que el juego puede hacer: aprobar una pieza, marcar pendientes como cumplidos, anotar en el cuaderno
-// Lo que se marca en el juego queda también como novedad: el Estratega lo lee en el próximo plan.
-// La confirmación final del día también se puede dar desde acá (confirmar_pieza), con las mismas reglas que el botón de Telegram.
+//   armarEstadoOficina → lo que el juego lee (flujo semanal, novedades, charla, lo que marcaste, estrategia, stock, rendimiento de Instagram)
+//   aplicarAccion      → lo que el juego puede hacer: charlar con el bot, editar estrategia, mover stock y ventas, marcar pendientes, anotar
+// Lo que se marca en el juego queda también como novedad: el Estratega lo lee en el próximo flujo.
 import { ErrorOperacion, aplicarOperacion, leerOperacion } from "./operacion.js";
 import { ErrorInventario, aplicarInventario, leerInventario, vistaInventario } from "./inventario.js";
 import { lineasDeInvestigacion, vistaEstrategia } from "./estrategia-semana.js";
 import { ahoraArgentina, lunesDe } from "./fechas.js";
 import { createHash } from "node:crypto";
-import { revisarPieza } from "../agents/calidad-instagram.js";
-const DIA_MS = 86_400_000;
 const LIMITE_ENTRADAS = 200;
 const LIMITE_TEXTO = 300;
 const TIPOS_NOTA = new Set(["anotacion", "confirmado"]);
-const fechaISO = (ms) => new Date(ms).toISOString().slice(0, 10);
 const recortar = (valor, largo = LIMITE_TEXTO) => String(valor ?? "").trim().slice(0, largo);
 const claveValida = (valor) => typeof valor === "string" && /^[\w:-]{1,60}$/.test(valor);
 
@@ -35,89 +31,17 @@ async function guardarJuego(repo, juego) {
   await repo.guardarEstado("juego", { hechos: ultimas(juego.hechos), notas: ultimas(juego.notas) });
 }
 
-// "Cambiar todo" tarda (la IA arma la pieza y la corrige si rompe una regla): corre en segundo plano y el juego ve el avance acá.
-const MINUTOS_CAMBIO_MAXIMO = 5;
-const MINUTOS_SIN_SENALES = 3; // una sola llamada a la IA no debería tardar más que esto sin que cambie el paso
-function cambiosVisibles(cambios, ahora) {
-  const salida = {};
-  for (const [clave, c] of Object.entries(cambios && typeof cambios === "object" ? cambios : {})) {
-    const edad = ahora - Date.parse(c.en);
-    if (!(edad < 60 * 60_000)) continue; // lo viejo no le sirve al juego
-    // Si la IA no da señales hace rato (por ejemplo, el servidor se reinició a mitad de camino), no se la deja "trabajando" para siempre
-    const sinSenales = ahora - Date.parse(c.pasoEn ?? c.en) > MINUTOS_SIN_SENALES * 60_000;
-    salida[clave] = c.estado === "trabajando" && (edad > MINUTOS_CAMBIO_MAXIMO * 60_000 || sinSenales) ? { ...c, estado: "error", motivo: "Se interrumpió: probá de nuevo." } : c;
-  }
-  return salida;
-}
-
-// Uno por vez: dos cambios que terminan juntos no se pisan el avance
-let colaCambios = Promise.resolve();
-function guardarCambio(repo, clave, dato) {
-  const turno = colaCambios.then(async () => {
-    const actuales = (await repo.leerEstado("cambios")) ?? {};
-    const recientes = Object.fromEntries(Object.entries(actuales).slice(-9));
-    await repo.guardarEstado("cambios", { ...recientes, [clave]: dato });
-  });
-  colaCambios = turno.catch(() => {});
-  return turno;
-}
-
-// Lanza el cambio y contesta enseguida. Con `segundoPlano` (el servidor) sigue solo; sin él (pruebas) se espera el resultado.
-async function lanzarCambio({ repo, segundoPlano }, clave, ahora, trabajo) {
-  const previo = ((await repo.leerEstado("cambios")) ?? {})[clave];
-  if (previo?.estado === "trabajando" && ahora - Date.parse(previo.en) < MINUTOS_CAMBIO_MAXIMO * 60_000) throw new ErrorAccion("La IA ya está armando esa pieza: esperá un momento.", 409);
-  const en = new Date(ahora).toISOString();
-  await guardarCambio(repo, clave, { estado: "trabajando", en });
-  // El juego muestra en qué paso va la IA (así no parece trabado). Es informativo: si falla el guardado, el cambio sigue.
-  let pasoActual = "";
-  const alAvanzar = (paso) => {
-    const texto = String(paso ?? "").slice(0, 200);
-    if (!texto || texto === pasoActual) return;
-    pasoActual = texto;
-    guardarCambio(repo, clave, { estado: "trabajando", en, paso: texto, pasoEn: new Date().toISOString() }).catch(() => {});
-  };
-  const correr = (async () => {
-    let r;
-    try {
-      r = await trabajo(alAvanzar);
-    } catch (error) {
-      r = { ok: false, motivo: String(error.message ?? error) };
-    }
-    pasoActual = "";
-    await guardarCambio(repo, clave, r.ok ? { estado: "listo", en: new Date().toISOString(), id: r.id ?? null } : { estado: "error", en: new Date().toISOString(), motivo: String(r.motivo ?? "No se pudo armar la sugerencia.").slice(0, 400) });
-    return r;
-  })();
-  if (segundoPlano) {
-    segundoPlano(correr.catch((error) => console.error(`Cambio en segundo plano: ${error.message}`)));
-    return { ok: true, trabajando: true };
-  }
-  const r = await correr;
-  if (!r.ok) throw new ErrorAccion(r.motivo, 409);
-  return { ok: true, estado: r.estado, id: r.id };
-}
-
-export async function armarEstadoOficina({ repo, rendimiento = null, permitirPublicar = false, ahora = Date.now(), investigacion = lineasDeInvestigacion }) {
-  const [piezas, novedades, recordatorios, pausa, chat, juego, operacion, cambios, inventario, lineas] = await Promise.all([
-    repo.piezasEntre(fechaISO(ahora - 21 * DIA_MS), fechaISO(ahora + 45 * DIA_MS)),
+export async function armarEstadoOficina({ repo, servicio = null, rendimiento = null, ahora = Date.now(), investigacion = lineasDeInvestigacion }) {
+  const hoy = ahoraArgentina(new Date(ahora)).fecha;
+  const [flujo, novedades, chat, juego, operacion, inventario, lineas] = await Promise.all([
+    servicio ? servicio.flujosVigentes(hoy) : [],
     repo.novedadesRecientes(20),
-    repo.recordatoriosPendientes(fechaISO(ahora + 45 * DIA_MS)),
-    repo.leerEstado("pausa"),
     repo.leerEstado("chat"),
     leerJuego(repo),
     leerOperacion(repo),
-    repo.leerEstado("cambios"),
     leerInventario(repo),
     investigacion(),
   ]);
-  const hoy = ahoraArgentina(new Date(ahora)).fecha;
-  const filas = await Promise.all(
-    piezas.map(async (p) => ({
-      id: p.id, fecha: p.fecha, hora: p.hora, estado: p.estado, formato: p.pieza?.formato ?? null, pilar: p.pieza?.pilar ?? null,
-      gancho: p.pieza?.gancho ?? null, pieza: p.pieza ?? null, calidad: revisarPieza(p.pieza),
-      confirmada_el: p.confirmada_el ?? null, permalink: p.permalink ?? null, error: p.error ?? null,
-      medios: (await repo.mediosDePieza(p.id)).map((m) => ({ tipo: m.tipo, token: m.token })),
-    })),
-  );
   let rend = null;
   if (rendimiento) {
     try {
@@ -128,17 +52,13 @@ export async function armarEstadoOficina({ repo, rendimiento = null, permitirPub
   }
   const cuerpo = {
     generado: new Date(ahora).toISOString(),
-    pausa: pausa === true,
-    publica_de_verdad: permitirPublicar,
-    recordatorios_pendientes: recordatorios.length,
-    piezas: filas,
+    flujo,
     novedades: novedades.map((n) => ({ id: n.id, fecha: n.fecha, texto: recortar(n.texto, 240), usada: n.usada === true })),
     chat: (Array.isArray(chat) ? chat : []).slice(-30).map((m) => ({ rol: m.rol, texto: recortar(m.visible ?? m.texto, 1500), canal: m.canal ?? "telegram", en: m.en ?? null })),
     juego,
     operacion,
     estrategia_semana: vistaEstrategia(operacion.estrategia, lineas, lunesDe(hoy)),
     inventario: vistaInventario(inventario, hoy),
-    cambios: cambiosVisibles(cambios, ahora),
     rendimiento: rend,
   };
   // La versión cambia solo cuando cambia algo: el juego pregunta seguido y, si no cambió, el servidor contesta cortito
@@ -147,94 +67,10 @@ export async function armarEstadoOficina({ repo, rendimiento = null, permitirPub
   return { ...cuerpo, version: createHash("sha1").update(JSON.stringify(sinHora)).digest("hex").slice(0, 16) };
 }
 
-// Lo que la IA tiene que saber para sugerir algo mejor: novedades, charla con el bot, resto de la semana y cómo les fue a las últimas publicaciones
-export async function armarContexto({ repo, rendimiento = null }, idPieza, ahora = Date.now()) {
-  const [piezas, novedades, chat] = await Promise.all([repo.piezasEntre(fechaISO(ahora - 14 * DIA_MS), fechaISO(ahora + 30 * DIA_MS)), repo.novedadesRecientes(10), repo.leerEstado("chat")]);
-  const partes = [];
-  const otras = piezas.filter((p) => p.id !== idPieza && p.estado !== "cancelada").map((p) => `- ${p.fecha} ${p.pieza?.formato ?? ""} (${p.estado}): ${p.pieza?.gancho ?? ""}`);
-  if (otras.length) partes.push(`Otras piezas cerca (no repetir):\n${otras.join("\n")}`);
-  if (novedades.length) partes.push(`Novedades de Facundo:\n${novedades.map((n) => `- ${recortar(n.texto, 200)}`).join("\n")}`);
-  const mensajes = (Array.isArray(chat) ? chat : []).slice(-8).map((m) => `${m.rol === "usuario" ? "Facundo" : "Bot"}: ${recortar(m.texto, 250)}`);
-  if (mensajes.length) partes.push(`Últimos mensajes con el bot:\n${mensajes.join("\n")}`);
-  try {
-    const r = rendimiento ? await rendimiento.obtener() : null;
-    if (r?.publicaciones?.length) partes.push(`Rendimiento de las últimas publicaciones:\n${r.publicaciones.map((p) => `- ${p.fecha} ${p.gancho}: alcance ${p.alcance ?? "?"}, me gusta ${p.me_gusta ?? "?"}, guardados ${p.guardados ?? "?"}`).join("\n")}`);
-  } catch {
-    // sin rendimiento igual se puede sugerir
-  }
-  return partes.join("\n\n");
-}
-
 export async function aplicarAccion(deps, accion, ahora = Date.now()) {
-  const { repo, servicio, rendimiento = null } = deps;
+  const { repo, servicio } = deps;
   const en = new Date(ahora).toISOString();
   const tipo = accion?.accion;
-
-  if (tipo === "aprobar_pieza") {
-    if (!Number.isInteger(accion.id)) throw new ErrorAccion("Falta el id de la pieza.");
-    const resultado = await servicio.aprobarDesdeJuego(accion.id);
-    if (!resultado.ok) throw new ErrorAccion(resultado.motivo, 409);
-    return { ok: true, estado: resultado.estado };
-  }
-
-  if (tipo === "confirmar_pieza") {
-    if (!Number.isInteger(accion.id)) throw new ErrorAccion("Falta el id de la pieza.");
-    const resultado = await servicio.confirmarDesdeJuego(accion.id);
-    if (!resultado.ok) throw new ErrorAccion(resultado.motivo, 409);
-    return { ok: true, estado: resultado.estado, detalle: resultado.detalle };
-  }
-
-  // "La publico yo": la pieza queda para publicar a mano (caja de preguntas, links); el bot no la publica y a la hora manda el archivo
-  if (tipo === "manual_pieza") {
-    if (!Number.isInteger(accion.id)) throw new ErrorAccion("Falta el id de la pieza.");
-    const resultado = await servicio.manualDesdeJuego(accion.id);
-    if (!resultado.ok) throw new ErrorAccion(resultado.motivo, 409);
-    return { ok: true, estado: resultado.estado };
-  }
-
-  if (tipo === "cambiar_pieza" && !Number.isInteger(accion.id) && typeof accion.fecha === "string") {
-    // La pieza solo está en los documentos: la IA arma la nueva en el momento y queda propuesta para aprobar
-    return lanzarCambio(deps, `f:${accion.fecha}`, ahora, async (alAvanzar) => {
-      const r = await servicio.cambiarSinFila({ fecha: accion.fecha, formato: accion.formato, indicacion: recortar(accion.indicacion, 300), base: recortar(accion.base, 1500), alAvanzar });
-      return r.ok ? { ok: true, estado: r.estado, id: r.id } : r;
-    });
-  }
-
-  if (tipo === "cambiar_pieza") {
-    if (!Number.isInteger(accion.id)) throw new ErrorAccion("Falta el id de la pieza.");
-    return lanzarCambio(deps, String(accion.id), ahora, async (alAvanzar) => {
-      alAvanzar("Juntando el contexto (novedades, charla, Instagram)…");
-      const r = await servicio.sugerirCambio(accion.id, { indicacion: recortar(accion.indicacion, 300), contexto: await armarContexto({ repo, rendimiento }, accion.id), alAvanzar });
-      return r.ok ? { ok: true, estado: r.estado, id: accion.id } : r;
-    });
-  }
-
-  // "Editar": cambia la publicación existente a mano (tipo, epígrafe con párrafos, gancho, hora), sin IA
-  if (tipo === "editar_pieza") {
-    const cambios = accion.cambios && typeof accion.cambios === "object" ? accion.cambios : {};
-    const resultado = await servicio.editarDesdeJuego({
-      id: Number.isInteger(accion.id) ? accion.id : null,
-      fecha: typeof accion.fecha === "string" ? accion.fecha : null,
-      formato: typeof accion.formato === "string" ? accion.formato : null,
-      base: recortar(accion.base, 1500),
-      cambios,
-    });
-    if (!resultado.ok) throw new ErrorAccion(resultado.motivo, 409);
-    return { ok: true, id: resultado.id, estado: resultado.estado };
-  }
-
-  if (tipo === "eliminar_pieza") {
-    if (!Number.isInteger(accion.id)) throw new ErrorAccion("Falta el id de la pieza.");
-    const resultado = await servicio.eliminarDesdeJuego(accion.id);
-    if (!resultado.ok) throw new ErrorAccion(resultado.motivo, 409);
-    return { ok: true, estado: resultado.estado };
-  }
-
-  if (tipo === "quitar_archivos") {
-    const resultado = await servicio.quitarArchivosDesdeJuego(accion.id);
-    if (!resultado.ok) throw new ErrorAccion(resultado.motivo, 409);
-    return { ok: true };
-  }
 
   // El chat del juego es el mismo bot y la misma memoria que Telegram
   if (tipo === "chat") {

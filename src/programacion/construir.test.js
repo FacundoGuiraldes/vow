@@ -11,13 +11,6 @@ test("sin alguna variable obligatoria no monta nada y dice cuáles faltan", asyn
   assert.deepEqual(faltan, ["TELEGRAM_CHAT_ID"]);
 });
 
-test("las imágenes con IA se activan solo con credenciales completas; Cloudflare tiene prioridad sobre Gemini", async () => {
-  assert.equal((await construir()).imagenesConIA, false);
-  assert.equal((await construir({ CLOUDFLARE_ACCOUNT_ID: "cuenta" })).imagenesConIA, false, "con la mitad de las credenciales no se activa");
-  assert.equal((await construir({ CLOUDFLARE_ACCOUNT_ID: "cuenta", CLOUDFLARE_API_TOKEN: "token" })).imagenesConIA, true);
-  assert.equal((await construir({ GEMINI_API_KEY: "clave" })).imagenesConIA, true);
-});
-
 test("el chat con la IA se activa solo con GEMINI_API_KEY", async () => {
   assert.equal((await construir()).chatConIA, false);
   assert.equal((await construir({ GEMINI_API_KEY: "clave" })).chatConIA, true);

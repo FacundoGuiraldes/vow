@@ -1,6 +1,6 @@
 name: Plan semanal
 
-# Genera el plan de contenido de una semana con el Estratega (usa la API de Anthropic: gasta plata).
+# Genera el flujo de contenido de una semana con el Estratega (usa la API de Anthropic: gasta plata).
 # Solo se lanza a mano desde Actions > Plan semanal > Run workflow, y solo desde main.
 # El resultado queda en el resumen de la corrida y como archivo descargable. No se publica ni se guarda en el repo.
 
@@ -20,15 +20,6 @@ on:
           - base
           - expectativa
           - cuenta-regresiva
-      piezas:
-        description: "Cantidad de piezas de la semana"
-        required: true
-        type: choice
-        default: "2"
-        options:
-          - "1"
-          - "2"
-          - "3"
       producto:
         description: "Ya hay producto físico para mostrar"
         required: true
@@ -63,7 +54,6 @@ jobs:
       # Los datos que escribe la persona pasan por variables de entorno, no dentro del script
       SEMANA: ${{ inputs.semana }}
       FASE: ${{ inputs.fase }}
-      PIEZAS: ${{ inputs.piezas }}
       PRODUCTO: ${{ inputs.producto }}
       GENTE: ${{ inputs.gente }}
       NOTAS: ${{ inputs.notas }}
@@ -86,7 +76,7 @@ jobs:
 
       - name: Generar el plan
         run: |
-          args=(--semana "$SEMANA" --fase "$FASE" --piezas "$PIEZAS")
+          args=(--semana "$SEMANA" --fase "$FASE")
           if [ "$PRODUCTO" = "true" ]; then args+=(--producto); fi
           if [ "$GENTE" = "true" ]; then args+=(--gente); fi
           if [ -n "$NOTAS" ]; then args+=(--notas "$NOTAS"); fi

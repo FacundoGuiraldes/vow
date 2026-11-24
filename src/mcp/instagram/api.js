@@ -1,6 +1,6 @@
 // Cliente mínimo de la API oficial de Meta (Instagram con inicio de sesión de Facebook) para la cuenta de VOW.
-// Lee perfil, publicaciones, métricas y comentarios, y puede crear contenedores, publicarlos y responder
-// comentarios. No decide nada: las reglas (qué se puede publicar y cuándo) viven en herramientas.js.
+// Lee perfil, publicaciones, métricas y comentarios, y puede responder comentarios. No publica nada.
+// No decide nada: las reglas (qué se puede responder) viven en herramientas.js.
 // El token nunca sale de acá: no aparece en respuestas ni en mensajes de error.
 import { VERSION_API, explicarError } from "../../agents/instagram.js";
 
@@ -61,25 +61,6 @@ export function crearClienteMeta({ token, idCuenta, fetchFn = fetch } = {}) {
 
     comentarios: async (idPublicacion, limite = 25) =>
       (await pedir("GET", `${idPublicacion}/comments`, { fields: CAMPOS_COMENTARIO, limit: limitar(limite, 25) })).data ?? [],
-
-    // Cupo de publicación por API en las últimas 24 h
-    cupo: async () => {
-      const { data = [] } = await pedir("GET", `${idCuenta}/content_publishing_limit`, { fields: "quota_usage,config" });
-      const fila = data[0] ?? {};
-      return { usado: fila.quota_usage ?? null, total: fila.config?.quota_total ?? null };
-    },
-
-    crearContenedor: async (parametros) => (await pedir("POST", `${idCuenta}/media`, parametros)).id,
-
-    estadoContenedor: async (idContenedor) =>
-      (await pedir("GET", idContenedor, { fields: "status_code" })).status_code ?? null,
-
-    publicar: async (idContenedor) => {
-      const { id } = await pedir("POST", `${idCuenta}/media_publish`, { creation_id: idContenedor });
-      // Ya se publicó: si falla la consulta del link, no puede contarse como un error de publicación
-      const { permalink = null } = (await pedir("GET", id, { fields: "permalink" }).catch(() => null)) ?? {};
-      return { id, permalink };
-    },
 
     responder: async (idComentario, mensaje) => (await pedir("POST", `${idComentario}/replies`, { message: mensaje })).id,
   };

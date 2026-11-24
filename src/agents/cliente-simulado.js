@@ -1,5 +1,11 @@
-// Cliente que no llama a Claude: devuelve un plan de ejemplo que cumple las reglas.
+// Cliente que no llama a Claude: devuelve un flujo de ejemplo que cumple las reglas.
 // Sirve para probar el flujo completo gratis (npm run plan -- --simulado, npm run semana -- --simulado).
+const sumar = (fechaISO, dias) => {
+  const f = new Date(`${fechaISO}T00:00:00Z`);
+  f.setUTCDate(f.getUTCDate() + dias);
+  return f.toISOString().slice(0, 10);
+};
+
 export const crearClienteSimulado = (semana) => ({
   messages: {
     create: async () => ({
@@ -7,26 +13,12 @@ export const crearClienteSimulado = (semana) => ({
         {
           type: "tool_use",
           id: "simulado",
-          name: "proponer_plan",
+          name: "proponer_flujo",
           input: {
-            resumen: "Plan de ejemplo (modo simulado, no usa IA).",
-            piezas: [
-              {
-                fecha: semana,
-                formato: "reel",
-                pilar: "proceso",
-                gancho: "Una cosa por vez.",
-                ganchos_alternativos: ["Hecho con calma. Hecho bien.", "Cada detalle cuenta.", "Lo simple se sostiene."],
-                guion: "Video corto de texto sobre fondo hueso, una frase por vez.",
-                texto_en_pantalla: ["Una cosa por vez.", "Sin apuro. Sin ruido."],
-                produccion: "propio",
-                instrucciones_ia: "",
-                epigrafe: "Se hace despacio y se hace bien. Anotate en la lista: link en la bio.",
-                palabras_clave: ["proceso", "constancia"],
-                cta: "Anotate en la lista de espera.",
-                recursos: ["Diseño en colores de marca"],
-                justificacion: "Muestra el criterio de trabajo de la marca sin mostrar producto.",
-              },
+            dias: [
+              { fecha: semana, formato: "story", contenido: "Pregunta con dos opciones para quien entrena: qué prefiere hacer primero en la semana. Se ven las dos opciones sobre fondo liso." },
+              { fecha: sumar(semana, 2), formato: "reel", contenido: "Video corto del proceso de trabajo de la marca: una mesa con muestras de tela y un lápiz, sin mostrar producto terminado." },
+              { fecha: sumar(semana, 4), formato: "carrusel", contenido: "Carrusel de tres láminas con situaciones que quien entrena reconoce, una por lámina, y una última que invita a sumarse a la lista de espera." },
             ],
           },
         },

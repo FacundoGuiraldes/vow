@@ -4,7 +4,7 @@ import { crearClienteSimulado } from "../agents/cliente-simulado.js";
 import { correrPlanDelLunes, opcionesDelPlan } from "./plan-lunes.js";
 
 const ENTORNO = { ANTHROPIC_API_KEY: "clave", URL_PUBLICA: "https://vow.example.com", PROGRAMACION_SECRETO: "secreto" };
-const VALORES = { fase: "base", producto: false, gente: false, notas: "", piezas: "2", simulado: false, "sin-enviar": false };
+const VALORES = { fase: "base", producto: false, gente: false, notas: "", simulado: false, "sin-enviar": false };
 const respuesta = (cuerpo, status = 200) => new Response(JSON.stringify(cuerpo), { status, headers: { "Content-Type": "application/json" } });
 
 // Servicio falso: anota lo que le mandan
@@ -14,8 +14,8 @@ function servicioFalso({ novedades = [], estadoPlan = 201, planExistente = 0 } =
     const ruta = new URL(url).pathname.replace("/api/programacion/", "");
     pedidos.push({ ruta, metodo: opciones.method, autorizacion: opciones.headers.Authorization, cuerpo: opciones.body ? JSON.parse(opciones.body) : null });
     if (ruta === "novedades") return respuesta({ novedades });
-    if (ruta.startsWith("plan/")) return respuesta({ existe: planExistente > 0, piezas: planExistente });
-    return respuesta(estadoPlan === 201 ? { piezas: 1, urgentes: 0 } : { error: "no" }, estadoPlan);
+    if (ruta.startsWith("plan/")) return respuesta({ existe: planExistente > 0, publicaciones: planExistente });
+    return respuesta(estadoPlan === 201 ? { publicaciones: 3 } : { error: "no" }, estadoPlan);
   };
   return { pedidos, fetchFn };
 }
@@ -50,7 +50,7 @@ test("trae las novedades, arma el plan y lo manda al servicio con las novedades 
   assert.ok(servicio.pedidos.every((p) => p.autorizacion === "Bearer secreto"));
   const enviado = servicio.pedidos.find((p) => p.ruta === "plan" && p.metodo === "POST").cuerpo;
   assert.equal(enviado.semana, "2026-10-26");
-  assert.equal(enviado.plan.piezas.length, 1);
+  assert.equal(enviado.plan.dias.length, 3);
   assert.deepEqual(enviado.novedades_usadas, [7]);
   assert.match(cliente.pedidos[0].messages[0].content, /Llegaron las gorras/);
 });
@@ -59,7 +59,7 @@ test("no manda una aprobación: el plan sale solo planificado y revisado", async
   const servicio = servicioFalso();
   const r = await correrPlanDelLunes({ valores: VALORES, env: ENTORNO, hoy: "2026-10-26", log: () => {}, fetchFn: servicio.fetchFn, crearCliente: async () => crearClienteSimulado("2026-10-26") });
   assert.ok(!("aprobado" in servicio.pedidos.find((p) => p.metodo === "POST").cuerpo));
-  assert.equal(r.plan.piezas.length, 1);
+  assert.equal(r.plan.dias.length, 3);
 });
 
 test("--simulado nunca toca el servicio real", async () => {
@@ -78,7 +78,7 @@ test("--sin-enviar arma el plan pero no lo manda", async () => {
 
 test("si el plan no pasa las reglas, se lo avisa a Facundo por Telegram y termina con error", async () => {
   const servicio = servicioFalso();
-  const clienteMalo = { messages: { create: async () => ({ usage: {}, stop_reason: "tool_use", content: [{ type: "tool_use", name: "proponer_plan", input: { resumen: "", piezas: [] } }] }) } };
+  const clienteMalo = { messages: { create: async () => ({ usage: {}, stop_reason: "tool_use", content: [{ type: "tool_use", name: "proponer_flujo", input: { dias: [] } }] }) } };
   await assert.rejects(
     correrPlanDelLunes({ valores: VALORES, env: ENTORNO, hoy: "2026-10-26", log: () => {}, fetchFn: servicio.fetchFn, crearCliente: async () => clienteMalo }),
     /no pasó/,
@@ -96,7 +96,7 @@ test("sin ANTHROPIC_API_KEY falla con un mensaje claro y no gasta", async () => 
 test("un error del servicio (400) no se reintenta; uno de servidor (500) sí", async () => {
   let intentos = 0;
   const fetch500 = async () => { intentos++; return respuesta({ error: "caído" }, intentos < 3 ? 503 : 200); };
-  const r = await correrPlanDelLunes({ valores: { ...VALORES, "sin-enviar": false }, env: ENTORNO, hoy: "2026-10-26", log: () => {}, fetchFn: async (url, o) => (new URL(url).pathname.endsWith("novedades") ? fetch500() : respuesta({ piezas: 1 })), crearCliente: async () => crearClienteSimulado("2026-10-26") });
+  const r = await correrPlanDelLunes({ valores: { ...VALORES, "sin-enviar": false }, env: ENTORNO, hoy: "2026-10-26", log: () => {}, fetchFn: async (url, o) => (new URL(url).pathname.endsWith("novedades") ? fetch500() : respuesta({ publicaciones: 3 })), crearCliente: async () => crearClienteSimulado("2026-10-26") });
   assert.equal(r.enviado, true);
   assert.equal(intentos, 3);
 
@@ -113,15 +113,6 @@ test("el foco y las notas de estrategia del juego llegan al Estratega como notas
   assert.match(o.notas, /FOCO DE LA SEMANA.*Suspenso del Drop 00/);
   assert.match(o.notas, /Más stories/);
   assert.equal(opcionesDelPlan({ valores: VALORES, hoy: "2026-10-26" }).notas, VALORES.notas ?? "");
-});
-
-test("sin cantidad fija, la IA decide cuántas piezas arma (auto)", async () => {
-  assert.equal(opcionesDelPlan({ valores: { ...VALORES, piezas: "auto" }, hoy: "2026-10-26" }).piezas, "auto");
-  assert.equal(opcionesDelPlan({ valores: { ...VALORES, piezas: undefined }, hoy: "2026-10-26" }).piezas, "auto");
-  assert.equal(opcionesDelPlan({ valores: { ...VALORES, piezas: "3" }, hoy: "2026-10-26" }).piezas, 3);
-  const cliente = clienteQueAnota("2026-10-26");
-  await correrPlanDelLunes({ valores: { ...VALORES, piezas: "auto", "sin-enviar": true }, env: { ANTHROPIC_API_KEY: "clave" }, hoy: "2026-10-26", log: () => {}, crearCliente: async () => cliente });
-  assert.match(cliente.pedidos[0].messages[0].content, /la decidís vos/);
 });
 
 test("si la semana ya tiene plan, no arma otro (el workflow se programa varias veces el lunes)", async () => {

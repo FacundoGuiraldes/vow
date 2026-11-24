@@ -1,5 +1,6 @@
-// Servidor MCP (por stdio) para gestionar la cuenta de Instagram de VOW desde Claude Code.
-// Se registra en .mcp.json. Lee INSTAGRAM_TOKEN, INSTAGRAM_USER_ID e INSTAGRAM_PERMITIR_PUBLICAR del .env.
+// Servidor MCP (por stdio) para leer la cuenta de Instagram de VOW (perfil, publicaciones, métricas, comentarios) y responder comentarios desde Claude Code.
+// No publica nada.
+// Se registra en .mcp.json. Lee INSTAGRAM_TOKEN e INSTAGRAM_USER_ID del .env.
 // Importante: por stdio, stdout es el canal del protocolo. Nada de console.log: los avisos van a stderr.
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -12,7 +13,7 @@ import { crearHerramientas } from "./herramientas.js";
 export function crearServidor(env = process.env, { fetchFn } = {}) {
   const meta = crearClienteMeta({ token: env.INSTAGRAM_TOKEN, idCuenta: env.INSTAGRAM_USER_ID, fetchFn });
   const servidor = new McpServer({ name: "vow-instagram", version: "1.0.0" });
-  for (const h of crearHerramientas(meta, { permitirPublicar: env.INSTAGRAM_PERMITIR_PUBLICAR === "1" })) {
+  for (const h of crearHerramientas(meta)) {
     servidor.registerTool(
       h.nombre,
       { title: h.titulo, description: h.descripcion, inputSchema: h.esquema, annotations: h.anotaciones },

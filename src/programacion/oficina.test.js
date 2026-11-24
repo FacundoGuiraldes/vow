@@ -1,39 +1,10 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { crearEscenario, crearPieza } from "./ayuda-pruebas.js";
+import { crearDia, crearEscenario } from "./ayuda-pruebas.js";
 import { aplicarAccion, armarEstadoOficina, ErrorAccion } from "./oficina.js";
 import { crearRendimientoJuego } from "./rendimiento-juego.js";
 
 describe("la oficina", () => {
-  test("aprobar desde el juego equivale al botón de Telegram y avisa por Telegram", async () => {
-    const e = crearEscenario();
-    const fila = await e.cargarPieza();
-    const r = await aplicarAccion(e, { accion: "aprobar_pieza", id: fila.id });
-    assert.equal(r.estado, "aprobada");
-    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "aprobada");
-    assert.ok(e.telegram.buscar("Aprobaste desde la oficina"));
-    await assert.rejects(aplicarAccion(e, { accion: "aprobar_pieza", id: fila.id }), (error) => error instanceof ErrorAccion && error.estado === 409);
-  });
-
-  test("cada pieza trae su revisión de calidad y revisarla no cambia ni aprueba nada", async () => {
-    const e = crearEscenario();
-    const fila = await e.cargarPieza();
-    const estado = await armarEstadoOficina({ repo: e.repo });
-    const pieza = estado.piezas.find((p) => p.id === fila.id);
-    assert.ok(["listo", "revisar", "arreglar"].includes(pieza.calidad.veredicto));
-    assert.ok(Array.isArray(pieza.calidad.avisos));
-    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, fila.estado);
-  });
-
-  test("aprobar desde el juego NO confirma la publicación del día", async () => {
-    const e = crearEscenario({ fecha: "2026-10-30" });
-    const fila = await e.cargarPieza();
-    await aplicarAccion(e, { accion: "aprobar_pieza", id: fila.id });
-    const tras = await e.repo.obtenerPieza(fila.id);
-    assert.notEqual(tras.estado, "confirmada");
-    assert.equal(tras.confirmada_el, null);
-  });
-
   test("lo que se cumple o se anota queda guardado y le llega al Estratega como novedad", async () => {
     const e = crearEscenario();
     await aplicarAccion(e, { accion: "cumplir", clave: "p1", texto: "Filmar el reel", sala: "diseno" });
@@ -63,15 +34,14 @@ describe("la oficina", () => {
     assert.equal(Object.keys((await armarEstadoOficina({ repo: e.repo })).juego.hechos).length, 200);
   });
 
-  test("el estado trae las piezas con sus archivos, la charla reciente y el rendimiento", async () => {
+  test("el estado trae el flujo, la charla reciente y el rendimiento", async () => {
     const e = crearEscenario();
-    const fila = await e.cargarPieza();
-    await e.repo.agregarMedio({ piezaId: fila.id, tipo: "video", mime: "video/mp4", datos: Buffer.from("x") });
+    await e.servicio.recibirPlan({ semana: "2026-10-26", plan: { dias: [crearDia({ fecha: "2026-10-30" })] } });
     await e.repo.guardarEstado("chat", Array.from({ length: 20 }, (_, i) => ({ rol: "usuario", texto: `m${i}` })));
-    const estado = await armarEstadoOficina({ repo: e.repo, rendimiento: { obtener: async () => ({ totales: { alcance: 5 } }) }, ahora: Date.UTC(2026, 9, 28) });
-    assert.equal(estado.piezas[0].medios[0].tipo, "video");
-    assert.match(estado.piezas[0].medios[0].token, /^[a-f0-9]{48}$/);
-    assert.equal(estado.piezas[0].pieza.gancho, fila.pieza.gancho);
+    const estado = await armarEstadoOficina({ repo: e.repo, servicio: e.servicio, rendimiento: { obtener: async () => ({ totales: { alcance: 5 } }) }, ahora: Date.UTC(2026, 9, 28) });
+    assert.equal(estado.flujo[0].semana, "2026-10-26");
+    assert.equal(estado.flujo[0].dias[0].formato, "reel");
+    assert.equal(estado.piezas, undefined);
     assert.equal(estado.chat.length, 20);
     assert.equal(estado.chat[0].canal, "telegram");
     assert.equal(estado.rendimiento.totales.alcance, 5);
@@ -134,112 +104,6 @@ describe("rendimiento de Instagram para el juego", () => {
   });
 });
 
-describe("cambiar una pieza desde la oficina", () => {
-  const editorQue = (resultado) => ({ pedidos: [], async editarPieza(p) { this.pedidos.push(p); return typeof resultado === "function" ? resultado(p) : resultado; } });
-
-  test("la IA arma otra sugerencia con el contexto, la deja para aprobar y avisa por Telegram", async () => {
-    const editor = editorQue(({ fila }) => ({ ok: true, pieza: { ...fila.pieza, gancho: "Otra idea. Mismo día." }, hora: fila.hora, queCambio: "Cambié el enfoque.", errores: [] }));
-    const e = crearEscenario({ fecha: "2026-10-26", editor });
-    const fila = await e.cargarPieza();
-    await e.repo.agregarNovedad("Llegaron las gorras");
-    await e.repo.guardarEstado("chat", [{ rol: "usuario", texto: "quiero algo más de proceso" }]);
-    await aplicarAccion({ ...e, rendimiento: { obtener: async () => ({ publicaciones: [{ fecha: "2026-10-19", gancho: "Presentación", alcance: 200 }] }) } }, { accion: "cambiar_pieza", id: fila.id, indicacion: "más corto" });
-    const nueva = await e.repo.obtenerPieza(fila.id);
-    assert.equal(nueva.pieza.gancho, "Otra idea. Mismo día.");
-    assert.equal(nueva.estado, "propuesta");
-    assert.ok(editor.pedidos[0].alternativa);
-    for (const dato of ["más corto", "Llegaron las gorras", "quiero algo más de proceso", "alcance 200"]) assert.ok(editor.pedidos[0].instruccion.includes(dato), dato);
-    assert.match(e.telegram.ultimo().texto, /Nueva sugerencia pedida desde la oficina/);
-  });
-
-  test("si estaba confirmada, vuelve a pedir aprobación; sin IA o con pieza ya publicada, avisa por qué no", async () => {
-    const editor = editorQue(({ fila }) => ({ ok: true, pieza: { ...fila.pieza, gancho: "Nuevo." }, hora: fila.hora, queCambio: "", errores: [] }));
-    const e = crearEscenario({ fecha: "2026-10-30", editor });
-    const fila = await e.cargarPieza();
-    await e.repo.actualizarPieza(fila.id, { estado: "confirmada", confirmada_el: "2026-10-30" });
-    await aplicarAccion(e, { accion: "cambiar_pieza", id: fila.id });
-    const nueva = await e.repo.obtenerPieza(fila.id);
-    assert.equal(nueva.estado, "propuesta");
-    assert.equal(nueva.confirmada_el, null);
-    await e.repo.actualizarPieza(fila.id, { estado: "publicada" });
-    await assert.rejects(aplicarAccion(e, { accion: "cambiar_pieza", id: fila.id }), (error) => error.estado === 409);
-
-    const sinIA = crearEscenario({ fecha: "2026-10-30" });
-    const f2 = await sinIA.cargarPieza();
-    await assert.rejects(aplicarAccion(sinIA, { accion: "cambiar_pieza", id: f2.id }), /ANTHROPIC_API_KEY/);
-  });
-
-  test("en el servidor, Cambiar contesta enseguida y el avance se ve en el estado (listo o con el error)", async () => {
-    let soltar;
-    const puerta = new Promise((r) => { soltar = r; }); // la IA "tarda" hasta que el test la suelta
-    const editor = editorQue(async ({ fila }) => { await puerta; return { ok: true, pieza: { ...fila.pieza, gancho: "Nuevo." }, hora: fila.hora, queCambio: "", errores: [] }; });
-    const e = crearEscenario({ fecha: "2026-10-30", editor });
-    const fila = await e.cargarPieza();
-    const trabajos = [];
-    const deps = { ...e, segundoPlano: (p) => trabajos.push(p) };
-    const r = await aplicarAccion(deps, { accion: "cambiar_pieza", id: fila.id });
-    assert.deepEqual(r, { ok: true, trabajando: true });
-    assert.equal((await armarEstadoOficina({ repo: e.repo })).cambios[fila.id].estado, "trabajando");
-    await assert.rejects(aplicarAccion(deps, { accion: "cambiar_pieza", id: fila.id }), (error) => error.estado === 409 && /ya está armando/.test(error.message));
-    soltar();
-    await Promise.all(trabajos);
-    assert.equal((await armarEstadoOficina({ repo: e.repo })).cambios[fila.id].estado, "listo");
-    assert.equal((await e.repo.obtenerPieza(fila.id)).pieza.gancho, "Nuevo.");
-
-    const malo = crearEscenario({ fecha: "2026-10-30", editor: editorQue({ ok: false, errores: ["urgencia falsa"] }) });
-    const f2 = await malo.cargarPieza();
-    const t2 = [];
-    await aplicarAccion({ ...malo, segundoPlano: (p) => t2.push(p) }, { accion: "cambiar_pieza", id: f2.id });
-    await Promise.all(t2);
-    const c = (await armarEstadoOficina({ repo: malo.repo })).cambios[f2.id];
-    assert.equal(c.estado, "error");
-    assert.match(c.motivo, /urgencia falsa/);
-  });
-
-  test("un cambio que quedó 'trabajando' más de 5 minutos se muestra como interrumpido", async () => {
-    const e = crearEscenario();
-    const ahora = Date.parse("2026-10-26T12:00:00Z");
-    await e.repo.guardarEstado("cambios", { 5: { estado: "trabajando", en: "2026-10-26T11:50:00Z" } });
-    const c = (await armarEstadoOficina({ repo: e.repo, ahora })).cambios[5];
-    assert.equal(c.estado, "error");
-    assert.match(c.motivo, /interrumpió/);
-  });
-
-  test("mientras la IA trabaja, el estado muestra el paso en el que va; sin señales por 3 minutos se da por interrumpido", async () => {
-    let verPaso;
-    const editor = { editarPieza: async ({ fila, alAvanzar }) => {
-      alAvanzar("Corrigiendo una regla de la marca (intento 2 de 3): urgencia falsa");
-      await verPaso();
-      return { ok: true, pieza: { ...fila.pieza, gancho: "Nuevo." }, hora: fila.hora, queCambio: "", errores: [] };
-    } };
-    const e = crearEscenario({ fecha: "2026-10-30", editor });
-    const fila = await e.cargarPieza();
-    verPaso = async () => {
-      await new Promise((r) => setTimeout(r, 20));
-      const c = (await armarEstadoOficina({ repo: e.repo })).cambios[fila.id];
-      assert.equal(c.estado, "trabajando");
-      assert.match(c.paso, /intento 2 de 3/);
-    };
-    await aplicarAccion(e, { accion: "cambiar_pieza", id: fila.id });
-    const final = (await armarEstadoOficina({ repo: e.repo })).cambios[fila.id];
-    assert.equal(final.estado, "listo");
-    assert.equal(final.paso, undefined);
-
-    const ahora = Date.parse("2026-10-26T12:00:00Z");
-    await e.repo.guardarEstado("cambios", { 7: { estado: "trabajando", en: "2026-10-26T11:57:00Z", paso: "algo", pasoEn: "2026-10-26T11:56:30Z" }, 8: { estado: "trabajando", en: "2026-10-26T11:57:00Z", paso: "algo", pasoEn: "2026-10-26T11:59:30Z" } });
-    const c = (await armarEstadoOficina({ repo: e.repo, ahora })).cambios;
-    assert.equal(c[7].estado, "error");
-    assert.equal(c[8].estado, "trabajando");
-  });
-
-  test("una sugerencia que rompe las reglas de la marca no se guarda", async () => {
-    const e = crearEscenario({ fecha: "2026-10-26", editor: editorQue({ ok: false, errores: ["urgencia falsa"] }) });
-    const fila = await e.cargarPieza();
-    const antes = fila.pieza.gancho;
-    await assert.rejects(aplicarAccion(e, { accion: "cambiar_pieza", id: fila.id }), /urgencia falsa/);
-    assert.equal((await e.repo.obtenerPieza(fila.id)).pieza.gancho, antes);
-  });
-
   test("la versión del estado solo cambia cuando cambia algo", async () => {
     const e = crearEscenario();
     const a = await armarEstadoOficina({ repo: e.repo, ahora: 1000 });
@@ -262,124 +126,6 @@ describe("cambiar una pieza desde la oficina", () => {
     const sinIA = crearEscenario();
     await assert.rejects(aplicarAccion(sinIA, { accion: "chat", texto: "hola" }), (error) => error instanceof ErrorAccion && /no está configurado/.test(error.message));
   });
-
-  test("confirmar desde el juego es la confirmación final real: mismas reglas que el botón y avisa por Telegram", async () => {
-    const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00" });
-    const fila = await e.cargarPieza();
-    await aplicarAccion(e, { accion: "aprobar_pieza", id: fila.id });
-    await assert.rejects(aplicarAccion(e, { accion: "confirmar_pieza", id: fila.id }), (error) => error instanceof ErrorAccion && error.estado === 409 && /video/i.test(error.message), "sin archivo no se confirma");
-    assert.notEqual((await e.repo.obtenerPieza(fila.id)).estado, "confirmada");
-    await e.repo.agregarMedio({ piezaId: fila.id, tipo: "video", mime: "video/mp4", datos: Buffer.from("x") });
-    const r = await aplicarAccion(e, { accion: "confirmar_pieza", id: fila.id });
-    assert.equal(r.estado, "confirmada");
-    const tras = await e.repo.obtenerPieza(fila.id);
-    assert.equal(tras.estado, "confirmada");
-    assert.equal(tras.confirmada_el, "2026-10-30");
-    assert.ok(e.telegram.buscar("Confirmaste desde la oficina"));
-  });
-
-  test("«La publico yo» desde el juego deja la pieza para publicar a mano y avisa por Telegram", async () => {
-    const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00" });
-    const fila = await e.cargarPieza();
-    await aplicarAccion(e, { accion: "aprobar_pieza", id: fila.id });
-    const r = await aplicarAccion(e, { accion: "manual_pieza", id: fila.id });
-    assert.equal(r.estado, "manual");
-    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "manual");
-    assert.ok(e.telegram.buscar("Desde la oficina"));
-    e.mover("19:00");
-    await e.servicio.tick();
-    assert.equal(e.meta.llamadas.length, 0); // el bot no publica nada
-    assert.ok(e.telegram.buscar("te toca publicar a vos"));
-    await assert.rejects(aplicarAccion(e, { accion: "manual_pieza", id: fila.id }), (error) => error instanceof ErrorAccion && error.estado === 409);
-  });
-
-  test("«La publico yo» pide el id y rechaza una pieza que no existe", async () => {
-    const e = crearEscenario();
-    await assert.rejects(aplicarAccion(e, { accion: "manual_pieza" }), (error) => error instanceof ErrorAccion && error.estado === 400);
-    await assert.rejects(aplicarAccion(e, { accion: "manual_pieza", id: 999 }), (error) => error instanceof ErrorAccion && error.estado === 409);
-  });
-
-  test("confirmar una pieza de otro día se rechaza", async () => {
-    const e = crearEscenario({ fecha: "2026-10-28", hora: "08:00" });
-    const fila = await e.cargarPieza();
-    await assert.rejects(aplicarAccion(e, { accion: "confirmar_pieza", id: fila.id }), (error) => error.estado === 409 && /mismo día/.test(error.message));
-  });
-});
-
-describe("editar una publicación a mano desde el juego", () => {
-  const llm = { async conversar() { return ""; } };
-
-  test("el epígrafe conserva los párrafos y la edición borra la confirmación", async () => {
-    const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00", llm });
-    const fila = await e.cargarPieza();
-    await e.repo.agregarMedio({ piezaId: fila.id, tipo: "video", mime: "video/mp4", datos: Buffer.from("x") });
-    await aplicarAccion(e, { accion: "aprobar_pieza", id: fila.id });
-    await aplicarAccion(e, { accion: "confirmar_pieza", id: fila.id });
-    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "confirmada");
-    const epigrafe = "Primer párrafo del epígrafe.\r\n\r\n\r\n\r\nSegundo párrafo.\nLínea siguiente. Anotate en la lista: link en la bio.  ";
-    const r = await aplicarAccion(e, { accion: "editar_pieza", id: fila.id, cambios: { epigrafe } });
-    assert.equal(r.estado, "propuesta");
-    const tras = await e.repo.obtenerPieza(fila.id);
-    assert.equal(tras.pieza.epigrafe, "Primer párrafo del epígrafe.\n\nSegundo párrafo.\nLínea siguiente. Anotate en la lista: link en la bio.");
-    assert.equal(tras.confirmada_el, null);
-    assert.ok(e.telegram.buscar("Editada desde la oficina"));
-  });
-
-  test("cambiar el tipo descarta el archivo que ya no sirve y valida lo pedido", async () => {
-    const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00", llm });
-    const fila = await e.cargarPieza();
-    await e.repo.agregarMedio({ piezaId: fila.id, tipo: "video", mime: "video/mp4", datos: Buffer.from("x") });
-    await assert.rejects(aplicarAccion(e, { accion: "editar_pieza", id: fila.id, cambios: { formato: "podcast" } }), (error) => error.estado === 409 && /tipo/i.test(error.message));
-    await assert.rejects(aplicarAccion(e, { accion: "editar_pieza", id: fila.id, cambios: {} }), (error) => error.estado === 409);
-    await assert.rejects(aplicarAccion(e, { accion: "editar_pieza", id: fila.id, cambios: { hora: "mañana" } }), (error) => error.estado === 409);
-    await aplicarAccion(e, { accion: "editar_pieza", id: fila.id, cambios: { formato: "imagen" } });
-    assert.equal((await e.repo.obtenerPieza(fila.id)).pieza.formato, "imagen");
-    assert.equal((await e.repo.mediosDePieza(fila.id)).length, 0);
-  });
-
-  test("adjuntar desde el juego: solo el archivo que pide el tipo, y borra la confirmación", async () => {
-    const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00", llm });
-    const fila = await e.cargarPieza();
-    const malo = await e.servicio.adjuntarDesdeJuego(fila.id, { mime: "image/jpeg", datos: Buffer.from("x") });
-    assert.equal(malo.ok, false);
-    assert.match(malo.motivo, /video/);
-    assert.equal((await e.servicio.adjuntarDesdeJuego(fila.id, { mime: "application/pdf", datos: Buffer.from("x") })).ok, false);
-    const bien = await e.servicio.adjuntarDesdeJuego(fila.id, { mime: "video/mp4", datos: Buffer.from("video") });
-    assert.deepEqual([bien.ok, bien.archivos, bien.falta], [true, 1, null]);
-    await aplicarAccion(e, { accion: "aprobar_pieza", id: fila.id });
-    await aplicarAccion(e, { accion: "confirmar_pieza", id: fila.id });
-    await e.servicio.adjuntarDesdeJuego(fila.id, { mime: "video/mp4", datos: Buffer.from("otro") });
-    assert.equal((await e.repo.mediosDePieza(fila.id)).length, 1, "un reel lleva un solo video");
-    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "aprobada");
-    await aplicarAccion(e, { accion: "quitar_archivos", id: fila.id });
-    assert.equal((await e.repo.mediosDePieza(fila.id)).length, 0);
-  });
-});
-
-describe("eliminar una publicación desde el juego", () => {
-  test("queda cancelada, sin archivos ni recordatorios, y no se puede eliminar dos veces", async () => {
-    const e = crearEscenario();
-    const fila = await e.cargarPieza();
-    await e.servicio.adjuntarDesdeJuego(fila.id, { mime: "video/mp4", datos: Buffer.from("video") });
-    const r = await aplicarAccion(e, { accion: "eliminar_pieza", id: fila.id });
-    assert.deepEqual([r.ok, r.estado], [true, "cancelada"]);
-    assert.equal((await e.repo.obtenerPieza(fila.id)).estado, "cancelada");
-    assert.equal((await e.repo.mediosDePieza(fila.id)).length, 0);
-    await assert.rejects(aplicarAccion(e, { accion: "eliminar_pieza", id: fila.id }), /no se puede eliminar/);
-    await assert.rejects(aplicarAccion(e, { accion: "eliminar_pieza" }), /Falta el id/);
-  });
-});
-
-describe("quitar del juego una pieza que solo está en los documentos", () => {
-  test("queda guardada como oculta, sin duplicar, y llega al estado del juego", async () => {
-    const e = crearEscenario();
-    await aplicarAccion(e, { accion: "operacion", cambio: { tipo: "pieza_ocultar", fecha: "2026-10-27", formato: "Carrusel" } });
-    await aplicarAccion(e, { accion: "operacion", cambio: { tipo: "pieza_ocultar", fecha: "2026-10-27", formato: "carrusel" } });
-    const estado = await armarEstadoOficina({ repo: e.repo });
-    assert.deepEqual(estado.operacion.piezasOcultas, ["2026-10-27|carrusel"]);
-    await assert.rejects(aplicarAccion(e, { accion: "operacion", cambio: { tipo: "pieza_ocultar", fecha: "mañana", formato: "reel" } }), /AAAA-MM-DD/);
-  });
-});
 
 describe("datos de la operación: ida y vuelta entre el juego y el bot", () => {
   test("lo que se edita en el juego queda en la base, llega al estado y al Estratega como novedad", async () => {
@@ -424,46 +170,6 @@ describe("datos de la operación: ida y vuelta entre el juego y el bot", () => {
     assert.equal(estado.operacion.campos["estrategia.notas"], "Llegaron, faltan etiquetas");
     assert.equal(Object.values(estado.operacion.agenda.propias)[0].t, "Reunión con el proveedor");
     assert.equal(estado.operacion.historial.at(-1).origen, "bot");
-  });
-
-  test("cambiar una pieza que solo está en los documentos la arma en el momento y queda propuesta (no se manda como nota)", async () => {
-    const calls = [];
-    const editor = { editarPieza: async (pedido) => { calls.push(pedido); return { ok: true, pieza: crearPieza({ fecha: pedido.fila.fecha, formato: pedido.fila.pieza.formato, gancho: "Gancho rehecho" }), hora: "19:00", queCambio: "Rehecha." }; } };
-    const e = crearEscenario({ fecha: "2026-10-26", hora: "10:00", editor });
-    const r = await aplicarAccion(e, { accion: "cambiar_pieza", fecha: "2026-10-29", formato: "carrusel", indicacion: "más simple", base: "Texto del documento" });
-    assert.equal(r.estado, "propuesta");
-    const fila = await e.repo.obtenerPieza(r.id);
-    assert.equal(fila.fecha, "2026-10-29");
-    assert.equal(fila.pieza.gancho, "Gancho rehecho");
-    assert.match(calls[0].instruccion, /Texto del documento/);
-    assert.match(calls[0].instruccion, /más simple/);
-    assert.deepEqual(await e.repo.novedadesPendientes(), [], "no deja una nota suelta");
-    // si el día ya tiene pieza en la base, se cambia esa en vez de crear otra
-    const otra = await aplicarAccion(e, { accion: "cambiar_pieza", fecha: "2026-10-29", formato: "carrusel", indicacion: "otra" });
-    assert.equal(otra.id, r.id);
-    assert.equal((await e.repo.piezasDelDia("2026-10-29")).length, 1);
-  });
-});
-
-describe("editar y adjuntar: casos de borde", () => {
-  const llm = { async conversar() { return ""; } };
-
-  test("editar una pieza que solo está en los documentos la carga primero con la IA y después aplica el cambio", async () => {
-    const editor = { async editarPieza({ nueva, instruccion }) { assert.ok(nueva); assert.match(instruccion, /SIN cambiar su contenido/); return { ok: true, pieza: crearPieza({ fecha: "2026-10-29", formato: "reel" }), hora: "19:00", queCambio: "", errores: [] }; } };
-    const e = crearEscenario({ fecha: "2026-10-26", hora: "08:00", editor, llm });
-    const r = await aplicarAccion(e, { accion: "editar_pieza", fecha: "2026-10-29", formato: "reel", base: "Texto del documento", cambios: { epigrafe: "Uno.\n\nDos. Anotate en la lista: link en la bio." } });
-    assert.equal(r.estado, "propuesta");
-    assert.equal((await e.repo.obtenerPieza(r.id)).pieza.epigrafe, "Uno.\n\nDos. Anotate en la lista: link en la bio.");
-    await assert.rejects(aplicarAccion(e, { accion: "editar_pieza", id: 999, cambios: { epigrafe: "x" } }), (error) => error.estado === 409);
-  });
-
-  test("una historia acepta una foto o un video, y uno solo", async () => {
-    const e = crearEscenario({ fecha: "2026-10-30", hora: "08:00", llm });
-    const fila = await e.cargarPieza();
-    await aplicarAccion(e, { accion: "editar_pieza", id: fila.id, cambios: { formato: "story" } });
-    assert.equal((await e.servicio.adjuntarDesdeJuego(fila.id, { mime: "image/jpeg", datos: Buffer.from("a") })).ok, true);
-    assert.equal((await e.servicio.adjuntarDesdeJuego(fila.id, { mime: "video/mp4", datos: Buffer.from("b") })).ok, true);
-    assert.equal((await e.repo.mediosDePieza(fila.id)).length, 1);
   });
 });
 

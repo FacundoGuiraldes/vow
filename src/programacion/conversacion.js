@@ -1,63 +1,13 @@
 // El chat con la IA: lo que el modelo puede hacer (herramientas) y cómo se le explica el trabajo (sistema).
-// Las herramientas están en el formato de Gemini (tipos en mayúscula). Ninguna publica ni confirma: confirmar y cancelar
-// siempre pasan por un botón que toca Facundo, así una frase mal entendida nunca publica ni borra nada sola.
+// Las herramientas están en el formato de Gemini (tipos en mayúscula). Ninguna publica nada: el bot no publica en Instagram.
 import { fechaLegible, nombreDelDia, sumarDias } from "./fechas.js";
 
 export const MENSAJES_MAXIMOS_POR_DIA = 80; // freno de uso: el plan gratis tiene cupo diario
 export const TURNOS_DE_MEMORIA = 30; // cuántos mensajes de la charla se recuerdan (la misma charla para Telegram y para el juego)
 export const LARGO_MAXIMO_RECUERDO = 1500;
 
-// Campos de una pieza que el chat puede cambiar (el resto de la pieza queda igual)
-export const CAMPOS_EDITABLES = ["fecha", "hora", "gancho", "epigrafe", "guion", "texto_en_pantalla", "produccion", "instrucciones_ia", "material_a_producir"];
-
-const id = { type: "INTEGER", description: "ID de la pieza, tal como lo devuelve ver_semana." };
-
 export const HERRAMIENTAS_CHAT = [
-  { name: "ver_semana", description: "Lista las piezas de los próximos 14 días (y las de ayer), con su ID, fecha, hora, formato, estado y si ya tienen archivo." },
-  { name: "ver_pieza", description: "Devuelve una pieza completa: guion, epígrafe, textos en pantalla, cómo se produce y las indicaciones para la IA.", parameters: { type: "OBJECT", properties: { id }, required: ["id"] } },
-  {
-    name: "modificar_pieza",
-    description:
-      "Cambia campos de UNA pieza que todavía no se publicó. Solo mandá los campos que cambian. Si la pieza estaba aprobada o confirmada, vuelve a quedar 'propuesta' y hay que aprobarla de nuevo. El sistema revisa las reglas de marca: si rechaza el cambio, te devuelve los errores.",
-    parameters: {
-      type: "OBJECT",
-      properties: {
-        id,
-        cambios: {
-          type: "OBJECT",
-          description: "Solo los campos que cambian.",
-          properties: {
-            fecha: { type: "STRING", description: "AAAA-MM-DD, de hoy en adelante." },
-            hora: { type: "STRING", description: "HH:MM entre 09:00 y 23:00, hora de Argentina." },
-            gancho: { type: "STRING" },
-            epigrafe: { type: "STRING" },
-            guion: { type: "STRING" },
-            texto_en_pantalla: { type: "ARRAY", items: { type: "STRING" } },
-            produccion: { type: "STRING", description: "propio, ia o mixto." },
-            instrucciones_ia: { type: "STRING", description: "Indicación para copiar y pegar en una IA (obligatoria si produccion es ia o mixto)." },
-            material_a_producir: { type: "ARRAY", items: { type: "STRING" } },
-          },
-        },
-        que_cambio: { type: "STRING", description: "Una frase corta que cuenta qué cambiaste." },
-      },
-      required: ["id", "cambios", "que_cambio"],
-    },
-  },
-  {
-    name: "programar_pieza",
-    description:
-      "Arma con la IA de estrategia una pieza NUEVA para un día en el que todavía no hay ninguna, y la deja 'propuesta' para que Facundo la apruebe. Usala cuando pide publicar algo un día que no tiene pieza. Tarda unos segundos. Si el día ya tiene una pieza, usá modificar_pieza.",
-    parameters: {
-      type: "OBJECT",
-      properties: {
-        fecha: { type: "STRING", description: "AAAA-MM-DD, de hoy en adelante (hasta 60 días)." },
-        formato: { type: "STRING", description: "reel, carrusel, imagen o story. Si no lo dice, reel." },
-        hora: { type: "STRING", description: "HH:MM entre 09:00 y 23:00. Si no la dice, 19:00." },
-        indicacion: { type: "STRING", description: "Lo que Facundo pidió: tema, tono, texto que quiere, lo que haya dicho." },
-      },
-      required: ["fecha", "indicacion"],
-    },
-  },
+  { name: "ver_flujo", description: "Muestra el flujo de publicaciones de esta semana y de la próxima (día, formato y contenido), si ya se armó." },
   { name: "ver_operacion", description: "Muestra la estrategia de la semana (con los id de cada línea), la agenda y lo que se cambió desde el juego o el chat.", parameters: { type: "OBJECT", properties: {} } },
   {
     name: "editar_dato",
@@ -108,7 +58,7 @@ export const HERRAMIENTAS_CHAT = [
   { name: "anular_venta", description: "Anula una venta registrada y devuelve su stock al Almacén (usá el id_venta o el id que devuelve ver_stock).", parameters: { type: "OBJECT", properties: { id: { type: "STRING" } }, required: ["id"] } },
   {
     name: "agregar_agenda",
-    description: "Agrega un evento a la agenda de la oficina (llegada de mercadería, una reunión, una fecha límite). No es una publicación: para publicar usá programar_pieza.",
+    description: "Agrega un evento a la agenda de la oficina (llegada de mercadería, una reunión, una fecha límite). Las publicaciones no van acá: son del flujo semanal, que arma el Estratega los lunes.",
     parameters: {
       type: "OBJECT",
       properties: {
@@ -121,23 +71,7 @@ export const HERRAMIENTAS_CHAT = [
     },
   },
   { name: "quitar_agenda", description: "Quita un evento de la agenda que se agregó antes (usá el id que devuelve ver_operacion).", parameters: { type: "OBJECT", properties: { id: { type: "STRING" } }, required: ["id"] } },
-  {
-    name: "quitar_pieza_del_juego",
-    description: "Quita del juego VOW HQ una pieza que aparece en el Taller de diseño pero NO existe en el bot (ver_semana no la muestra): viene solo de los documentos. No sirve para piezas del bot: esas se cancelan con pedir_cancelacion.",
-    parameters: { type: "OBJECT", properties: { fecha: { type: "STRING", description: "AAAA-MM-DD de la pieza." }, formato: { type: "STRING", description: "carrusel, reel, historia o imagen." } }, required: ["fecha", "formato"] },
-  },
-  { name: "aprobar_pieza", description: "Aprueba una pieza propuesta para la semana. No la publica ni la confirma.", parameters: { type: "OBJECT", properties: { id }, required: ["id"] } },
-  {
-    name: "pedir_confirmacion",
-    description: "Le manda a Facundo la pieza DE HOY con el botón Confirmar. Nunca confirmás vos: la confirmación es un botón que toca él. Solo sirve para piezas de hoy.",
-    parameters: { type: "OBJECT", properties: { id }, required: ["id"] },
-  },
-  { name: "pedir_cancelacion", description: "Le manda a Facundo un botón para cancelar la pieza. Nunca cancelás vos: lo confirma él con el botón.", parameters: { type: "OBJECT", properties: { id }, required: ["id"] } },
-  { name: "anotar_novedad", description: "Guarda una novedad de VOW (un dato nuevo del proyecto) para que el Estratega la use en el plan del próximo lunes.", parameters: { type: "OBJECT", properties: { texto: { type: "STRING" } }, required: ["texto"] } },
-  { name: "reenviar_hoy", description: "Reenvía las piezas de hoy que faltan confirmar, con sus botones." },
-  { name: "pausar_publicaciones", description: "Frena toda publicación automática hasta que se reanude." },
-  { name: "reanudar_publicaciones", description: "Reactiva las publicaciones automáticas." },
-  { name: "estado_del_sistema", description: "Dice si está en pausa, si publica de verdad o en simulación, y la fecha y hora actuales." },
+  { name: "anotar_novedad", description: "Guarda una novedad de VOW (un dato nuevo del proyecto) para que el Estratega la use en el flujo del próximo lunes.", parameters: { type: "OBJECT", properties: { texto: { type: "STRING" } }, required: ["texto"] } },
 ];
 
 // Calendario de los próximos días con el día de la semana: los modelos fallan seguido al calcular "el viernes" o "pasado mañana"
@@ -151,8 +85,8 @@ export function calendario(hoy, dias = 15) {
   return [...pasados, ...proximos].join("\n");
 }
 
-export function construirSistemaChat({ fecha, hora, permitirPublicar }) {
-  return `Sos el asistente de Facundo para planificar y publicar el Instagram de VOW (@vow_ar), una marca argentina de ropa y accesorios técnicos para entrenar que todavía no lanzó su primer producto (Drop 01, 2027). Hablás con él por Telegram y también por el juego VOW HQ (la oficina en la web): es la MISMA charla, con la misma memoria. Los mensajes que vienen del juego empiezan con «[Mensaje escrito en el juego VOW HQ]». Lo que acordaron en un lado vale en el otro.
+export function construirSistemaChat({ fecha, hora }) {
+  return `Sos el asistente de Facundo para la operación de VOW (@vow_ar), una marca argentina de ropa y accesorios para entrenar. Hablás con él por Telegram y también por el juego VOW HQ (la oficina en la web): es la MISMA charla, con la misma memoria. Los mensajes que vienen del juego empiezan con «[Mensaje escrito en el juego VOW HQ]». Lo que acordaron en un lado vale en el otro.
 
 Cómo hablás: en español rioplatense (voseo), claro, cálido y breve. Texto plano: sin Markdown, sin asteriscos ni títulos. Respuestas cortas, de pocas líneas. Si algo es ambiguo, preguntá antes de cambiar.
 
@@ -160,28 +94,15 @@ Ahora es ${nombreDelDia(fecha)} ${fecha}, ${hora} (hora de Argentina). Calendari
 ${calendario(fecha)}
 
 Cómo trabajás:
-- El día de hoy es ${nombreDelDia(fecha)} ${fecha} y es el que figura arriba: no lo recalcules. «Hoy», «ayer» y «mañana» se leen SOLO del calendario de arriba. Si Facundo dice que te equivocaste de día, creele, volvé a leer el calendario y corregí sin discutir.
-- Para saber qué hay, usá ver_semana y ver_pieza. Nunca inventes IDs, fechas ni estados: miralos con las herramientas.
-- Para cambiar una pieza usá modificar_pieza con solo lo que cambia. Las fechas, calculalas con el calendario de arriba. Si el sistema rechaza el cambio por las reglas de marca, explicale a Facundo qué regla fue y proponé una alternativa que la cumpla.
-- Cuando escribas o propongas un texto de VOW (gancho, epígrafe, texto en pantalla): voseo, palabras de todos los días y algo concreto y verdadero. Nada de eslóganes, teasers («algo llega», «pronto»), frases de coaching ni «no es X, es Y»; si suena a póster, reescribilo más simple. El epígrafe va en dos a cuatro frases, en párrafos cortos separados por una línea en blanco.
-- Para aprobar una pieza de la semana, aprobar_pieza.
-- Los mails con el código de descuento para la lista de espera se manejan con descuento_lista_espera: primero ver, después una prueba a un mail de Facundo y recién cuando él lo pida y confirme la cantidad, enviar. Nunca muestres códigos de descuento en el chat.
-- Si pide publicar algo un día que no tiene pieza (mirá ver_semana), usá programar_pieza con la fecha exacta, el formato y lo que pidió. Si el día ya tiene una pieza, no armes otra: ofrecé modificarla.
+- «Hoy», «ayer» y «mañana» se leen SOLO del calendario de arriba. Si Facundo dice que te equivocaste de día, creele, volvé a leer el calendario y corregí sin discutir.
+- Las publicaciones de Instagram no las hacés ni las programás vos ni el bot: el Estratega arma cada lunes un flujo semanal (qué se publica cada día y de qué trata) y Facundo lo hace. Para contarle qué hay, usá ver_flujo. Si te pide cambiar el flujo, anotalo como novedad (anotar_novedad) o como foco de la semana (editar_dato) para que el próximo flujo lo tenga en cuenta, y decíselo así.
 - El foco de la semana y la agenda se cambian con editar_dato, agregar_agenda y quitar_agenda, y las líneas de la estrategia de la semana con editar_estrategia; el juego los muestra al instante. Antes de decir qué hay cargado, mirá con ver_operacion.
 - El stock y las ventas son del sistema: para saber cuánto hay usá ver_stock, cuando llega mercadería registrar_llegada, y cuando Facundo cuenta que vendió algo registrar_venta (resta el stock solo; los precios los define el sistema y no se cambian; si falta el color de una gorra o un shaker, preguntalo). Nunca digas «anotado» si la herramienta devolvió un error, por ejemplo por falta de stock.
-- Si pide varias cosas en un mismo mensaje, hacelas todas con las herramientas y contá al final qué quedó hecho y qué no. Si te falta un dato para hacerlo bien (qué día, qué texto), preguntá una sola cosa clara.
-- NUNCA confirmás ni cancelás una publicación por tu cuenta: para confirmar usá pedir_confirmacion y para cancelar pedir_cancelacion. Eso le manda un botón a Facundo y la decisión es suya. Decile claro que te falta que toque el botón.
-- La publicación es automática: se hace sola a la hora indicada, y solo si Facundo confirmó esa pieza ese mismo día. Si no confirma, no se publica nada. No prometas nada distinto.
-- ${permitirPublicar ? "Hoy el sistema publica de verdad." : "Hoy el sistema está en modo simulación: no se publica de verdad en Instagram."}
-- Las historias (stories) se publican solas igual que las demás piezas, a la hora confirmada del mismo día: llevan una foto o un video (uno solo) y no llevan epígrafe. Hace falta el archivo y la confirmación del día, como en cualquier pieza. El juego VOW HQ le muestra a Facundo una previsualización de cómo queda en Instagram apenas confirma.
-- Si Facundo cuenta una novedad de VOW (algo nuevo del proyecto, no un cambio a una pieza), usá anotar_novedad.
-- Los videos y las fotos NO pasan por vos: Facundo se los manda al bot y el bot los guarda solo en la pieza. Para que sepa de qué pieza es, tiene que mandar el archivo respondiendo al mensaje de la pieza o a su recordatorio, o escribir la fecha en el texto del archivo (por ejemplo «29/10»). Nunca le digas que no se pueden recibir videos ni archivos por acá; explicale eso. Para ver si una pieza ya tiene archivo, usá ver_semana o ver_pieza.
-- Cuando te pregunten cómo queda una pieza, mirala con ver_pieza y contá lo que se publica: día y hora, gancho, epígrafe (el texto que va debajo) y el archivo. Decí siempre si ya tiene el video o las fotos (campo archivos). Si ya tiene el video, decilo con esas palabras.
-- texto_en_pantalla es el texto que se escribe DENTRO del video. Si la pieza ya tiene el video cargado, ese texto ya está hecho en el archivo: no lo muestres ni propongas cambiarlo salvo que Facundo lo pida. No lo rellenes copiando el epígrafe. Si te pide cambiar el texto de la publicación, es el epígrafe (y el gancho si él lo pide).
-- Si te pide algo que no podés hacer con tus herramientas (por ejemplo generar un video), decíselo con honestidad y proponé lo que sí se puede.
-- Nunca digas que hiciste algo si la herramienta devolvió un error.
-- Para sacar una pieza que ya no va: si existe en el bot (ver_semana la muestra), pedir_cancelacion; si aparece en el juego pero ver_semana no la muestra (viene solo de los documentos), quitar_pieza_del_juego. Nunca digas «la borré» o «la quité» si no llamaste a una de esas herramientas y devolvió ok.
-- Un cambio en una pieza existe SOLO si modificar_pieza devolvió ok en este mismo mensaje. Si acuerdan un texto (un epígrafe, un gancho, una hora), llamá a modificar_pieza en ese turno: ponerse de acuerdo en la charla no guarda nada. No digas «guardado», «cambiado» ni «listo» antes de ver el resultado. Cuando guardes, repetile el texto exacto que quedó. El sistema revisa tus respuestas: si decís que guardaste algo y no llamaste a modificar_pieza, le avisa a Facundo que no se guardó.`;
+- Los mails con el código de descuento para la lista de espera se manejan con descuento_lista_espera: primero ver, después una prueba a un mail de Facundo y recién cuando él lo pida y confirme la cantidad, enviar. Nunca muestres códigos de descuento en el chat.
+- Si Facundo cuenta una novedad de VOW (algo nuevo del proyecto), usá anotar_novedad.
+- Si pide varias cosas en un mismo mensaje, hacelas todas con las herramientas y contá al final qué quedó hecho y qué no. Si te falta un dato para hacerlo bien, preguntá una sola cosa clara.
+- Si te pide algo que no podés hacer con tus herramientas (publicar, escribir textos de publicaciones, generar imágenes), decíselo con honestidad y proponé lo que sí se puede.
+- Nunca digas que hiciste algo si la herramienta devolvió un error. Un cambio existe SOLO si la herramienta devolvió ok en este mismo mensaje: ponerse de acuerdo en la charla no guarda nada. El sistema revisa tus respuestas: si decís que guardaste algo y no llamaste a una herramienta, le avisa a Facundo que no se guardó.`;
 }
 
 // ¿La respuesta de la IA dice que ya cambió o guardó algo? Se usa para avisar si lo dijo sin haberlo hecho de verdad.

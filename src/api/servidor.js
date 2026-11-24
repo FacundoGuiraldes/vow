@@ -260,11 +260,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const puerto = Number(process.env.PORT) || 3000;
   const pool = crearPool();
   const { construirProgramacion } = await import("../programacion/construir.js");
-  const { router: programacion, faltan, permitirPublicar, edicionConIA } = await construirProgramacion({ pool });
+  const { router: programacion, faltan, chatConIA } = await construirProgramacion({ pool });
   if (programacion) {
-    console.log(`Publicación programada activa (${permitirPublicar ? "publica de verdad" : "modo simulación"}; edición con IA: ${edicionConIA ? "sí" : "no"}).`);
+    console.log(`Bot de Telegram y oficina activos (chat con IA: ${chatConIA ? "sí" : "no"}).`);
   } else {
-    console.log(`Publicación programada apagada: faltan ${faltan.join(", ")}.`);
+    console.log(`Bot de Telegram y oficina apagados: faltan ${faltan.join(", ")}.`);
   }
   const app = crearApp({ pool, origenesPermitidos, programacion });
   app.listen(puerto, () => {

@@ -12,7 +12,7 @@ import { armarPasos, PASOS } from "./orquestador/flujo-semanal.js";
 //   npm run semana -- --semana 2026-10-26 --aprobar aprobar-plan   aprueba el plan (después volvé a correr el comando de arriba)
 //   npm run semana -- --semana 2026-10-26 --desde planificar       rehace desde ese paso (borra también las aprobaciones)
 //   agregá --simulado para probar el flujo completo sin gastar plata
-// Opciones del plan: --fase, --piezas, --producto, --gente, --notas (iguales a npm run plan)
+// Opciones del plan: --fase, --producto, --gente, --notas (iguales a npm run plan)
 
 const { values } = parseArgs({
   options: {
@@ -21,7 +21,6 @@ const { values } = parseArgs({
     producto: { type: "boolean", default: false },
     gente: { type: "boolean", default: false },
     notas: { type: "string", default: "" },
-    piezas: { type: "string", default: "2" },
     simulado: { type: "boolean", default: false },
     aprobar: { type: "string" },
     desde: { type: "string" },
@@ -83,7 +82,6 @@ const pasos = armarPasos({
     fase: values.fase,
     recursos: { producto: values.producto, gente: values.gente },
     notas: values.notas,
-    piezas: Number(values.piezas),
   },
   cliente,
   escribir: async (nombre, texto) => {
