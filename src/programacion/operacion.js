@@ -1,4 +1,4 @@
-// Los datos de la operación que se editan desde los dos lados: el juego (VOW HQ) y el bot (el chat de Telegram y del juego).
+// Los datos de la operación que se editan desde los dos lados: el juego (VOW HQ) y el bot (el chat del juego).
 // Los documentos del repo son el punto de partida; lo que se cambia acá se guarda en la base ("operacion") y manda sobre ellos.
 // Todo cambio deja una novedad para el Estratega y una línea en el historial, para saber quién cambió qué y cuándo.
 import { ahoraArgentina, esFechaISO, esHoraValida, lunesDe } from "./fechas.js";

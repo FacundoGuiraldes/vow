@@ -1,25 +1,20 @@
-// Lógica del bot de Telegram y de la oficina. Habla con cosas que se inyectan (por eso se prueba sin red ni base):
+// Lógica de la oficina (VOW HQ). Habla con cosas que se inyectan (por eso se prueba sin red ni base):
 //   repo      → la base (repositorio.js, o repositorio-memoria.js en los tests)
-//   telegram  → el bot con el que Facundo recibe y responde
-//   llm       → (opcional) la IA con la que Facundo charla; sin ella, lo que escribe queda como novedad
+//   llm       → (opcional) la IA con la que Facundo charla desde el juego
 //
 // Qué hace:
-//   1. Recibe el FLUJO SEMANAL que arma el Estratega (día, formato y contenido de cada publicación), lo guarda y se lo manda a Facundo.
+//   1. Recibe el FLUJO SEMANAL que arma el Estratega (día, formato y contenido de cada publicación) y lo guarda: el juego lo muestra.
 //   2. Conversa: stock, ventas, estrategia, agenda, descuentos y novedades. Nada de esto publica en Instagram.
-// El bot NO publica ni arma piezas: Facundo hace cada publicación a mano.
+// No publica ni arma piezas: Facundo hace cada publicación a mano.
 import { ErrorOperacion, aplicarOperacion, leerOperacion, resumenParaChat } from "./operacion.js";
 import { ErrorInventario, aplicarInventario, leerInventario, vistaInventario } from "./inventario.js";
 import { lineasDeInvestigacion, vistaEstrategia } from "./estrategia-semana.js";
 import { HERRAMIENTAS_CHAT, afirmaCambio, MENSAJES_MAXIMOS_POR_DIA, construirSistemaChat, paraElModelo, recortarRecuerdo } from "./conversacion.js";
-import { ahoraArgentina, fechaLegible, lunesDe, nombreDelDia, sumarDias } from "./fechas.js";
-import { textoFlujoSemanal } from "./mensajes.js";
+import { ahoraArgentina, lunesDe, nombreDelDia, sumarDias } from "./fechas.js";
 
 export const clavePlan = (semana) => `flujo:${semana}`;
 
-export function crearServicio({ repo, telegram, llm = null, ahora = () => ahoraArgentina(), descuentos = null, investigacion = lineasDeInvestigacion } = {}) {
-  const decir = (texto, opciones) => telegram.enviarMensaje(texto, opciones);
-  const autorizado = (chatId) => telegram.chatId !== null && String(chatId) === telegram.chatId;
-
+export function crearServicio({ repo, llm = null, ahora = () => ahoraArgentina(), descuentos = null, investigacion = lineasDeInvestigacion } = {}) {
   // ───────────────────────── Flujo de la semana ─────────────────────────
   async function leerFlujo(semana) {
     const guardado = await repo.leerEstado(clavePlan(semana));
@@ -41,64 +36,17 @@ export function crearServicio({ repo, telegram, llm = null, ahora = () => ahoraA
     const dias = plan.dias.map(({ fecha, formato, contenido }) => ({ fecha, formato, contenido: String(contenido).trim() }));
     await repo.guardarEstado(clavePlan(semana), { semana, dias, creado: new Date().toISOString() });
     await repo.marcarNovedadesUsadas(novedadesUsadas);
-    await decir(textoFlujoSemanal({ semana, dias }));
     return { publicaciones: dias.length };
   }
 
+  // El workflow del lunes avisa si no pudo armar el flujo: queda guardado y en el log
   async function avisarFalloDelPlan({ semana, error }) {
-    await decir(`⚠️ No pude armar el flujo de la semana del ${fechaLegible(semana)}.\n${error}\nSi querés, corré el plan de nuevo desde GitHub Actions (workflow "Plan del lunes").`);
-  }
-
-  // ───────────────────────── Mensajes y comandos ─────────────────────────
-  async function manejarMensaje(msg) {
-    const texto = msg.text?.trim() ?? "";
-    if (!autorizado(msg.chat?.id)) {
-      if (texto.startsWith("/start")) await telegram.enviarA(msg.chat.id, `Tu chat id es ${msg.chat.id}. Cargalo como TELEGRAM_CHAT_ID en el servicio para que este bot te responda.`);
-      return { ignorada: true };
-    }
-    if (texto.startsWith("/")) return comando(texto, msg);
-    if (msg.photo || msg.video || msg.document) {
-      return decir("Este bot ya no recibe archivos: las publicaciones las hacés vos desde Instagram. Si querés contarme algo, escribilo.", { responderA: msg.message_id });
-    }
-    if (!texto) return { ignorada: true };
-    if (llm) return conversar(msg, texto);
-    return novedad(msg, texto);
-  }
-
-  async function comando(texto, msg) {
-    const nombre = texto.split(/[\s@]/)[0].toLowerCase();
-    const responder = (t, o) => decir(t, { responderA: msg.message_id, ...o });
-    if (nombre === "/flujo" || nombre === "/hoy") {
-      const [actual] = await flujosVigentes();
-      return actual ? responder(textoFlujoSemanal(actual)) : responder("Todavía no hay flujo para esta semana. Se arma los lunes.");
-    }
-    return responder("Comandos: /flujo (te manda el flujo de la semana). Escribime para charlar (stock, ventas, estrategia) o para dejar una novedad de VOW.");
-  }
-
-  async function novedad(msg, texto) {
-    await repo.agregarNovedad(texto);
-    return decir("📝 Anotado. Se lo paso al Estratega en el próximo flujo del lunes.", { responderA: msg.message_id });
-  }
-
-  async function manejarActualizacion(actualizacion) {
-    try {
-      if (actualizacion.message) return await manejarMensaje(actualizacion.message);
-      return { ignorada: true };
-    } catch (error) {
-      // Un fallo no tiene que pasar en silencio: si Facundo no ve respuesta, no sabe si el bot cayó o si no entendió
-      console.error(`Error en el bot de Telegram: ${error.message}`);
-      const chatId = actualizacion.message?.chat?.id;
-      if (autorizado(chatId)) {
-        const aviso = String(error.message).slice(0, 300);
-        const idMensaje = actualizacion.message?.message_id;
-        await decir(`⚠️ No pude terminar eso: ${aviso}\nProbá de nuevo. Si se repite, mirá los logs del servicio en Render.`, idMensaje ? { responderA: idMensaje } : undefined).catch(() => {});
-      }
-      return { error: true };
-    }
+    console.error(`No se pudo armar el flujo de la semana del ${semana}: ${error}`);
+    await repo.guardarEstado(`flujo-error:${semana}`, { semana, error, en: new Date().toISOString() });
   }
 
   // ───────────────────────── Chat con la IA ─────────────────────────
-  // Un mensaje a la vez: si Facundo escribe en Telegram y en el juego casi juntos, el segundo espera al primero y ve su resultado
+  // Un mensaje a la vez: si Facundo escribe dos veces casi juntas, el segundo espera al primero y ve su resultado
   let cola = Promise.resolve();
   const enCola = (tarea) => {
     const corrida = cola.then(tarea, tarea);
@@ -106,7 +54,7 @@ export function crearServicio({ repo, telegram, llm = null, ahora = () => ahoraA
     return corrida;
   };
 
-  // El núcleo de la charla, igual para Telegram y para el juego: misma memoria ("chat"), mismas herramientas, mismas reglas.
+  // El núcleo de la charla: memoria ("chat"), mismas herramientas, mismas reglas.
   // Devuelve { ok, respuesta, limite } o { ok: false, error }.
   async function pensar({ texto, canal }) {
     const { fecha: hoy, hora } = ahora();
@@ -149,18 +97,7 @@ export function crearServicio({ repo, telegram, llm = null, ahora = () => ahoraA
     return { ok: true, respuesta };
   }
 
-  // Telegram
-  async function conversar(msg, texto) {
-    const responder = (t, o) => decir(t, { responderA: msg.message_id, ...o });
-    telegram.escribiendo?.();
-    const resultado = await enCola(() => pensar({ texto, canal: "telegram" }));
-    if (resultado.ok || resultado.limite) return responder(resultado.respuesta);
-    // Lo que no se pudo entender no se pierde: queda anotado como novedad para el próximo flujo
-    await repo.agregarNovedad(texto);
-    return responder(`No pude procesar tu mensaje: ${resultado.error}\nLo anoté como novedad de VOW para el próximo flujo. Si era un pedido, repetímelo en un rato.`);
-  }
-
-  // El juego: el mismo bot y la misma memoria. Un error acá no se anota como novedad: el juego lo muestra y Facundo reintenta.
+  // El chat del juego. Un error acá no se anota como novedad: el juego lo muestra y Facundo reintenta.
   async function conversarDesdeJuego(texto) {
     const limpio = String(texto ?? "").trim().slice(0, 2000);
     if (!limpio) return { ok: false, error: "El mensaje está vacío." };
@@ -171,7 +108,7 @@ export function crearServicio({ repo, telegram, llm = null, ahora = () => ahoraA
   // La charla guardada, lista para mostrar (lo que se ve es lo que Facundo escribió, sin los avisos internos)
   async function charla(limite = 30) {
     const memoria = (await repo.leerEstado("chat")) ?? [];
-    return memoria.slice(-limite).map((m) => ({ rol: m.rol, texto: m.visible ?? m.texto, canal: m.canal ?? "telegram", en: m.en ?? null }));
+    return memoria.slice(-limite).map((m) => ({ rol: m.rol, texto: m.visible ?? m.texto, canal: m.canal ?? "juego", en: m.en ?? null }));
   }
 
   async function ejecutarHerramienta(nombre, argumentos, { hoy }) {
@@ -234,22 +171,5 @@ export function crearServicio({ repo, telegram, llm = null, ahora = () => ahoraA
     return { error: `No existe la herramienta ${nombre}.` };
   }
 
-  // ───────────────────────── Mensajes que quedaron sin procesar ─────────────────────────
-  // Mensajes de Telegram que se guardaron pero no llegaron a procesarse (el servicio se cayó a mitad de camino).
-  // Se reintentan hasta 3 veces; los ya procesados se borran a los 7 días. Se revisa al arrancar el servicio.
-  async function recuperarActualizaciones({ minutos = 2 } = {}) {
-    const pendientes = await repo.reclamarActualizacionesPendientes({ antesDe: new Date(Date.now() - minutos * 60_000) });
-    for (const { id, cuerpo } of pendientes) {
-      try {
-        await manejarActualizacion(cuerpo);
-        await repo.marcarActualizacionProcesada(id);
-      } catch (error) {
-        console.error(`Error al recuperar el mensaje ${id} de Telegram (se reintenta hasta 3 veces): ${error.message}`);
-      }
-    }
-    await repo.borrarActualizacionesViejas(new Date(Date.now() - 7 * 24 * 60 * 60_000));
-    return pendientes.length;
-  }
-
-  return { recibirPlan, avisarFalloDelPlan, leerFlujo, flujosVigentes, manejarActualizacion, conversarDesdeJuego, charla, recuperarActualizaciones };
+  return { recibirPlan, avisarFalloDelPlan, leerFlujo, flujosVigentes, conversarDesdeJuego, charla };
 }

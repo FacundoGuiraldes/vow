@@ -213,7 +213,7 @@ button:focus-visible{outline:3px solid var(--beige);outline-offset:2px}
   <form id="nrap" hidden autocomplete="off"><input id="nrapIn" type="text" maxlength="300" placeholder="Anotale algo al bot…" enterkeyhint="send"><button type="submit">Anotar</button></form>
   <div id="abajo"><button class="gran sec" id="bAnotar" type="button">Anotar</button><button class="gran" id="bChat" type="button">Hablar con el bot<span id="bChatN" hidden></span></button></div>
   <div id="hoja" role="dialog" aria-modal="false"><header><h2 id="hT"></h2><button class="x" id="hX" type="button" aria-label="Cerrar">✕</button></header><div id="cuerpo"></div></div>
-  <div id="chat" role="dialog" aria-modal="false" aria-label="Chat con el bot"><header><h2>Bot VOW<small>La misma charla que en Telegram</small></h2><button class="x" id="chX" type="button" aria-label="Cerrar">✕</button></header><div id="chMsgs"></div><div id="chChips"></div><form id="chForm" autocomplete="off"><input id="chIn" type="text" placeholder="Escribile al bot…" enterkeyhint="send" maxlength="2000"><button id="chSend" type="submit">Enviar</button></form></div>
+  <div id="chat" role="dialog" aria-modal="false" aria-label="Chat con el bot"><header><h2>Bot VOW<small>Stock, ventas, estrategia y novedades</small></h2><button class="x" id="chX" type="button" aria-label="Cerrar">✕</button></header><div id="chMsgs"></div><div id="chChips"></div><form id="chForm" autocomplete="off"><input id="chIn" type="text" placeholder="Escribile al bot…" enterkeyhint="send" maxlength="2000"><button id="chSend" type="submit">Enviar</button></form></div>
 </div>
 <div id="clave" role="dialog" aria-label="Clave de la oficina"><form id="claveForm" autocomplete="off"><h3>Clave de la oficina</h3><p id="claveMsg"></p><input id="claveIn" type="password" placeholder="Clave" autocomplete="off" autocapitalize="off"><div class="fil"><button type="button" class="sec" id="claveCerrar">Ahora no</button><button type="submit">Entrar</button></div></form></div>
 <div id="toast" role="status"></div>
@@ -1592,7 +1592,7 @@ $('hX').addEventListener('click',cerrarHoja);
 $('bAnotar').addEventListener('click',function(){var f=$('nrap');f.hidden=!f.hidden;if(!f.hidden)$('nrapIn').focus()});
 $('nrap').addEventListener('submit',function(ev){ev.preventDefault();var i=$('nrapIn'),t=i.value.trim();if(!t)return;agregarNota(t,'bot','nota');i.value='';$('nrap').hidden=true});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&panelAbierto)cerrarHoja()});
-/* ================= chat con el bot: la misma charla y la misma memoria que Telegram ================= */
+/* ================= chat con el bot ================= */
 var CH={abierto:false,local:[],enviando:false,error:'',visto:'',sinLeer:0,avisados:0,listo:false,sig:''};
 try{CH.visto=localStorage.getItem('vow_chat_visto')||''}catch(e){}
 function chatVivo(){return (VIVO&&VIVO.chat)||[]}
@@ -1608,12 +1608,11 @@ function itemsChat(){
 }
 function pintarChat(forzar){
   var vivos=chatVivo();
-  if(VIVO&&!CH.listo){CH.listo=true;if(!CH.visto)CH.visto=ultimaEn(vivos);CH.avisados=vivos.filter(function(m){return m.canal==='telegram'&&m.en>CH.visto}).length}
-  var nuevos=vivos.filter(function(m){return m.canal==='telegram'&&m.en&&m.en>CH.visto});
+  if(VIVO&&!CH.listo){CH.listo=true;if(!CH.visto)CH.visto=ultimaEn(vivos);CH.avisados=0}
+  var nuevos=[];
   if(CH.abierto){marcarVisto();nuevos=[]}
   CH.sinLeer=nuevos.length;
   var badge=$('bChatN');badge.textContent=CH.sinLeer>9?'9+':String(CH.sinLeer);badge.hidden=!CH.sinLeer;
-  if(CH.sinLeer>CH.avisados&&CH.listo){var u=nuevos[nuevos.length-1];aviso('Telegram: '+String(u.texto).replace(/\s+/g,' ').slice(0,90),4200)}
   CH.avisados=CH.sinLeer;
   if(!CH.abierto&&!forzar)return;
   var sg=JSON.stringify([vivos.length,ultimaEn(vivos),CH.local.length,CH.enviando,CH.error,conectado,CH.abierto]);
@@ -1621,11 +1620,11 @@ function pintarChat(forzar){
   var box=$('chMsgs'),pegado=!box.childNodes.length||box.scrollHeight-box.scrollTop-box.clientHeight<90;
   box.textContent='';
   var items=itemsChat();
-  if(!items.length&&!CH.enviando){var v=document.createElement('div');v.id='chVacio';v.textContent=conectado==='vivo'?'Escribile lo que necesites: ver el flujo de la semana, consultar el stock, anotar algo. Es el mismo bot de Telegram: lo que hablen acá lo recuerda allá y al revés.':'Sin conexión con el bot. Revisá el aviso de arriba.';box.appendChild(v)}
+  if(!items.length&&!CH.enviando){var v=document.createElement('div');v.id='chVacio';v.textContent=conectado==='vivo'?'Escribile lo que necesites: ver el flujo de la semana, consultar el stock, anotar algo.':'Sin conexión con el bot. Revisá el aviso de arriba.';box.appendChild(v)}
   items.forEach(function(m){
     var b=document.createElement('div');b.className='bub '+(m.rol==='usuario'?'yo':'bot');
     b.appendChild(document.createTextNode(m.texto));
-    var meta=[];if(m.canal==='telegram')meta.push('desde Telegram');var hr=horaChat(m.en);if(hr)meta.push(hr);
+    var meta=[];var hr=horaChat(m.en);if(hr)meta.push(hr);
     if(meta.length){var s=document.createElement('span');s.className='meta';s.textContent=meta.join(' · ');b.appendChild(s)}
     box.appendChild(b);
   });

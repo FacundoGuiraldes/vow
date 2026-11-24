@@ -1,5 +1,4 @@
 // Rutas HTTP del bot y la oficina, todas bajo /api/programacion:
-//   POST /telegram       webhook del bot (lo llama Telegram; se valida con un secreto en el encabezado)
 //   POST /tick           ya no hace nada (antes publicaba): se deja para que un cron viejo no reciba un 404
 //   POST /plan           lo llama el workflow del lunes con el flujo semanal ya armado por los agentes (clave)
 //   GET  /plan/:semana   ¿esa semana ya tiene flujo? (clave)
@@ -33,9 +32,8 @@ export function validarPlanEntrante(cuerpo) {
   return null;
 }
 
-export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOficina = null, secretoWebhook, rendimiento = null, ventas = null, limitePorMinuto = 120, documentosOficina = null }) {
+export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOficina = null, rendimiento = null, ventas = null, limitePorMinuto = 120, documentosOficina = null }) {
   const router = Router();
-  const pendientes = new Set(); // procesamientos del webhook que siguen en curso (los tests los esperan)
   router.use(json({ limit: "256kb" }));
 
   const limitador = rateLimit({ windowMs: 60_000, limit: limitePorMinuto, standardHeaders: true, legacyHeaders: false, message: { error: "Demasiados pedidos." } });
@@ -47,27 +45,6 @@ export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOfic
     if (tipo !== "Bearer" || !clave || !iguales(clave, secretoApi)) return res.status(401).json({ error: "No autorizado." });
     return siguiente();
   };
-
-  router.post("/telegram", async (req, res, siguiente) => {
-    try {
-      if (!secretoWebhook || !iguales(req.headers["x-telegram-bot-api-secret-token"] ?? "", secretoWebhook)) return res.sendStatus(401);
-      const actualizacion = req.body;
-      if (!Number.isInteger(actualizacion?.update_id)) return res.sendStatus(200);
-      // Primero se GUARDA el mensaje y recién después se le contesta OK a Telegram: si el servicio se cae a mitad de camino,
-      // el mensaje queda pendiente y se recupera solo (servicio.recuperarActualizaciones). Un update_id ya visto no se repite.
-      if (!(await repo.registrarActualizacion(actualizacion.update_id, actualizacion))) return res.sendStatus(200);
-      res.sendStatus(200); // se contesta ya: editar con la IA puede tardar más de lo que Telegram espera
-      const trabajo = servicio
-        .manejarActualizacion(actualizacion)
-        // solo se marca si terminó bien: si falló, queda pendiente y se reintenta (hasta 3 veces)
-        .then(() => repo.marcarActualizacionProcesada(actualizacion.update_id))
-        .catch((error) => console.error(`Error en el bot de Telegram (queda pendiente): ${error.message}`));
-      pendientes.add(trabajo);
-      trabajo.finally(() => pendientes.delete(trabajo));
-    } catch (error) {
-      siguiente(error);
-    }
-  });
 
   // Venta propia con Mercado Pago (src/pagos)
   if (ventas) router.use("/ventas", ventas);
@@ -139,6 +116,7 @@ export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOfic
     }
   });
 
+  const pendientes = new Set(); // trabajos en segundo plano que siguen en curso (los tests los esperan)
   const segundoPlano = (trabajo) => {
     pendientes.add(trabajo);
     trabajo.finally(() => pendientes.delete(trabajo));

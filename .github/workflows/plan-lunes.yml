@@ -1,6 +1,6 @@
 name: Plan del lunes
 
-# Todos los lunes a las 8:00 (hora de Argentina) corre los agentes y manda el flujo de la semana (qué se publica cada día y de qué trata) al Telegram de Facundo.
+# Todos los lunes a las 8:00 (hora de Argentina) corre los agentes y guarda el flujo de la semana (qué se publica cada día y de qué trata) en VOW HQ.
 # No publica nada: las publicaciones las hace Facundo.
 # Usa la API de Anthropic (gasta plata, unos centavos de dólar por plan). También se puede lanzar a mano.
 #
@@ -108,7 +108,7 @@ jobs:
           echo "::warning title=Plan sin datos de Instagram::Las cuentas de referencia o @vow_ar no respondieron (casi seguro venció INSTAGRAM_TOKEN). El plan se arma igual, pero sin lo que mejor rindió."
           echo "> **Ojo:** este plan se armó sin datos de Instagram (investigar: ${{ steps.investigar.outcome }}, rendimiento: ${{ steps.rendimiento.outcome }}). Revisá INSTAGRAM_TOKEN." >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Planificar y enviar a Telegram
+      - name: Planificar y guardar en VOW HQ
         run: |
           args=()
           if [ -n "$SEMANA" ]; then args+=(--semana "$SEMANA"); fi

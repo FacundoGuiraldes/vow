@@ -3,7 +3,7 @@
 import { fechaLegible, nombreDelDia, sumarDias } from "./fechas.js";
 
 export const MENSAJES_MAXIMOS_POR_DIA = 80; // freno de uso: el plan gratis tiene cupo diario
-export const TURNOS_DE_MEMORIA = 30; // cuántos mensajes de la charla se recuerdan (la misma charla para Telegram y para el juego)
+export const TURNOS_DE_MEMORIA = 30; // cuántos mensajes de la charla se recuerdan
 export const LARGO_MAXIMO_RECUERDO = 1500;
 
 export const HERRAMIENTAS_CHAT = [
@@ -86,7 +86,7 @@ export function calendario(hoy, dias = 15) {
 }
 
 export function construirSistemaChat({ fecha, hora }) {
-  return `Sos el asistente de Facundo para la operación de VOW (@vow_ar), una marca argentina de ropa y accesorios para entrenar. Hablás con él por Telegram y también por el juego VOW HQ (la oficina en la web): es la MISMA charla, con la misma memoria. Los mensajes que vienen del juego empiezan con «[Mensaje escrito en el juego VOW HQ]». Lo que acordaron en un lado vale en el otro.
+  return `Sos el asistente de Facundo para la operación de VOW (@vow_ar), una marca argentina de ropa y accesorios para entrenar. Hablás con él por el juego VOW HQ (la oficina en la web).
 
 Cómo hablás: en español rioplatense (voseo), claro, cálido y breve. Texto plano: sin Markdown, sin asteriscos ni títulos. Respuestas cortas, de pocas líneas. Si algo es ambiguo, preguntá antes de cambiar.
 

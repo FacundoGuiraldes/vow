@@ -43,7 +43,7 @@ describe("la oficina", () => {
     assert.equal(estado.flujo[0].dias[0].formato, "reel");
     assert.equal(estado.piezas, undefined);
     assert.equal(estado.chat.length, 20);
-    assert.equal(estado.chat[0].canal, "telegram");
+    assert.equal(estado.chat[0].canal, "juego");
     assert.equal(estado.rendimiento.totales.alcance, 5);
     const roto = await armarEstadoOficina({ repo: e.repo, rendimiento: { obtener: async () => { throw new Error("token vencido"); } } });
     assert.equal(roto.rendimiento.error, "token vencido");

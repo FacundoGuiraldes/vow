@@ -76,7 +76,7 @@ test("--sin-enviar arma el plan pero no lo manda", async () => {
   assert.equal(servicio.pedidos.length, 0);
 });
 
-test("si el plan no pasa las reglas, se lo avisa a Facundo por Telegram y termina con error", async () => {
+test("si el plan no pasa las reglas, se lo avisa al servicio y termina con error", async () => {
   const servicio = servicioFalso();
   const clienteMalo = { messages: { create: async () => ({ usage: {}, stop_reason: "tool_use", content: [{ type: "tool_use", name: "proponer_flujo", input: { dias: [] } }] }) } };
   await assert.rejects(

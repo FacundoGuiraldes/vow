@@ -19,22 +19,6 @@ function contrato(nombre, crear, { saltear = false, alTerminar = async () => {} 
     });
     after(alTerminar);
 
-    test("la bandeja de Telegram guarda cada actualización una vez y permite recuperar las que no se terminaron", async () => {
-      const id = 900_000_000 + (process.pid % 1000);
-      assert.equal(await repo.registrarActualizacion(id, { update_id: id, message: { text: "a" } }), true);
-      assert.equal(await repo.registrarActualizacion(id, { update_id: id }), false);
-      const futuro = new Date(Date.now() + 3_600_000);
-      // recién registrada: todavía no toca reintentarla
-      assert.equal((await repo.reclamarActualizacionesPendientes({ antesDe: new Date(Date.now() - 3_600_000) })).filter((x) => x.id === id).length, 0);
-      const primera = await repo.reclamarActualizacionesPendientes({ antesDe: futuro });
-      assert.deepEqual(primera.filter((x) => x.id === id).map((x) => x.cuerpo.message.text), ["a"]);
-      // reclamarla la marca como "en intento": otro reclamo inmediato no la devuelve de nuevo
-      assert.equal((await repo.reclamarActualizacionesPendientes({ antesDe: new Date(Date.now() - 3_600_000) })).filter((x) => x.id === id).length, 0);
-      await repo.marcarActualizacionProcesada(id);
-      assert.equal((await repo.reclamarActualizacionesPendientes({ antesDe: new Date(Date.now() + 3_600_000) })).filter((x) => x.id === id).length, 0);
-      await repo.borrarActualizacionesViejas(new Date(Date.now() + 3_600_000));
-    });
-
     test("estado del bot: leer, guardar y tomar una sola vez", async () => {
       const clave = `${prefijo}-clave`;
       assert.equal(await repo.leerEstado(clave), null);
@@ -81,7 +65,6 @@ contrato(
     alTerminar: async () => {
       if (!pool) return;
       await pool.query("DELETE FROM bot_estado WHERE clave LIKE $1", [`${prefijo}%`]);
-      await pool.query("DELETE FROM telegram_pendientes WHERE clave LIKE '%tg:9000%'");
       await pool.query("DELETE FROM novedades WHERE texto LIKE $1", [`${prefijo}%`]);
       await pool.end();
     },

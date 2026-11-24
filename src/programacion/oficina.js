@@ -54,7 +54,7 @@ export async function armarEstadoOficina({ repo, servicio = null, rendimiento = 
     generado: new Date(ahora).toISOString(),
     flujo,
     novedades: novedades.map((n) => ({ id: n.id, fecha: n.fecha, texto: recortar(n.texto, 240), usada: n.usada === true })),
-    chat: (Array.isArray(chat) ? chat : []).slice(-30).map((m) => ({ rol: m.rol, texto: recortar(m.visible ?? m.texto, 1500), canal: m.canal ?? "telegram", en: m.en ?? null })),
+    chat: (Array.isArray(chat) ? chat : []).slice(-30).map((m) => ({ rol: m.rol, texto: recortar(m.visible ?? m.texto, 1500), canal: m.canal ?? "juego", en: m.en ?? null })),
     juego,
     operacion,
     estrategia_semana: vistaEstrategia(operacion.estrategia, lineas, lunesDe(hoy)),
@@ -72,7 +72,7 @@ export async function aplicarAccion(deps, accion, ahora = Date.now()) {
   const en = new Date(ahora).toISOString();
   const tipo = accion?.accion;
 
-  // El chat del juego es el mismo bot y la misma memoria que Telegram
+  // El chat del juego
   if (tipo === "chat") {
     const texto = typeof accion.texto === "string" ? accion.texto.trim() : "";
     if (!texto) throw new ErrorAccion("Escribí un mensaje.");

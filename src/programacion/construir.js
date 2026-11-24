@@ -1,4 +1,4 @@
-// Arma el servicio del bot de Telegram y la oficina con la configuración del entorno (Render).
+// Arma el servicio de la oficina (VOW HQ y su chat) con la configuración del entorno (Render).
 // Si falta alguna variable obligatoria, no se monta nada: la API sigue funcionando igual y el log dice qué falta.
 import { crearClienteMeta } from "../mcp/instagram/api.js";
 import { crearLLMGemini } from "./llm-gemini.js";
@@ -12,16 +12,14 @@ import { crearRutasVentas } from "../pagos/rutas.js";
 import { crearArrepentimientos } from "../pagos/arrepentimiento.js";
 import { crearRutasProgramacion } from "./rutas.js";
 import { crearServicio } from "./servicio.js";
-import { crearClienteTelegram } from "./telegram.js";
 
-export const VARIABLES_OBLIGATORIAS = ["TELEGRAM_TOKEN", "TELEGRAM_CHAT_ID", "TELEGRAM_WEBHOOK_SECRETO", "PROGRAMACION_SECRETO", "URL_PUBLICA"];
+export const VARIABLES_OBLIGATORIAS = ["PROGRAMACION_SECRETO", "URL_PUBLICA"];
 
 export async function construirProgramacion({ pool, env = process.env, fetchFn = fetch } = {}) {
   const faltan = VARIABLES_OBLIGATORIAS.filter((nombre) => !env[nombre]);
   if (faltan.length) return { router: null, faltan };
 
   const repo = crearRepositorio(pool);
-  const telegram = crearClienteTelegram({ token: env.TELEGRAM_TOKEN, chatId: env.TELEGRAM_CHAT_ID, fetchFn });
   // Instagram solo se lee (rendimiento para el juego): el sistema no publica
   const meta = env.INSTAGRAM_TOKEN && env.INSTAGRAM_USER_ID ? crearClienteMeta({ token: env.INSTAGRAM_TOKEN, idCuenta: env.INSTAGRAM_USER_ID, fetchFn }) : null;
 
@@ -49,23 +47,25 @@ export async function construirProgramacion({ pool, env = process.env, fetchFn =
       ? pool.query("SELECT 1 FROM lista_espera WHERE email = $1 AND creado_en < $2", [email, corte])
       : pool.query("SELECT 1 FROM lista_espera WHERE email = $1", [email]))).rowCount > 0, porcentaje, dias });
   }
-  if (configValida && env.MAIL_USUARIO && (porApi || env.MAIL_CLAVE_APP) && env.URL_LANDING) {
+  // Por la API de Google si están las claves (funciona en Render gratis); si no, SMTP con contraseña de aplicación (Render gratis lo bloquea)
+  const hayCorreo = Boolean(env.MAIL_USUARIO && (porApi || env.MAIL_CLAVE_APP));
+  const correo = !hayCorreo ? null : porApi
+    ? crearTransporteGmailApi({ usuario: env.MAIL_USUARIO, clientId: env.GMAIL_CLIENT_ID, clientSecret: env.GMAIL_CLIENT_SECRET, refreshToken: env.GMAIL_REFRESH_TOKEN, fetchFn })
+    : crearTransporteGmail({ usuario: env.MAIL_USUARIO, clave: env.MAIL_CLAVE_APP });
+  if (configValida && correo && env.URL_LANDING) {
     descuentos = crearEnvioDescuentos({
       codigos,
       listarEmails: async () => (await (soloAntesDelCorte
         ? pool.query("SELECT email FROM lista_espera WHERE creado_en < $1 ORDER BY id", [corte])
         : pool.query("SELECT email FROM lista_espera ORDER BY id"))).rows.map((r) => r.email),
-      // Por la API de Google si están las claves (funciona en Render gratis); si no, SMTP con contraseña de aplicación (Render gratis lo bloquea)
-      correo: porApi
-        ? crearTransporteGmailApi({ usuario: env.MAIL_USUARIO, clientId: env.GMAIL_CLIENT_ID, clientSecret: env.GMAIL_CLIENT_SECRET, refreshToken: env.GMAIL_REFRESH_TOKEN, fetchFn })
-        : crearTransporteGmail({ usuario: env.MAIL_USUARIO, clave: env.MAIL_CLAVE_APP }),
+      correo,
       porcentaje,
       dias,
       urlLanding: env.URL_LANDING.replace(/\/$/, ""),
     });
   }
 
-  const servicio = crearServicio({ repo, telegram, llm, descuentos });
+  const servicio = crearServicio({ repo, llm, descuentos });
   // Venta propia con Mercado Pago: con las claves puestas se arma, pero no se abre hasta que VENTA_ABIERTA sea "1"
   let ventas = null;
   if (env.MERCADOPAGO_ACCESS_TOKEN && env.MERCADOPAGO_WEBHOOK_SECRETO && env.URL_LANDING) {
@@ -77,14 +77,20 @@ export async function construirProgramacion({ pool, env = process.env, fetchFn =
       ventaAbierta: env.VENTA_ABIERTA === "1",
       codigos,
       consultaCodigo,
-      arrepentimientos: crearArrepentimientos({ repo, avisar: (texto) => telegram.enviarMensaje(texto) }),
+      arrepentimientos: crearArrepentimientos({
+        repo,
+        // Se avisa a VOW por mail (a la propia cuenta de VOW); sin correo configurado queda el registro en la base y el aviso en el log
+        avisar: async (texto) => {
+          if (!correo) return console.warn(`Arrepentimiento registrado (sin correo configurado para avisar): ${texto.replace(/\n/g, " | ")}`);
+          const escapado = texto.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/\n/g, "<br>");
+          await correo.enviar({ para: env.MAIL_USUARIO, asunto: "Botón de arrepentimiento: hay un pedido nuevo", html: `<p>${escapado}</p>`, texto });
+        },
+      }),
       cotizarEnvio: Number.isInteger(costoFijo) && costoFijo > 0 ? async () => ({ costo: costoFijo, servicio: "Correo Argentino" }) : null,
       urlPublica: env.URL_PUBLICA.replace(/\/$/, ""),
       urlLanding: env.URL_LANDING.replace(/\/$/, ""),
     });
   }
-  const router = crearRutasProgramacion({ servicio, repo, ventas, secretoApi: env.PROGRAMACION_SECRETO, secretoOficina: env.OFICINA_SECRETO || null, secretoWebhook: env.TELEGRAM_WEBHOOK_SECRETO, rendimiento: meta ? crearRendimientoJuego({ meta }) : null });
-  // Al arrancar se revisa la bandeja de Telegram (un poco después, para no pisar a la copia anterior mientras termina de cerrar)
-  setTimeout(() => servicio.recuperarActualizaciones().catch((error) => console.error(`No se pudo revisar la bandeja de Telegram: ${error.message}`)), 90_000).unref();
-  return { router, servicio, telegram, chatConIA: llm !== null };
+  const router = crearRutasProgramacion({ servicio, repo, ventas, secretoApi: env.PROGRAMACION_SECRETO, secretoOficina: env.OFICINA_SECRETO || null, rendimiento: meta ? crearRendimientoJuego({ meta }) : null });
+  return { router, servicio, chatConIA: llm !== null };
 }

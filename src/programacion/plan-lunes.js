@@ -1,10 +1,10 @@
-// Flujo de los lunes: corre los agentes (Estratega y Revisor) y le manda el flujo de la semana (día, formato y contenido) al bot de Telegram.
+// Flujo de los lunes: corre los agentes (Estratega y Revisor) y le manda el flujo de la semana (día, formato y contenido) a la API, que lo guarda para VOW HQ.
 // Lo ejecuta el workflow "Plan del lunes" (npm run plan:lunes). El bot no publica nada: Facundo hace cada publicación.
 //
 //   npm run plan:lunes                          planifica la semana de hoy (o la próxima, si hoy no es lunes) y la envía
 //   npm run plan:lunes -- --semana 2026-11-02   una semana puntual
 //   npm run plan:lunes -- --forzar              arma el plan aunque la semana ya tenga uno
-//   npm run plan:lunes -- --simulado            sin gastar plata: usa el plan de ejemplo y lo muestra (nunca lo manda a Telegram)
+//   npm run plan:lunes -- --simulado            sin gastar plata: usa el plan de ejemplo y lo muestra (nunca lo manda a la API)
 //   npm run plan:lunes -- --sin-enviar          arma el plan con la IA real y lo muestra, sin mandarlo
 import "dotenv/config";
 import { fileURLToPath } from "node:url";
@@ -19,7 +19,7 @@ export const INTENTOS_DEL_PLAN = 3;
 
 export function opcionesDelPlan({ valores, hoy, novedades = [], foco = "", notasEstrategia = "" }) {
   const semana = valores.semana ?? lunesDe(hoy, { siguiente: true });
-  const notasDeNovedades = novedades.length ? `Novedades que Facundo te pasó por Telegram (tomalas como ciertas): ${novedades.map((n) => n.texto).join(" | ")}` : "";
+  const notasDeNovedades = novedades.length ? `Novedades que Facundo te pasó por el chat de VOW HQ (tomalas como ciertas): ${novedades.map((n) => n.texto).join(" | ")}` : "";
   const notasDelJuego = [foco && `FOCO DE LA SEMANA que fijó Facundo (el flujo gira alrededor de esto): ${foco}`, notasEstrategia && `Notas de estrategia de Facundo: ${notasEstrategia}`].filter(Boolean).join("\n");
   return {
     semana,
@@ -63,7 +63,7 @@ export async function correrPlanDelLunes({
   fetchFn = fetch,
   crearCliente = (origen) => crearClienteReal(origen), // se inyecta en los tests para no gastar
 }) {
-  // Una corrida simulada nunca toca el servicio real: no llena el Telegram de Facundo con un plan de ejemplo
+  // Una corrida simulada nunca toca el servicio real: no guarda un plan de ejemplo en la base real
   const valores = pedidos.simulado ? { ...pedidos, "sin-enviar": true } : pedidos;
   const puedeHablarConElServicio = Boolean(env.URL_PUBLICA && env.PROGRAMACION_SECRETO) && !valores.simulado;
   let novedades = [];
@@ -124,7 +124,7 @@ export async function correrPlanDelLunes({
     env,
     fetchFn,
   });
-  log(`Flujo enviado a Telegram: ${respuesta.publicaciones} ${respuesta.publicaciones === 1 ? "publicación" : "publicaciones"}.`);
+  log(`Flujo guardado en VOW HQ: ${respuesta.publicaciones} ${respuesta.publicaciones === 1 ? "publicación" : "publicaciones"}.`);
   return { plan, enviado: true };
 }
 

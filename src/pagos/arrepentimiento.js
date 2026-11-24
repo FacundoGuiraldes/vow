@@ -1,6 +1,6 @@
 // Botón de arrepentimiento (Resolución 424/2020 de la Secretaría de Comercio Interior; art. 34 de la Ley 24.240).
 // Quien compró por la web pide revocar la compra sin registrarse ni hacer otro trámite. Se le da un código de arrepentimiento
-// en el mismo momento y por el mismo medio (dentro del plazo de 24 horas que pide la norma) y se avisa a VOW por Telegram.
+// en el mismo momento y por el mismo medio (dentro del plazo de 24 horas que pide la norma) y se avisa a VOW (por mail).
 import { randomInt } from "node:crypto";
 
 const CLAVE = "arrepentimientos";
@@ -45,7 +45,7 @@ export function crearArrepentimientos({ repo, avisar = null, ahora = () => Date.
         try {
           await avisar(`Botón de arrepentimiento\nCódigo: ${registro.codigo}\nNombre: ${registro.nombre}\nMail: ${registro.email}\nPedido: ${registro.pedido ?? "no indicó"}\nHay que contestarle y coordinar la devolución.`);
         } catch (error) {
-          console.error(`No se pudo avisar por Telegram del arrepentimiento ${registro.codigo}: ${error.message}`);
+          console.error(`No se pudo avisar del arrepentimiento ${registro.codigo}: ${error.message}`);
         }
       }
       return { codigo: registro.codigo, fecha: registro.fecha };

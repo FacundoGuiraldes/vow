@@ -472,7 +472,7 @@ $('hX').addEventListener('click',cerrarHoja);
 $('bAnotar').addEventListener('click',function(){var f=$('nrap');f.hidden=!f.hidden;if(!f.hidden)$('nrapIn').focus()});
 $('nrap').addEventListener('submit',function(ev){ev.preventDefault();var i=$('nrapIn'),t=i.value.trim();if(!t)return;agregarNota(t,'bot','nota');i.value='';$('nrap').hidden=true});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&panelAbierto)cerrarHoja()});
-/* ================= chat con el bot: la misma charla y la misma memoria que Telegram ================= */
+/* ================= chat con el bot ================= */
 var CH={abierto:false,local:[],enviando:false,error:'',visto:'',sinLeer:0,avisados:0,listo:false,sig:''};
 try{CH.visto=localStorage.getItem('vow_chat_visto')||''}catch(e){}
 function chatVivo(){return (VIVO&&VIVO.chat)||[]}
@@ -488,12 +488,11 @@ function itemsChat(){
 }
 function pintarChat(forzar){
   var vivos=chatVivo();
-  if(VIVO&&!CH.listo){CH.listo=true;if(!CH.visto)CH.visto=ultimaEn(vivos);CH.avisados=vivos.filter(function(m){return m.canal==='telegram'&&m.en>CH.visto}).length}
-  var nuevos=vivos.filter(function(m){return m.canal==='telegram'&&m.en&&m.en>CH.visto});
+  if(VIVO&&!CH.listo){CH.listo=true;if(!CH.visto)CH.visto=ultimaEn(vivos);CH.avisados=0}
+  var nuevos=[];
   if(CH.abierto){marcarVisto();nuevos=[]}
   CH.sinLeer=nuevos.length;
   var badge=$('bChatN');badge.textContent=CH.sinLeer>9?'9+':String(CH.sinLeer);badge.hidden=!CH.sinLeer;
-  if(CH.sinLeer>CH.avisados&&CH.listo){var u=nuevos[nuevos.length-1];aviso('Telegram: '+String(u.texto).replace(/\s+/g,' ').slice(0,90),4200)}
   CH.avisados=CH.sinLeer;
   if(!CH.abierto&&!forzar)return;
   var sg=JSON.stringify([vivos.length,ultimaEn(vivos),CH.local.length,CH.enviando,CH.error,conectado,CH.abierto]);
@@ -501,11 +500,11 @@ function pintarChat(forzar){
   var box=$('chMsgs'),pegado=!box.childNodes.length||box.scrollHeight-box.scrollTop-box.clientHeight<90;
   box.textContent='';
   var items=itemsChat();
-  if(!items.length&&!CH.enviando){var v=document.createElement('div');v.id='chVacio';v.textContent=conectado==='vivo'?'Escribile lo que necesites: ver el flujo de la semana, consultar el stock, anotar algo. Es el mismo bot de Telegram: lo que hablen acá lo recuerda allá y al revés.':'Sin conexión con el bot. Revisá el aviso de arriba.';box.appendChild(v)}
+  if(!items.length&&!CH.enviando){var v=document.createElement('div');v.id='chVacio';v.textContent=conectado==='vivo'?'Escribile lo que necesites: ver el flujo de la semana, consultar el stock, anotar algo.':'Sin conexión con el bot. Revisá el aviso de arriba.';box.appendChild(v)}
   items.forEach(function(m){
     var b=document.createElement('div');b.className='bub '+(m.rol==='usuario'?'yo':'bot');
     b.appendChild(document.createTextNode(m.texto));
-    var meta=[];if(m.canal==='telegram')meta.push('desde Telegram');var hr=horaChat(m.en);if(hr)meta.push(hr);
+    var meta=[];var hr=horaChat(m.en);if(hr)meta.push(hr);
     if(meta.length){var s=document.createElement('span');s.className='meta';s.textContent=meta.join(' · ');b.appendChild(s)}
     box.appendChild(b);
   });

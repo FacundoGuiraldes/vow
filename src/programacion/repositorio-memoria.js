@@ -3,29 +3,11 @@ const copiar = (valor) => (valor === null || valor === undefined ? valor : struc
 
 export function crearRepositorioMemoria() {
   const estado = new Map();
-  const bandeja = new Map(); // mensajes de Telegram recibidos: id → { cuerpo, intento_en, intentos, procesada }
   let novedades = [];
   const ids = { novedad: 1 };
 
   return {
     async leerEstado(clave) { return estado.has(clave) ? copiar(estado.get(clave)) : null; },
-    async registrarActualizacion(id, cuerpo) {
-      if (bandeja.has(id)) return false;
-      bandeja.set(id, { cuerpo: copiar(cuerpo), intento_en: Date.now(), intentos: 1, procesada: null });
-      return true;
-    },
-    async marcarActualizacionProcesada(id) { const f = bandeja.get(id); if (f) f.procesada = Date.now(); },
-    async reclamarActualizacionesPendientes({ antesDe, maximo = 3 }) {
-      const limite = new Date(antesDe).getTime(), salida = [];
-      for (const [id, f] of bandeja) {
-        if (f.procesada === null && f.intento_en < limite && f.intentos < maximo) { f.intento_en = Date.now(); f.intentos += 1; salida.push({ id, cuerpo: copiar(f.cuerpo) }); }
-      }
-      return salida;
-    },
-    async borrarActualizacionesViejas(antesDe) {
-      const limite = new Date(antesDe).getTime();
-      for (const [id, f] of bandeja) if (f.procesada !== null && f.procesada < limite) bandeja.delete(id);
-    },
     async guardarEstado(clave, valor) { estado.set(clave, copiar(valor)); },
     async tomarEstado(clave, valor) {
       if (estado.has(clave) && JSON.stringify(estado.get(clave)) === JSON.stringify(valor)) return false;

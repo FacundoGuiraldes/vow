@@ -14,12 +14,12 @@ Guía viva del lanzamiento: qué está listo, qué falta y en qué orden se hace
 | Código de descuento de la lista de espera | Terminado: 10 %, un solo uso, personal, vence a los `DESCUENTO_LISTA_DIAS` días (14) de generado. Cada código pertenece a un drop. |
 | Mail con el código | Terminado, por la API de Gmail desde la cuenta de VOW. Técnicamente perfecto (10/10 en mail-tester), pero **cae en spam** porque el remitente es nuevo. |
 | "Consultá tu código" en la tienda | Terminado: quien se anotó escribe su mail y ve su código sin depender del mail. Solo funciona con la venta abierta. |
-| Instagram | El sistema ya **no publica**: el bot de Telegram manda el flujo semanal (día, formato y de qué trata) y Facundo publica a mano. |
+| Instagram | El sistema ya **no publica**: VOW HQ muestra el flujo semanal (día, formato y de qué trata) y Facundo publica a mano. |
 | Envío | Por ahora retiro en persona o costo fijo (`ENVIO_COSTO_FIJO`). Cotización automática con MiCorreo pendiente. |
 
 ## Cómo funcionan los códigos
 
-- **Drop 00:** toda persona anotada en la lista de espera hasta el lanzamiento recibe un código del 10 % válido solo en el Drop 00. Lo recibe por mail (lo dispara Facundo a mano desde el bot de Telegram) o lo ve en "Consultá tu código".
+- **Drop 00:** toda persona anotada en la lista de espera hasta el lanzamiento recibe un código del 10 % válido solo en el Drop 00. Lo recibe por mail (lo dispara Facundo a mano desde el chat de VOW HQ) o lo ve en "Consultá tu código".
 - **Drop 01:** como agradecimiento, esas mismas personas (las anotadas **antes** del lanzamiento del 00) reciben un código nuevo del 10 % válido solo en el Drop 01. El código del 00 deja de servir en ese momento, se haya usado o no. Quien se anote después del lanzamiento del 00 no recibe código del 01.
 - **No acumulables:** cada persona tiene un solo código por drop y el pedido admite un único código.
 - **Para pasar al Drop 01:** en Render se cambia `DROP_ACTUAL=01` y se carga `LISTA_CORTE` con la fecha de lanzamiento del Drop 00 (por ejemplo `2026-11-14T00:00:00-03:00`, en hora de Argentina). Sin `LISTA_CORTE`, los códigos quedan apagados y el log lo avisa.
@@ -41,7 +41,7 @@ Pendientes que bloquean o conviene cerrar antes de vender:
 1. Revisar que el último deploy de Render diga "Live" y que `GET /api/programacion/ventas/estado` responda `{"abierta":false}` (con la venta cerrada solo muestra eso).
 2. Poner `VENTA_ABIERTA=1` en Render. El servicio se reinicia solo.
 3. Probar "Consultá tu código" con un mail propio que esté en la lista. Tiene que mostrar el código y el campo de la tienda lo tiene que aceptar.
-4. Mandar los mails desde el bot de Telegram en tandas chicas (5 a 10 personas): `ver`, después `enviar` confirmando la cantidad. La respuesta de cada mail se mira antes de seguir con más.
+4. Mandar los mails desde el chat de VOW HQ en tandas chicas (5 a 10 personas): `ver`, después `enviar` confirmando la cantidad. La respuesta de cada mail se mira antes de seguir con más.
 5. Avisar en Instagram que los anotados tienen un 10 % y que lo pueden consultar en la tienda con el mail con el que se anotaron. Así nadie depende de que el mail llegue a la bandeja.
 6. Anotar la fecha y hora del lanzamiento: es el `LISTA_CORTE` del Drop 01.
 

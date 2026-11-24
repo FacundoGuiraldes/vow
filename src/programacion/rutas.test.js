@@ -7,16 +7,14 @@ import { crearRutasProgramacion, validarPlanEntrante } from "./rutas.js";
 import { crearDia, crearPlan } from "./ayuda-pruebas.js";
 
 const CLAVE = "clave-de-la-api-de-prueba";
-const SECRETO_WEBHOOK = "secreto-del-webhook-1234";
 
 const levantar = (app) => new Promise((resolver) => { const i = app.listen(0, "127.0.0.1", () => resolver(i)); });
 const cerrar = (i) => new Promise((resolver) => { i.closeAllConnections(); i.close(resolver); });
 
-describe("rutas de la publicación programada", () => {
+describe("rutas de la oficina", () => {
   const repo = crearRepositorioMemoria();
-  const llamadas = { actualizaciones: [], planes: [], fallos: [] };
+  const llamadas = { planes: [], fallos: [] };
   const servicio = {
-    manejarActualizacion: async (u) => { llamadas.actualizaciones.push(u); },
     recibirPlan: async (p) => { llamadas.planes.push(p); return { publicaciones: p.plan.dias.length }; },
     flujosVigentes: async () => [],
     leerFlujo: async (semana) => (semana === "2026-12-08" ? { dias: [crearDia()] } : null),
@@ -27,7 +25,7 @@ describe("rutas de la publicación programada", () => {
   let base;
 
   before(async () => {
-    router = crearRutasProgramacion({ servicio, repo, secretoApi: CLAVE, secretoWebhook: SECRETO_WEBHOOK });
+    router = crearRutasProgramacion({ servicio, repo, secretoApi: CLAVE });
     const app = express();
     app.use("/api/programacion", router);
     servidor = await levantar(app);
@@ -42,49 +40,6 @@ describe("rutas de la publicación programada", () => {
       body: cuerpo ? JSON.stringify(cuerpo) : undefined,
     });
 
-  test("el webhook de Telegram rechaza un secreto equivocado o ausente", async () => {
-    const mal = await pedir("/telegram", { metodo: "POST", cuerpo: { update_id: 1 }, encabezados: { "X-Telegram-Bot-Api-Secret-Token": "otro" } });
-    const sin = await pedir("/telegram", { metodo: "POST", cuerpo: { update_id: 1 } });
-    assert.equal(mal.status, 401);
-    assert.equal(sin.status, 401);
-    assert.equal(llamadas.actualizaciones.length, 0);
-  });
-
-  test("el webhook procesa cada actualización una sola vez, aunque Telegram la reenvíe", async () => {
-    const encabezados = { "X-Telegram-Bot-Api-Secret-Token": SECRETO_WEBHOOK };
-    const u = { update_id: 10, message: { text: "hola" } };
-    assert.equal((await pedir("/telegram", { metodo: "POST", cuerpo: u, encabezados })).status, 200);
-    assert.equal((await pedir("/telegram", { metodo: "POST", cuerpo: u, encabezados })).status, 200);
-    await router.esperarPendientes();
-    assert.equal(llamadas.actualizaciones.filter((x) => x.update_id === 10).length, 1);
-
-  });
-
-  test("el webhook guarda la actualización antes de contestar y, si el procesamiento se cae, queda pendiente para recuperarla", async () => {
-    const encabezados = { "X-Telegram-Bot-Api-Secret-Token": SECRETO_WEBHOOK };
-    const u = { update_id: 11, message: { text: "se cae" } };
-    const original = servicio.manejarActualizacion;
-    servicio.manejarActualizacion = async () => { throw new Error("se reinició el servidor"); };
-    try {
-      assert.equal((await pedir("/telegram", { metodo: "POST", cuerpo: u, encabezados })).status, 200);
-      await router.esperarPendientes();
-    } finally {
-      servicio.manejarActualizacion = original;
-    }
-    // quedó guardada y sin marcar: se puede reclamar para reintentarla
-    const reclamadas = await repo.reclamarActualizacionesPendientes({ antesDe: new Date(Date.now() + 1000) });
-    assert.deepEqual(reclamadas.map((x) => x.id), [11]);
-    assert.equal(reclamadas[0].cuerpo.message.text, "se cae");
-  });
-
-  test("el webhook ignora lo que no trae un update_id entero", async () => {
-    const encabezados = { "X-Telegram-Bot-Api-Secret-Token": SECRETO_WEBHOOK };
-    const antes = llamadas.actualizaciones.length;
-    assert.equal((await pedir("/telegram", { metodo: "POST", cuerpo: { message: {} }, encabezados })).status, 200);
-    await router.esperarPendientes();
-    assert.equal(llamadas.actualizaciones.length, antes);
-  });
-
   test("/tick exige la clave y ya no hace nada", async () => {
     assert.equal((await pedir("/tick", { metodo: "POST" })).status, 401);
     assert.equal((await pedir("/tick", { metodo: "POST", clave: "mala" })).status, 401);
@@ -95,7 +50,7 @@ describe("rutas de la publicación programada", () => {
 
   test("sin PROGRAMACION_SECRETO configurado, las rutas con clave quedan cerradas (503), nunca abiertas", async () => {
     const app = express();
-    app.use("/api/programacion", crearRutasProgramacion({ servicio, repo, secretoApi: "", secretoWebhook: SECRETO_WEBHOOK }));
+    app.use("/api/programacion", crearRutasProgramacion({ servicio, repo, secretoApi: "" }));
     const otro = await levantar(app);
     try {
       const r = await fetch(`http://127.0.0.1:${otro.address().port}/api/programacion/tick`, { method: "POST" });
@@ -141,7 +96,7 @@ describe("rutas de la publicación programada", () => {
     const cuerpo = await r.json();
     assert.ok(Array.isArray(cuerpo.flujo) && Array.isArray(cuerpo.novedades));
     assert.equal(cuerpo.piezas, undefined);
-    assert.deepEqual(cuerpo.chat.at(-1), { rol: "usuario", texto: "cambiá el foco", canal: "telegram", en: null });
+    assert.deepEqual(cuerpo.chat.at(-1), { rol: "usuario", texto: "cambiá el foco", canal: "juego", en: null });
 
     assert.equal((await pedir("/oficina/accion", { metodo: "POST", cuerpo: { accion: "nota", texto: "x" } })).status, 401);
     const nota = await pedir("/oficina/accion", { metodo: "POST", clave: CLAVE, cuerpo: { accion: "nota", clave: "n1", texto: "Ojo con la luz", tipo: "anotacion" } });
@@ -152,7 +107,7 @@ describe("rutas de la publicación programada", () => {
 
   test("la oficina también entra con su propia clave, y esa clave no sirve para el resto", async () => {
     const aparte = express();
-    aparte.use("/api/programacion", crearRutasProgramacion({ servicio, repo, secretoApi: CLAVE, secretoOficina: "clave-de-la-oficina", secretoWebhook: SECRETO_WEBHOOK }));
+    aparte.use("/api/programacion", crearRutasProgramacion({ servicio, repo, secretoApi: CLAVE, secretoOficina: "clave-de-la-oficina" }));
     const i = await levantar(aparte);
     try {
       const url = `http://127.0.0.1:${i.address().port}/api/programacion`;
@@ -192,7 +147,7 @@ describe("dentro de la API de VOW", () => {
   test("el router va antes del parser de 10 kb y el resto de la API conserva su límite", async () => {
     const llamadas = [];
     const servicio = { recibirPlan: async (p) => { llamadas.push(p); return { publicaciones: 1 }; } };
-    const router = crearRutasProgramacion({ servicio, repo: crearRepositorioMemoria(), secretoApi: CLAVE, secretoWebhook: SECRETO_WEBHOOK });
+    const router = crearRutasProgramacion({ servicio, repo: crearRepositorioMemoria(), secretoApi: CLAVE });
     const app = crearApp({ pool: null, origenesPermitidos: [], programacion: router });
     const servidor = await levantar(app);
     const url = `http://127.0.0.1:${servidor.address().port}`;
