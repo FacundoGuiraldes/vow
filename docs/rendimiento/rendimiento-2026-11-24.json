@@ -1,0 +1,266 @@
+{
+  "fecha": "2026-11-24",
+  "cuenta": {
+    "usuario": "vow_ar",
+    "seguidores": 405,
+    "seguidos": 140
+  },
+  "referencias": [
+    "Fuark",
+    "Gymshark",
+    "YoungLA",
+    "Darcsport",
+    "Vanquish Fitness",
+    "Fitnesas",
+    "PRO ONE",
+    "Blat Balance"
+  ],
+  "porTipo": {
+    "reel": {
+      "cantidad": 2,
+      "medianaReaccionesPorSeguidor": 0.06666666666666667,
+      "medianaVistasPorSeguidor": 2.31358024691358,
+      "medianaAlcancePorSeguidor": 1.4962962962962965,
+      "medianaInteraccionesPorAlcance": 0.04908994863344464,
+      "medianaEnviosPorAlcance": 0,
+      "guardados": 0,
+      "compartidos": 0
+    },
+    "carrusel": {
+      "cantidad": 1,
+      "medianaReaccionesPorSeguidor": 0.14814814814814814,
+      "medianaVistasPorSeguidor": 3.6271604938271604,
+      "medianaAlcancePorSeguidor": 2.3728395061728396,
+      "medianaInteraccionesPorAlcance": 0.06451612903225806,
+      "medianaEnviosPorAlcance": 0,
+      "guardados": 0,
+      "compartidos": 0
+    }
+  },
+  "referenciasPorTipo": {
+    "carrusel": {
+      "cuentas": 8,
+      "medianaReaccionesPorSeguidor": 0.0014818116744417871,
+      "medianaVistasPorSeguidor": null
+    },
+    "reel": {
+      "cuentas": 8,
+      "medianaReaccionesPorSeguidor": 0.0003672333908301381,
+      "medianaVistasPorSeguidor": 0.04520292337150449
+    },
+    "imagen": {
+      "cuentas": 5,
+      "medianaReaccionesPorSeguidor": 0.00040685321640070523,
+      "medianaVistasPorSeguidor": null
+    }
+  },
+  "comparacion": [
+    {
+      "tipo": "reel",
+      "medida": "reacciones por seguidor",
+      "cantidad": 2,
+      "vow": 0.06666666666666667,
+      "referencias": 0.0003672333908301381,
+      "veredicto": "muestra muy chica"
+    },
+    {
+      "tipo": "reel",
+      "medida": "vistas por seguidor",
+      "cantidad": 2,
+      "vow": 2.31358024691358,
+      "referencias": 0.04520292337150449,
+      "veredicto": "muestra muy chica"
+    },
+    {
+      "tipo": "carrusel",
+      "medida": "reacciones por seguidor",
+      "cantidad": 1,
+      "vow": 0.14814814814814814,
+      "referencias": 0.0014818116744417871,
+      "veredicto": "muestra muy chica"
+    },
+    {
+      "tipo": "carrusel",
+      "medida": "vistas por seguidor",
+      "cantidad": 1,
+      "vow": 3.6271604938271604,
+      "referencias": null,
+      "veredicto": "sin datos para comparar"
+    }
+  ],
+  "horarios": {
+    "porFranja": [
+      {
+        "clave": "tarde (12 a 18 h)",
+        "cantidad": 1,
+        "medianaInteraccionesPorAlcance": 0.06451612903225806,
+        "medianaAlcancePorSeguidor": 2.3728395061728396,
+        "muestraSuficiente": false
+      },
+      {
+        "clave": "noche (18 a 24 h)",
+        "cantidad": 2,
+        "medianaInteraccionesPorAlcance": 0.04908994863344464,
+        "medianaAlcancePorSeguidor": 1.4962962962962965,
+        "muestraSuficiente": false
+      }
+    ],
+    "porDia": [
+      {
+        "clave": "viernes",
+        "cantidad": 1,
+        "medianaInteraccionesPorAlcance": 0.055762081784386616,
+        "medianaAlcancePorSeguidor": 0.6641975308641975,
+        "muestraSuficiente": false
+      },
+      {
+        "clave": "lunes",
+        "cantidad": 2,
+        "medianaInteraccionesPorAlcance": 0.053466972257380355,
+        "medianaAlcancePorSeguidor": 2.3506172839506174,
+        "muestraSuficiente": false
+      }
+    ],
+    "mejorFranja": null,
+    "mejorDia": null
+  },
+  "formatos": [
+    {
+      "tipo": "carrusel",
+      "cantidad": 1,
+      "enviosPorAlcance": 0,
+      "interaccionesPorAlcance": 0.06451612903225806,
+      "muestraSuficiente": false
+    },
+    {
+      "tipo": "reel",
+      "cantidad": 2,
+      "enviosPorAlcance": 0,
+      "interaccionesPorAlcance": 0.04908994863344464,
+      "muestraSuficiente": false
+    }
+  ],
+  "hashtags": {
+    "sinHashtags": {
+      "clave": "sin hashtags",
+      "cantidad": 3,
+      "medianaInteraccionesPorAlcance": 0.055762081784386616,
+      "medianaAlcancePorSeguidor": 2.3283950617283953,
+      "muestraSuficiente": true
+    },
+    "etiquetas": []
+  },
+  "destacadas": {
+    "masInteraccionPorAlcance": {
+      "tipo": "carrusel",
+      "fecha": "2026-10-19T15:02:25+0000",
+      "enlace": "https://www.instagram.com/p/DeriKp-FdNV/",
+      "likes": 58,
+      "comentarios": 2,
+      "vistas": 1469,
+      "reaccionesPorSeguidor": 0.14814814814814814,
+      "vistasPorSeguidor": 3.6271604938271604,
+      "palabras": 11,
+      "primeraLinea": "Una promesa con vos. ",
+      "palabrasPrimeraLinea": 5,
+      "hashtags": 0,
+      "emojis": 0,
+      "esPregunta": false,
+      "alcance": 961,
+      "guardados": 0,
+      "compartidos": 0,
+      "interacciones": 62,
+      "interaccionesPorAlcance": 0.06451612903225806,
+      "enviosPorAlcance": 0,
+      "etiquetas": [],
+      "alcancePorSeguidor": 2.3728395061728396,
+      "reciente": false
+    },
+    "masGuardada": null,
+    "masCompartida": null
+  },
+  "avisos": [
+    "Una cuenta chica suele tener más reacciones por seguidor que una enorme: la comparación con las referencias orienta, no es una competencia pareja.",
+    "Las vistas de las referencias pueden incluir anuncios pagos. VOW no tiene anuncios: sus vistas son orgánicas.",
+    "Muestra muy chica en: reel (2), carrusel (1). Con menos de 3 publicaciones de un tipo, tomalo como señal y no como conclusión.",
+    "Todavía no alcanza para decir cuál es el mejor horario: hace falta al menos 3 publicaciones en una misma franja. Hasta entonces, un horario de buena actividad es una apuesta y no un dato.",
+    "Con menos de 3 publicaciones por hashtag no se puede decir cuáles ayudan: no se saca ninguna conclusión de hashtags todavía."
+  ],
+  "publicaciones": [
+    {
+      "tipo": "reel",
+      "fecha": "2026-10-30T22:00:14+0000",
+      "enlace": "https://www.instagram.com/reel/DfIlAlUiQMe/",
+      "likes": 14,
+      "comentarios": 0,
+      "vistas": 465,
+      "reaccionesPorSeguidor": 0.0345679012345679,
+      "vistasPorSeguidor": 1.1481481481481481,
+      "palabras": 22,
+      "primeraLinea": "Drop 01 en 2027, sí... pero la paciencia no es nuestro fuerte.",
+      "palabrasPrimeraLinea": 12,
+      "hashtags": 0,
+      "emojis": 0,
+      "esPregunta": false,
+      "alcance": 269,
+      "guardados": 0,
+      "compartidos": 0,
+      "interacciones": 15,
+      "interaccionesPorAlcance": 0.055762081784386616,
+      "enviosPorAlcance": 0,
+      "etiquetas": [],
+      "alcancePorSeguidor": 0.6641975308641975,
+      "reciente": false
+    },
+    {
+      "tipo": "reel",
+      "fecha": "2026-10-20T02:16:22+0000",
+      "enlace": "https://www.instagram.com/reel/DesvQr2zTTo/",
+      "likes": 38,
+      "comentarios": 2,
+      "vistas": 1409,
+      "reaccionesPorSeguidor": 0.09876543209876543,
+      "vistasPorSeguidor": 3.4790123456790125,
+      "palabras": 30,
+      "primeraLinea": "¿Y vos? ¿Qué te prometés? Cumplilo.",
+      "palabrasPrimeraLinea": 6,
+      "hashtags": 0,
+      "emojis": 0,
+      "esPregunta": true,
+      "alcance": 943,
+      "guardados": 0,
+      "compartidos": 0,
+      "interacciones": 40,
+      "interaccionesPorAlcance": 0.042417815482502653,
+      "enviosPorAlcance": 0,
+      "etiquetas": [],
+      "alcancePorSeguidor": 2.3283950617283953,
+      "reciente": false
+    },
+    {
+      "tipo": "carrusel",
+      "fecha": "2026-10-19T15:02:25+0000",
+      "enlace": "https://www.instagram.com/p/DeriKp-FdNV/",
+      "likes": 58,
+      "comentarios": 2,
+      "vistas": 1469,
+      "reaccionesPorSeguidor": 0.14814814814814814,
+      "vistasPorSeguidor": 3.6271604938271604,
+      "palabras": 11,
+      "primeraLinea": "Una promesa con vos. ",
+      "palabrasPrimeraLinea": 5,
+      "hashtags": 0,
+      "emojis": 0,
+      "esPregunta": false,
+      "alcance": 961,
+      "guardados": 0,
+      "compartidos": 0,
+      "interacciones": 62,
+      "interaccionesPorAlcance": 0.06451612903225806,
+      "enviosPorAlcance": 0,
+      "etiquetas": [],
+      "alcancePorSeguidor": 2.3728395061728396,
+      "reciente": false
+    }
+  ]
+}
