@@ -9,5 +9,10 @@ export const negocio = {
   domicilio: null,          // domicilio legal o de atención
   email: 'vow2026ar@gmail.com',
   instagram: 'vow_ar',
-  pais: 'Argentina'
+  pais: 'Argentina',
+  // Punto de retiro en persona (se muestra en la tienda y en los términos)
+  retiro: {
+    direccion: 'Gdor. Marcelino Ugarte 2257, B1636 Olivos, Provincia de Buenos Aires',
+    horario: 'de 12 a 21 hs, desde el día siguiente a la compra'
+  }
 };

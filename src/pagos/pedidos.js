@@ -207,7 +207,7 @@ export function textoDeAvisoDePedido(id, pedido, { sinStock = false } = {}) {
     ...productosDelPedido(pedido).map((p) => `· ${p}`),
     "",
     `Comprador: ${c.nombre} · ${c.email} · ${c.telefono}`,
-    pedido.entrega?.tipo === "envio" ? `Enviar a: ${direccionDelPedido(pedido.entrega)}` : "Entrega: retira en persona (coordinar con el comprador).",
+    pedido.entrega?.tipo === "envio" ? `Enviar a: ${direccionDelPedido(pedido.entrega)}` : "Entrega: retira en persona en Olivos, desde el día siguiente a la compra y de 12 a 21 hs (coordinar el horario con el comprador).",
     pedido.envio?.costo ? `Envío cobrado: ${pesos(pedido.envio.costo)} (${pedido.envio.servicio})` : "",
     "",
     sinStock ? "" : "Cuando lo despaches, marcalo en VOW HQ (Caja → Para enviar) con el código de seguimiento.",

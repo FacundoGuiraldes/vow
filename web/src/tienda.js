@@ -1,5 +1,6 @@
 // Tienda del Drop 00: aparece solo si la API dice que la venta está abierta (VENTA_ABIERTA=1 en el servidor).
 // El navegador solo manda qué quiere y a dónde: el precio lo calcula el servidor, y el pago se hace en Mercado Pago.
+import { negocio } from './negocio.js';
 import { TOPE_POR_LINEA, ajustarCarrito, maximoParaSumar } from './stock-carrito.js';
 
 const pesos = n => `$${n.toLocaleString('es-AR')}`;
@@ -57,6 +58,8 @@ export async function iniciarTienda(apiUrl) {
   const codigoInput = document.getElementById('tienda-codigo');
   const codigoMsg = document.getElementById('tienda-codigo-msg');
 
+  const notaRetiro = document.getElementById('tienda-retiro-nota');
+  notaRetiro.textContent = `Retirás ${negocio.retiro.horario}, coordinando el horario con nosotros. Dirección: ${negocio.retiro.direccion}.`;
   if (!estado.envio) opcionEnvio.hidden = true;
   if (estado.codigos) codigoBloque.hidden = false;
   const consulta = document.getElementById('tienda-consulta');
@@ -186,7 +189,11 @@ export async function iniciarTienda(apiUrl) {
     }
   });
 
-  form.addEventListener('change', () => { bloqueEnvio.hidden = form.elements.entrega.value !== 'envio'; });
+  form.addEventListener('change', () => {
+    const envio = form.elements.entrega.value === 'envio';
+    bloqueEnvio.hidden = !envio;
+    notaRetiro.hidden = envio;
+  });
 
   form.addEventListener('submit', async e => {
     e.preventDefault();
