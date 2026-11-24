@@ -21,11 +21,6 @@ _Nada agregado._
 
 _Ninguno._
 
-## Piezas de los documentos que se quitaron del juego
-
-- 2026-10-27 · carrusel
-- 2026-11-02 · reel
-
 ## Últimos cambios
 
 - 2026-11-02 17:45 UTC · juego · Quitó del juego la pieza reel del 2026-11-02
