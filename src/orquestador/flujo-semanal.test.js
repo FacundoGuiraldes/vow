@@ -12,7 +12,7 @@ const entorno = (cliente = crearClienteSimulado(SEMANA)) => {
   return {
     escritos,
     pasos: armarPasos({
-      opciones: { semana: SEMANA, piezas: 1 },
+      opciones: { semana: SEMANA },
       cliente,
       leer: async () => "CONTENIDO",
       listar: async () => [],
@@ -36,7 +36,7 @@ test("flujo completo: planifica, revisa, espera la aprobación y recién despué
   const segunda = await ejecutarFlujo({ pasos, registro: aprobar(primera.registro, "aprobar-plan"), ahora });
   assert.equal(segunda.estado, "completo");
   assert.deepEqual(Object.keys(escritos), [`plan-${SEMANA}.json`]);
-  assert.equal(JSON.parse(escritos[`plan-${SEMANA}.json`]).piezas[0].gancho, "Una cosa por vez.");
+  assert.equal(JSON.parse(escritos[`plan-${SEMANA}.json`]).dias.length, 3);
 });
 
 test("si la IA no devuelve un plan válido, el flujo se frena en planificar y no pide aprobación", async () => {
@@ -48,10 +48,9 @@ test("si la IA no devuelve un plan válido, el flujo se frena en planificar y no
   assert.ok(r.registro.gasto.entrada > 0); // se registró lo gastado aunque falló
 });
 
-test("si el plan guardado pasa a romper una regla antes de la revisión, se frena en revisar", async () => {
-  // El Estratega acepta el plan, pero el Revisor lo mira con otro contexto: ahí ya hay una pieza definida igual
+test("si el flujo pasa a romper una regla antes de la revisión, se frena en revisar", async () => {
   const { pasos } = entorno();
-  pasos[0] = { nombre: "planificar", correr: async () => ({ salida: { resumen: "x", piezas: [{ fecha: SEMANA, formato: "reel", pilar: "proceso", gancho: "Dominá la barra." }] } }) };
+  pasos[0] = { nombre: "planificar", correr: async () => ({ salida: { dias: [{ fecha: "2026-12-30", formato: "reel", contenido: "Algo fuera de la semana que se está planificando." }] } }) };
   const r = await ejecutarFlujo({ pasos, registro: registroNuevo(SEMANA), ahora });
   assert.equal(r.estado, "error");
   assert.equal(r.fallo, "revisar");
@@ -60,7 +59,7 @@ test("si el plan guardado pasa a romper una regla antes de la revisión, se fren
 
 test("con sufijo (modo simulado) el plan se guarda con otro nombre", async () => {
   const escritos = {};
-  const pasos = armarPasos({ opciones: { semana: SEMANA, piezas: 1 }, cliente: crearClienteSimulado(SEMANA), leer: async () => "C", listar: async () => [], escribir: async (a, t) => { escritos[a] = t; }, sufijo: "-simulado" });
+  const pasos = armarPasos({ opciones: { semana: SEMANA }, cliente: crearClienteSimulado(SEMANA), leer: async () => "C", listar: async () => [], escribir: async (a, t) => { escritos[a] = t; }, sufijo: "-simulado" });
   const primera = await ejecutarFlujo({ pasos, registro: registroNuevo(SEMANA), ahora });
   await ejecutarFlujo({ pasos, registro: aprobar(primera.registro, "aprobar-plan"), ahora });
   assert.deepEqual(Object.keys(escritos), [`plan-${SEMANA}-simulado.json`]);

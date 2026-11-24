@@ -5,33 +5,19 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { revisarPlan } from "../src/agents/revisor.js";
-import { NOMBRES_DE_REGLAS, revisarReglas } from "../src/agents/reglas-marca.js";
+import { NOMBRES_DE_REGLAS_DURAS, revisarReglas } from "../src/agents/reglas-marca.js";
 
 export const RUTA_CASOS = new URL("./casos-revisor.json", import.meta.url);
 
-// Arma el plan de un caso: la pieza base con los cambios indicados
+// Arma el flujo de un caso: el día base con los cambios indicados ('dia' es un día; 'dias' son varios)
 export function armarPlan(conjunto, caso) {
-  const overrides = caso.piezas ?? (caso.pieza ? [caso.pieza] : []);
-  return { resumen: "Plan de prueba.", piezas: overrides.map((cambios) => ({ ...conjunto.base, ...cambios })), ...(caso.plan ?? {}) };
-}
-
-// Contexto falso: el cerebro, las referencias y las piezas definidas salen del propio caso, no de los archivos reales,
-// así los resultados no cambian cuando se edita el cerebro de marca.
-function contextoDelCaso(conjunto, caso) {
-  const definidas = caso.definidas ?? {};
-  return {
-    listar: async (carpeta) => (String(carpeta).includes("piezas") ? Object.keys(definidas) : []),
-    leer: async (ruta) => {
-      const texto = String(ruta);
-      if (texto.includes("cerebro")) return caso.cerebro ?? conjunto.cerebro;
-      return definidas[texto.split("/").pop()] ?? "";
-    },
-  };
+  const cambios = caso.dias ?? [caso.dia ?? {}];
+  return { dias: cambios.map((c) => ({ ...conjunto.base, ...c })), ...(caso.plan ?? {}) };
 }
 
 export async function ejecutarCaso(conjunto, caso) {
   const plan = armarPlan(conjunto, caso);
-  const { aprobada, problemas, advertencias = [] } = await revisarPlan(plan, { semanaInicio: caso.semana ?? conjunto.semana, recursos: caso.recursos ?? {}, ...contextoDelCaso(conjunto, caso) });
+  const { aprobada, problemas, advertencias = [] } = await revisarPlan(plan, { semanaInicio: caso.semana ?? conjunto.semana });
   const faltan = caso.esperado.problemas_contienen.filter((texto) => !problemas.some((p) => p.includes(texto)));
   const faltanAvisos = (caso.esperado.avisos_contienen ?? []).filter((texto) => !advertencias.some((a) => a.includes(texto)));
   const motivos = [];
@@ -42,10 +28,10 @@ export async function ejecutarCaso(conjunto, caso) {
   return { id: caso.id, descripcion: caso.descripcion, ok: motivos.length === 0, motivos };
 }
 
-// Cada regla de marca tiene que tener al menos un caso que la dispare; si no, podrían borrarla sin que nada falle.
+// Cada regla DURA de marca tiene que tener al menos un caso que la dispare; si no, podrían borrarla sin que nada falle.
 export function reglasSinCaso(conjunto) {
   const buscadas = conjunto.casos.flatMap((c) => [...(c.esperado.aprobada ? [] : c.esperado.problemas_contienen), ...(c.esperado.avisos_contienen ?? [])]);
-  return NOMBRES_DE_REGLAS.filter((regla) => !buscadas.some((texto) => texto.includes(regla)));
+  return NOMBRES_DE_REGLAS_DURAS.filter((regla) => !buscadas.some((texto) => texto.includes(regla)));
 }
 
 export async function ejecutarEvals(conjunto) {

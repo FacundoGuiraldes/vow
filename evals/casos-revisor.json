@@ -1,91 +1,26 @@
 {
-  "descripcion": "Casos fijos del Revisor y las reglas de marca. Cada caso arma un plan a partir de 'base' con los cambios de 'pieza' (o 'piezas'), lo revisa y compara con 'esperado'. Los casos 'falso positivo' vienen de fallas reales que ya se corrigieron.",
+  "descripcion": "Casos fijos del Revisor y las reglas duras de marca sobre el flujo semanal. Cada caso arma un flujo a partir de 'base' con los cambios de 'dia' (o 'dias'), lo revisa y compara con 'esperado'. Los falsos positivos vienen de fallas reales que ya se corrigieron.",
   "semana": "2026-10-26",
   "base": {
     "fecha": "2026-10-27",
     "formato": "reel",
-    "pilar": "proceso",
-    "gancho": "Una cosa por vez.",
-    "ganchos_alternativos": [
-      "Hecho con calma. Hecho bien.",
-      "Cada detalle cuenta.",
-      "Lo simple se sostiene."
-    ],
-    "guion": "Texto sobre fondo hueso, una frase por vez.",
-    "texto_en_pantalla": [
-      "Una cosa por vez.",
-      "Sin apuro. Sin ruido."
-    ],
-    "epigrafe": "Se hace despacio y se hace bien. Anotate en la lista: link en la bio.",
-    "palabras_clave": [
-      "proceso"
-    ],
-    "cta": "Anotate en la lista de espera.",
-    "recursos": [
-      "Diseño en colores de marca"
-    ],
-    "justificacion": "Muestra el criterio de trabajo sin mostrar producto."
+    "contenido": "Un plano fijo de unas manos atando el cordón antes de salir a entrenar, sin cara ni producto."
   },
-  "cerebro": "## 8. Ganchos\n\n**Aprobados por Facundo:**\n- \"Firmá lo que vas a sostener\"\n- \"Cumplite a vos primero\"\n\n**Descartados:**\n- \"Tu palabra primero.\"\n\n## 9. Por confirmar\n",
   "casos": [
     {
       "id": "base-valido",
-      "descripcion": "La pieza de referencia cumple todo",
-      "pieza": {},
+      "descripcion": "El día de referencia cumple todo",
+      "dia": {},
       "esperado": {
         "aprobada": true,
         "problemas_contienen": []
       }
     },
     {
-      "id": "guion-niega-papel",
-      "descripcion": "Un guion puede nombrar algo para descartarlo (falso positivo del PR #29)",
-      "pieza": {
-        "guion": "No aparece papel ni lapicera. Solo texto sobre fondo hueso."
-      },
-      "esperado": {
-        "aprobada": true,
-        "problemas_contienen": []
-      }
-    },
-    {
-      "id": "guion-niega-lo-que-falta",
-      "descripcion": "Un guion puede decir que no se habla de lo que falta (PR #29)",
-      "pieza": {
-        "guion": "No se habla de lo que todavía no hay. Solo la idea."
-      },
-      "esperado": {
-        "aprobada": true,
-        "problemas_contienen": []
-      }
-    },
-    {
-      "id": "guion-numera-laminas",
-      "descripcion": "Numerar las láminas no es una cifra inventada (PR #32)",
-      "pieza": {
-        "guion": "Lámina 1: el gancho. Lámina 2: la frase. Lámina 3: la invitación."
-      },
-      "esperado": {
-        "aprobada": true,
-        "problemas_contienen": []
-      }
-    },
-    {
-      "id": "guion-lista-con-parentesis",
-      "descripcion": "Los marcadores 1) 2) 3) no son cifras (PR #39)",
-      "pieza": {
-        "guion": "1) Aparece el gancho. 2) Entra la frase. 3) Cierra la invitación."
-      },
-      "esperado": {
-        "aprobada": true,
-        "problemas_contienen": []
-      }
-    },
-    {
-      "id": "grips-se-pueden-nombrar",
+      "id": "nombra-grips",
       "descripcion": "Grips, straps y prendas son el producto y se nombran",
-      "pieza": {
-        "gancho": "Tus grips, tu promesa."
+      "dia": {
+        "contenido": "Primer plano de unos grips sobre una mesa de madera, con luz de ventana y sin personas."
       },
       "esperado": {
         "aprobada": true,
@@ -95,8 +30,8 @@
     {
       "id": "drop-01-permitido",
       "descripcion": "\"Drop 01\" es el nombre del lanzamiento",
-      "pieza": {
-        "epigrafe": "Drop 01 en desarrollo. Anotate en la lista: link en la bio."
+      "dia": {
+        "contenido": "Una story con el texto Drop 01 en desarrollo sobre fondo liso, sin imágenes de producto."
       },
       "esperado": {
         "aprobada": true,
@@ -104,13 +39,10 @@
       }
     },
     {
-      "id": "misma-idea-otra-semana",
-      "descripcion": "Una pieza definida de hace más de 7 días no bloquea el mismo formato y pilar",
-      "pieza": {
-        "fecha": "2026-10-28"
-      },
-      "definidas": {
-        "2026-11-20-reel-proceso.md": "# Reel · 20/11/2026 · pilar proceso\n\n## Láminas\n1. Otra frase\n"
+      "id": "anio-del-lanzamiento",
+      "descripcion": "2027 es el año del lanzamiento y se puede decir",
+      "dia": {
+        "contenido": "Una story sobre fondo liso que dice Drop 01 en 2027 y la invitación a la lista de espera."
       },
       "esperado": {
         "aprobada": true,
@@ -118,13 +50,10 @@
       }
     },
     {
-      "id": "producto-con-producto",
-      "descripcion": "Se puede mostrar producto si hay producto",
-      "pieza": {
-        "pilar": "producto en uso"
-      },
-      "recursos": {
-        "producto": true
+      "id": "verbo-pesa",
+      "descripcion": "El verbo \"pesa\" no se confunde con pesas del gimnasio",
+      "dia": {
+        "contenido": "Texto sobre fondo hueso: lo que pesa, se sostiene. Una frase por vez, sin música fuerte."
       },
       "esperado": {
         "aprobada": true,
@@ -132,41 +61,45 @@
       }
     },
     {
-      "id": "motivacion-vacia",
-      "descripcion": "Frases de motivación vacía",
-      "pieza": {
-        "epigrafe": "Sin excusas. Anotate en la lista: link en la bio."
+      "id": "numera-laminas",
+      "descripcion": "Numerar las láminas no es una cifra inventada",
+      "dia": {
+        "formato": "carrusel",
+        "contenido": "Lámina 1: una frase. Lámina 2: otra frase. Lámina 3: la invitación a la lista de espera."
       },
       "esperado": {
         "aprobada": true,
-        "avisos_contienen": [
-          "motivación vacía"
-        ],
         "problemas_contienen": []
       }
     },
     {
-      "id": "mejor-version",
-      "descripcion": "\"Tu mejor versión\" es motivación vacía",
-      "pieza": {
-        "texto_en_pantalla": [
-          "Tu mejor versión.",
-          "Sin apuro."
-        ]
+      "id": "lista-con-parentesis",
+      "descripcion": "Los marcadores 1) 2) 3) no son cifras",
+      "dia": {
+        "formato": "carrusel",
+        "contenido": "1) Aparece la frase. 2) Entra el detalle. 3) Cierra la invitación a la lista de espera."
       },
       "esperado": {
         "aprobada": true,
-        "avisos_contienen": [
-          "motivación vacía"
-        ],
+        "problemas_contienen": []
+      }
+    },
+    {
+      "id": "estilo-blando-no-bloquea",
+      "descripcion": "Una frase de estilo (blanda) no frena el flujo: eso es de la edición, no de las reglas duras",
+      "dia": {
+        "contenido": "Una story con la frase sin excusas sobre fondo liso, sin imágenes de producto ni personas."
+      },
+      "esperado": {
+        "aprobada": true,
         "problemas_contienen": []
       }
     },
     {
       "id": "resultado-fisico",
       "descripcion": "No se prometen resultados físicos",
-      "pieza": {
-        "epigrafe": "Bajá de peso entrenando. Anotate en la lista: link en la bio."
+      "dia": {
+        "contenido": "Un reel que muestra cómo bajá de peso entrenando tres veces por semana con la gorra."
       },
       "esperado": {
         "aprobada": false,
@@ -178,8 +111,8 @@
     {
       "id": "urgencia-falsa",
       "descripcion": "No se inventa escasez",
-      "pieza": {
-        "epigrafe": "Últimas unidades. Anotate en la lista: link en la bio."
+      "dia": {
+        "contenido": "Una story con el texto últimas unidades sobre fondo liso, con la gorra en primer plano."
       },
       "esperado": {
         "aprobada": false,
@@ -189,44 +122,10 @@
       }
     },
     {
-      "id": "presumir",
-      "descripcion": "No se presume",
-      "pieza": {
-        "texto_en_pantalla": [
-          "Modo bestia.",
-          "Sin apuro."
-        ]
-      },
-      "esperado": {
-        "aprobada": true,
-        "avisos_contienen": [
-          "presumir"
-        ],
-        "problemas_contienen": []
-      }
-    },
-    {
-      "id": "ingles-innecesario",
-      "descripcion": "Inglés donde hay una palabra en castellano",
-      "pieza": {
-        "texto_en_pantalla": [
-          "Sin grind no hay nada.",
-          "Sin apuro."
-        ]
-      },
-      "esperado": {
-        "aprobada": true,
-        "avisos_contienen": [
-          "inglés innecesario"
-        ],
-        "problemas_contienen": []
-      }
-    },
-    {
       "id": "fuera-del-voseo",
       "descripcion": "Voz de tú",
-      "pieza": {
-        "epigrafe": "Tú puedes cumplirlo. Anotate en la lista: link en la bio."
+      "dia": {
+        "contenido": "Una story que dice tú puedes cumplirlo, sobre fondo liso y sin imágenes de producto."
       },
       "esperado": {
         "aprobada": false,
@@ -236,97 +135,23 @@
       }
     },
     {
-      "id": "anuncia-lo-que-falta",
-      "descripcion": "Al público no se le dice lo que falta",
-      "pieza": {
-        "epigrafe": "Todavía no hay producto. Anotate en la lista: link en la bio."
+      "id": "voseo-tu-solo",
+      "descripcion": "\"tú\" solo, sin otra conjugación",
+      "dia": {
+        "contenido": "Texto sobre fondo hueso: tú primero. Una sola frase, sin música y sin imágenes."
       },
       "esperado": {
-        "aprobada": true,
-        "avisos_contienen": [
-          "anuncia lo que falta"
-        ],
-        "problemas_contienen": []
-      }
-    },
-    {
-      "id": "teaser-vacio",
-      "descripcion": "Un teaser que anuncia que hay algo sin decir qué suena a humo (sugerencia real que Facundo marcó como cringe)",
-      "pieza": {
-        "epigrafe": "Quedate. Algo llega antes. Anotate en la lista: link en la bio."
-      },
-      "esperado": {
-        "aprobada": true,
-        "avisos_contienen": [
-          "teaser vacío o frase de eslogan"
-        ],
-        "problemas_contienen": []
-      }
-    },
-    {
-      "id": "elementos-del-gimnasio",
-      "descripcion": "Nombrar barras, mancuernas o pesas suena forzado",
-      "pieza": {
-        "gancho": "Dominá la barra."
-      },
-      "esperado": {
-        "aprobada": true,
-        "avisos_contienen": [
-          "nombra elementos del gimnasio"
-        ],
-        "problemas_contienen": []
-      }
-    },
-    {
-      "id": "promesa-en-papel",
-      "descripcion": "La promesa no se escribe",
-      "pieza": {
-        "texto_en_pantalla": [
-          "Escribila a mano.",
-          "Sin apuro."
+        "aprobada": false,
+        "problemas_contienen": [
+          "no está en voseo"
         ]
-      },
-      "esperado": {
-        "aprobada": true,
-        "avisos_contienen": [
-          "promesa en papel"
-        ],
-        "problemas_contienen": []
-      }
-    },
-    {
-      "id": "exclamaciones",
-      "descripcion": "Cadenas de signos de exclamación",
-      "pieza": {
-        "epigrafe": "Cumplí!! Anotate en la lista: link en la bio."
-      },
-      "esperado": {
-        "aprobada": true,
-        "avisos_contienen": [
-          "exceso de exclamaciones"
-        ],
-        "problemas_contienen": []
-      }
-    },
-    {
-      "id": "demasiados-emojis",
-      "descripcion": "Más de un emoji",
-      "pieza": {
-        "epigrafe": "Despacio 🔥💪 Anotate en la lista: link en la bio."
-      },
-      "esperado": {
-        "aprobada": true,
-        "avisos_contienen": [
-          "demasiados emojis"
-        ],
-        "problemas_contienen": []
       }
     },
     {
       "id": "drop-suelto",
       "descripcion": "\"Drop\" solo vale como \"Drop 01\"",
-      "pieza": {
-        "epigrafe": "Llega el drop. Anotate en la lista: link en la bio."
+      "dia": {
+        "contenido": "Una story que anuncia que llega el drop, sobre fondo liso y sin imágenes de producto."
       },
       "esperado": {
         "aprobada": false,
@@ -336,26 +161,10 @@
       }
     },
     {
-      "id": "explica-la-marca-por-dentro",
-      "descripcion": "Al público no se le explica paleta ni tipografía",
-      "pieza": {
-        "texto_en_pantalla": [
-          "Nuestra paleta es bordó.",
-          "Sin apuro."
-        ]
-      },
-      "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
-          "explica la marca por dentro"
-        ]
-      }
-    },
-    {
       "id": "cifra-inventada",
       "descripcion": "Toda cifra tiene que existir en los datos",
-      "pieza": {
-        "epigrafe": "Más de 500 personas ya están en la lista: link en la bio."
+      "dia": {
+        "contenido": "Una story que cuenta que más de 500 personas ya están en la lista, sobre fondo liso."
       },
       "esperado": {
         "aprobada": false,
@@ -365,125 +174,22 @@
       }
     },
     {
-      "id": "gancho-largo",
-      "descripcion": "Más de 12 palabras",
-      "pieza": {
-        "gancho": "Una cosa por vez porque así se hacen bien las cosas que importan de verdad"
+      "id": "otro-anio-rechazado",
+      "descripcion": "Cualquier otro año sería inventar un dato",
+      "dia": {
+        "contenido": "Una story sobre fondo liso que dice Drop 01 en 2028 y la invitación a la lista de espera."
       },
       "esperado": {
         "aprobada": false,
         "problemas_contienen": [
-          "palabras (máximo 12)"
-        ]
-      }
-    },
-    {
-      "id": "gancho-tutorial",
-      "descripcion": "Un gancho no es un tutorial",
-      "pieza": {
-        "gancho": "Cómo cumplir lo que prometés."
-      },
-      "esperado": {
-        "aprobada": true,
-        "avisos_contienen": [
-          "suena a tutorial"
-        ],
-        "problemas_contienen": []
-      }
-    },
-    {
-      "id": "pocos-alternativos",
-      "descripcion": "Hacen falta al menos 3 ganchos alternativos",
-      "pieza": {
-        "ganchos_alternativos": [
-          "Cada detalle cuenta.",
-          "Lo simple se sostiene."
-        ]
-      },
-      "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
-          "al menos 3 ganchos alternativos"
-        ]
-      }
-    },
-    {
-      "id": "alternativo-repetido",
-      "descripcion": "Los alternativos no se repiten",
-      "pieza": {
-        "ganchos_alternativos": [
-          "Cada detalle cuenta.",
-          "Cada detalle cuenta.",
-          "Lo simple se sostiene."
-        ]
-      },
-      "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
-          "está repetido"
-        ]
-      }
-    },
-    {
-      "id": "alternativo-copiado-del-cerebro",
-      "descripcion": "Los alternativos no copian los ejemplos del cerebro de marca",
-      "pieza": {
-        "ganchos_alternativos": [
-          "Firmá lo que vas a sostener",
-          "Cada detalle cuenta.",
-          "Lo simple se sostiene."
-        ]
-      },
-      "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
-          "copia un ejemplo del cerebro de marca"
-        ]
-      }
-    },
-    {
-      "id": "sin-invitacion-a-la-lista",
-      "descripcion": "La acción final es anotarse en la lista",
-      "pieza": {
-        "cta": "Seguinos."
-      },
-      "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
-          "anotarse en la lista"
-        ]
-      }
-    },
-    {
-      "id": "producto-sin-producto",
-      "descripcion": "No se muestra producto que no existe",
-      "pieza": {
-        "pilar": "producto en uso"
-      },
-      "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
-          "todavía no hay producto"
-        ]
-      }
-    },
-    {
-      "id": "gente-sin-gente",
-      "descripcion": "No se muestra gente que no está confirmada",
-      "pieza": {
-        "pilar": "gente que entrena"
-      },
-      "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
-          "no hay personas confirmadas"
+          "la cifra \"2028\""
         ]
       }
     },
     {
       "id": "formato-inventado",
       "descripcion": "Formato fuera de la lista",
-      "pieza": {
+      "dia": {
         "formato": "podcast"
       },
       "esperado": {
@@ -494,22 +200,9 @@
       }
     },
     {
-      "id": "pilar-inventado",
-      "descripcion": "Pilar fuera de la lista",
-      "pieza": {
-        "pilar": "humor"
-      },
-      "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
-          "pilar inválido"
-        ]
-      }
-    },
-    {
       "id": "fecha-fuera-de-la-semana",
       "descripcion": "La fecha tiene que caer en la semana planificada",
-      "pieza": {
+      "dia": {
         "fecha": "2026-11-20"
       },
       "esperado": {
@@ -520,217 +213,119 @@
       }
     },
     {
-      "id": "frase-ya-definida",
-      "descripcion": "No se reutilizan frases de piezas ya definidas",
-      "pieza": {
-        "texto_en_pantalla": [
-          "Cumplite a vos primero",
-          "Sin apuro."
-        ]
-      },
-      "definidas": {
-        "2026-10-27-carrusel-promesa.md": "# Carrusel · 27/10/2026 · pilar promesa\n\n## Láminas\n1. Cumplite a vos primero\n2. Lo que firmás con vos no se rompe\n"
+      "id": "fecha-invalida",
+      "descripcion": "La fecha tiene que ser AAAA-MM-DD",
+      "dia": {
+        "fecha": "27/10"
       },
       "esperado": {
         "aprobada": false,
         "problemas_contienen": [
-          "reutiliza una frase de una pieza ya definida"
+          "la fecha no es AAAA-MM-DD"
         ]
       }
     },
     {
-      "id": "mismo-formato-y-pilar-cerca",
-      "descripcion": "No se repite formato y pilar a menos de 7 días de una pieza definida",
-      "pieza": {
-        "fecha": "2026-10-28",
-        "formato": "carrusel",
-        "pilar": "promesa"
+      "id": "contenido-corto",
+      "descripcion": "El contenido tiene que decir de qué trata",
+      "dia": {
+        "contenido": "Un reel"
       },
-      "definidas": {
-        "2026-10-27-carrusel-promesa.md": "# Carrusel · 27/10/2026 · pilar promesa\n\n## Láminas\n1. Cumplite a vos primero\n2. Lo que firmás con vos no se rompe\n"
+      "esperado": {
+        "aprobada": false,
+        "problemas_contienen": [
+          "muy corto"
+        ]
+      }
+    },
+    {
+      "id": "contenido-largo",
+      "descripcion": "El contenido es una idea, no el texto final",
+      "dia": {
+        "contenido": "palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra palabra "
       },
+      "esperado": {
+        "aprobada": false,
+        "problemas_contienen": [
+          "supera 600 caracteres"
+        ]
+      }
+    },
+    {
+      "id": "mismo-formato-mismo-dia",
+      "descripcion": "No se repite el formato el mismo día",
+      "dia": {},
       "esperado": {
         "aprobada": false,
         "problemas_contienen": [
           "repite el formato"
         ]
+      },
+      "dias": [
+        {},
+        {
+          "contenido": "Otro plano del cordón desde arriba, con luz natural de la mañana y sin cara."
+        }
+      ]
+    },
+    {
+      "id": "flujo-sin-dias",
+      "descripcion": "Un flujo vacío se rechaza",
+      "dia": {},
+      "esperado": {
+        "aprobada": false,
+        "problemas_contienen": [
+          "no tiene publicaciones"
+        ]
+      },
+      "plan": {
+        "dias": []
       }
     },
     {
-      "id": "pilar-repetido",
-      "descripcion": "Con 2 piezas, los pilares tienen que ser distintos",
-      "piezas": [
+      "id": "demasiados-dias",
+      "descripcion": "No más de 7 publicaciones",
+      "dia": {},
+      "esperado": {
+        "aprobada": false,
+        "problemas_contienen": [
+          "más de 7"
+        ]
+      },
+      "dias": [
         {
-          "fecha": "2026-10-27"
+          "fecha": "2026-10-26",
+          "formato": "reel"
+        },
+        {
+          "fecha": "2026-10-26",
+          "formato": "story"
+        },
+        {
+          "fecha": "2026-10-27",
+          "formato": "reel"
+        },
+        {
+          "fecha": "2026-10-27",
+          "formato": "story"
+        },
+        {
+          "fecha": "2026-10-28",
+          "formato": "reel"
+        },
+        {
+          "fecha": "2026-10-28",
+          "formato": "story"
         },
         {
           "fecha": "2026-10-29",
-          "formato": "carrusel",
-          "gancho": "Lo simple alcanza.",
-          "texto_en_pantalla": [
-            "Lo simple alcanza."
-          ],
-          "ganchos_alternativos": [
-            "Hecho a conciencia.",
-            "Sin vueltas.",
-            "Despacio y firme."
-          ]
+          "formato": "reel"
+        },
+        {
+          "fecha": "2026-10-29",
+          "formato": "story"
         }
-      ],
-      "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
-          "aparece 2 veces"
-        ]
-      }
-    },
-    {
-      "id": "plan-sin-piezas",
-      "descripcion": "Un plan vacío se rechaza",
-      "plan": {
-        "piezas": []
-      },
-      "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
-          "no tiene piezas"
-        ]
-      }
-    },
-    {
-      "id": "plan-sin-resumen",
-      "descripcion": "El plan necesita resumen",
-      "pieza": {},
-      "plan": {
-        "resumen": ""
-      },
-      "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
-          "Falta el resumen"
-        ]
-      }
-    },
-    {
-      "id": "presumir-bestia-sola",
-      "descripcion": "\"bestia\" suelta también presume",
-      "pieza": {
-        "texto_en_pantalla": [
-          "Entrená como una bestia.",
-          "Sin apuro."
-        ]
-      },
-      "esperado": {
-        "aprobada": true,
-        "avisos_contienen": [
-          "presumir"
-        ],
-        "problemas_contienen": []
-      }
-    },
-    {
-      "id": "presumir-fisico",
-      "descripcion": "Mostrar el físico también presume",
-      "pieza": {
-        "texto_en_pantalla": [
-          "Mostrá tu físico.",
-          "Sin apuro."
-        ]
-      },
-      "esperado": {
-        "aprobada": true,
-        "avisos_contienen": [
-          "presumir"
-        ],
-        "problemas_contienen": []
-      }
-    },
-    {
-      "id": "voseo-tu-solo",
-      "descripcion": "\"tú\" solo, sin otra conjugación",
-      "pieza": {
-        "texto_en_pantalla": [
-          "Tú primero.",
-          "Sin apuro."
-        ]
-      },
-      "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
-          "no está en voseo"
-        ]
-      }
-    },
-    {
-      "id": "voseo-conjugacion-tu",
-      "descripcion": "Una conjugación de tú sin el pronombre",
-      "pieza": {
-        "texto_en_pantalla": [
-          "Puedes empezar hoy.",
-          "Sin apuro."
-        ]
-      },
-      "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
-          "no está en voseo"
-        ]
-      }
-    },
-    {
-      "id": "papel-lapicera",
-      "descripcion": "La lapicera también convierte la promesa en papel",
-      "pieza": {
-        "texto_en_pantalla": [
-          "Una lapicera y nada más.",
-          "Sin apuro."
-        ]
-      },
-      "esperado": {
-        "aprobada": true,
-        "avisos_contienen": [
-          "promesa en papel"
-        ],
-        "problemas_contienen": []
-      }
-    },
-    {
-      "id": "guion-no-perdona-equipos",
-      "descripcion": "Un guion puede negar papel, pero no puede nombrar equipos del gimnasio",
-      "pieza": {
-        "guion": "No usamos barra en el video. Solo texto sobre fondo hueso."
-      },
-      "esperado": {
-        "aprobada": true,
-        "avisos_contienen": [
-          "nombra elementos del gimnasio"
-        ],
-        "problemas_contienen": []
-      }
-    },
-    {
-      "id": "anio-del-lanzamiento",
-      "descripcion": "2027 es el año del lanzamiento y se puede decir",
-      "pieza": {
-        "epigrafe": "Drop 01 en 2027. Anotate en la lista: link en la bio."
-      },
-      "esperado": {
-        "aprobada": true,
-        "problemas_contienen": []
-      }
-    },
-    {
-      "id": "otro-anio-rechazado",
-      "descripcion": "Cualquier otro año o fecha sería inventar un dato",
-      "pieza": {
-        "epigrafe": "Drop 01 en 2028. Anotate en la lista: link en la bio."
-      },
-      "esperado": {
-        "aprobada": false,
-        "problemas_contienen": [
-          "la cifra \"2028\""
-        ]
-      }
+      ]
     }
   ]
 }

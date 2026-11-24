@@ -33,7 +33,7 @@ describe("botón de arrepentimiento", () => {
     await assert.rejects(arr.registrar({ nombre: "Ana Pérez", email: "no-es-mail" }), ErrorArrepentimiento);
   });
 
-  test("si falla el aviso por Telegram igual entrega el código", async () => {
+  test("si falla el aviso igual entrega el código", async () => {
     const arr = crearArrepentimientos({ repo: crearRepositorioMemoria(), avisar: async () => { throw new Error("caído"); } });
     const original = console.error; console.error = () => {};
     try { assert.ok((await arr.registrar({ nombre: "Ana Pérez", email: "a@b.com" })).codigo); } finally { console.error = original; }

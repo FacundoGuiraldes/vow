@@ -10,15 +10,14 @@ testProgramar("afirmaCambio también detecta cuando dice que borró, eliminó o 
   assert.equal(afirmaCambioProgramar("¿Querés que la borre?"), false);
 });
 
-testProgramar("afirmaCambio también detecta cuando dice que programó o armó una pieza", () => {
+testProgramar("afirmaCambio también detecta cuando dice que programó o armó algo", () => {
   assert.equal(afirmaCambioProgramar("Listo, ya la programé para el lunes."), true);
-  assert.equal(afirmaCambioProgramar("La pieza quedó programada."), true);
   assert.equal(afirmaCambioProgramar("¿Querés que la programe?"), false);
 });
-testProgramar("el sistema del chat aclara que las historias se publican solas con archivo y confirmación", () => {
-  for (const permitirPublicar of [true, false]) {
-    const texto = construirSistemaChat({ fecha: "2026-10-27", hora: "09:00", permitirPublicar });
-    assert.match(texto, /historias \(stories\) se publican solas/);
-    assert.match(texto, /foto o un video/);
-  }
+
+testProgramar("el sistema del chat aclara que el bot no publica y que el flujo lo arma el Estratega", () => {
+  const texto = construirSistemaChat({ fecha: "2026-10-27", hora: "09:00" });
+  assert.match(texto, /no las hacés ni las programás vos ni el bot/);
+  assert.match(texto, /ver_flujo/);
+  assert.doesNotMatch(texto, /se publican solas/);
 });

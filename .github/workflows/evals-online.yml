@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       pedidos:
-        description: "Qué pedidos correr (vacío = todos). Ids separados por coma, por ejemplo: base-1-pieza-sin-producto,base-con-gente"
+        description: "Qué pedidos correr (vacío = todos). Ids separados por coma, por ejemplo: base-sin-producto,base-con-gente"
         required: false
         type: string
         default: ""

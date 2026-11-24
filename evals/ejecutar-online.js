@@ -22,7 +22,7 @@ const RUTA_LINEA_BASE = new URL("./linea-base-online.json", import.meta.url);
 const CARPETA_RESULTADOS = new URL("./resultados/", import.meta.url);
 
 // "Pieza 1: nombra elementos del gimnasio ("barra")." y "Pieza 2: nombra elementos del gimnasio ("pesas")."
-// son el mismo problema: se agrupan quitando la etiqueta de la pieza, lo citado y los números.
+// son el mismo problema: se agrupan quitando la etiqueta de la publicación, lo citado y los números.
 export function clasificarError(error) {
   return String(error)
     .replace(/^[^:]*:\s*/, "")
@@ -47,7 +47,7 @@ export async function correrEvalsOnline({ pedidos, crearCliente, planificar = pl
       const inicio = reloj();
       try {
         const r = await planificar(
-          { semanaInicio: pedido.semana, fase: pedido.fase, recursos: pedido.recursos ?? {}, notas: pedido.notas ?? "", piezas: pedido.piezas },
+          { semanaInicio: pedido.semana, fase: pedido.fase, recursos: pedido.recursos ?? {}, notas: pedido.notas ?? "" },
           { cliente: crearCliente(pedido) }
         );
         const costo = costoUSD(r.uso);

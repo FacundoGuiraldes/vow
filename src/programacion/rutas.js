@@ -1,67 +1,42 @@
-// Rutas HTTP de la publicación programada, todas bajo /api/programacion:
-//   POST /telegram       webhook del bot (lo llama Telegram; se valida con un secreto en el encabezado)
-//   POST /tick           lo llaman cron-job.org y GitHub Actions: manda el aviso de las 8 y publica lo que toque (clave)
-//   POST /plan           lo llama el workflow del lunes con el plan ya armado por los agentes (clave)
+// Rutas HTTP del bot y la oficina, todas bajo /api/programacion:
+//   POST /tick           ya no hace nada (antes publicaba): se deja para que un cron viejo no reciba un 404
+//   POST /plan           lo llama el workflow del lunes con el flujo semanal ya armado por los agentes (clave)
+//   GET  /plan/:semana   ¿esa semana ya tiene flujo? (clave)
 //   GET  /novedades      lo que Facundo le contó al bot y todavía no leyó el Estratega (clave)
-//   GET  /oficina       todo lo que muestra el juego de la oficina: piezas, medios, charla, novedades y rendimiento (clave)
-//   GET  /oficina/documentos  los documentos del repo (piezas, estrategia, depósito): privados, solo con clave
-//   GET  /oficina/medios/:clave/:archivo  archivo de una pieza con enlace firmado que vence (lo pide un <img> o <video>, que no manda clave)
-//   POST /oficina/accion lo que hace el juego: aprobar una pieza, pedir otra sugerencia, marcar pendientes, anotar en el cuaderno (clave)
-//   GET  /medios/:token  el archivo de una pieza: Meta lo descarga desde acá (el token es imposible de adivinar)
+//   GET  /oficina        todo lo que muestra el juego de la oficina: flujo, charla, novedades, estrategia, stock y rendimiento (clave)
+//   GET  /oficina/documentos  los documentos del repo (estrategia, depósito): privados, solo con clave
+//   POST /oficina/accion lo que hace el juego: chat, estrategia, stock, ventas, pendientes y notas (clave)
 import { createHash, timingSafeEqual } from "node:crypto";
-import { Router, json, raw } from "express";
+import { Router, json } from "express";
 import { rateLimit } from "express-rate-limit";
-import { esFechaISO, esHoraValida } from "./fechas.js";
+import { esFechaISO } from "./fechas.js";
 import { ErrorAccion, aplicarAccion, armarEstadoOficina } from "./oficina.js";
 import { leerOperacion } from "./operacion.js";
 import { crearDocumentosOficina } from "./oficina-documentos.js";
 
-const FORMATO_TOKEN = /^[a-f0-9]{48}$/;
-const LIMITE_PIEZAS = 5;
+const FORMATOS = ["reel", "carrusel", "imagen", "story"];
+const LIMITE_PUBLICACIONES = 7;
 
 const huella = (texto) => createHash("sha256").update(String(texto)).digest();
 const iguales = (a, b) => timingSafeEqual(huella(a), huella(b));
 
-// Valida lo mínimo del plan que manda el workflow (el contenido ya lo validó el Estratega)
+// Valida lo mínimo del flujo que manda el workflow (el contenido ya lo validó el Estratega)
 export function validarPlanEntrante(cuerpo) {
   if (!esFechaISO(cuerpo?.semana)) return "Falta semana (AAAA-MM-DD).";
-  const piezas = cuerpo?.plan?.piezas;
-  if (!Array.isArray(piezas) || piezas.length === 0 || piezas.length > LIMITE_PIEZAS) return `El plan tiene que traer de 1 a ${LIMITE_PIEZAS} piezas.`;
-  for (const [i, pieza] of piezas.entries()) {
-    if (!esFechaISO(pieza?.fecha) || typeof pieza?.formato !== "string" || typeof pieza?.gancho !== "string") return `La pieza ${i + 1} no tiene fecha, formato y gancho.`;
-    if (pieza.hora !== undefined && !esHoraValida(pieza.hora)) return `La pieza ${i + 1} tiene una hora inválida.`;
+  const dias = cuerpo?.plan?.dias;
+  if (!Array.isArray(dias) || dias.length === 0 || dias.length > LIMITE_PUBLICACIONES) return `El flujo tiene que traer de 1 a ${LIMITE_PUBLICACIONES} publicaciones.`;
+  for (const [i, dia] of dias.entries()) {
+    if (!esFechaISO(dia?.fecha) || !FORMATOS.includes(dia?.formato) || typeof dia?.contenido !== "string" || !dia.contenido.trim()) return `La publicación ${i + 1} no tiene fecha, formato y contenido.`;
   }
   if (cuerpo.novedades_usadas !== undefined && !(Array.isArray(cuerpo.novedades_usadas) && cuerpo.novedades_usadas.every(Number.isInteger))) return "novedades_usadas tiene que ser una lista de números.";
   return null;
 }
 
-// Entrega un archivo con soporte de Range: Meta puede pedir el video por partes
-function entregar(req, res, { mime, datos }) {
-  const total = datos.length;
-  // helmet pone Cross-Origin-Resource-Policy: same-origin por defecto y el navegador bloquea el <video> y las <img> del juego (otro dominio).
-  // Cada archivo tiene su propio token (uno nuevo si se reemplaza), así que el navegador puede guardarlo una hora sin volver a pedirlo en cada refresco del juego.
-  // Los archivos solo se piden con su token de 48 caracteres (el mismo que usa Instagram), así que se permite verlos desde otro sitio.
-  res.set({ "Content-Type": mime, "Accept-Ranges": "bytes", "Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff", "Cross-Origin-Resource-Policy": "cross-site" });
-  const pedido = req.headers.range;
-  if (!pedido) return res.status(200).set("Content-Length", String(total)).end(datos);
-
-  const m = /^bytes=(\d*)-(\d*)$/.exec(pedido);
-  if (!m || (m[1] === "" && m[2] === "")) return res.status(416).set("Content-Range", `bytes */${total}`).end();
-  const inicio = m[1] === "" ? Math.max(0, total - Number(m[2])) : Number(m[1]);
-  const fin = m[1] === "" || m[2] === "" ? total - 1 : Math.min(Number(m[2]), total - 1);
-  if (inicio >= total || inicio > fin) return res.status(416).set("Content-Range", `bytes */${total}`).end();
-  return res
-    .status(206)
-    .set({ "Content-Range": `bytes ${inicio}-${fin}/${total}`, "Content-Length": String(fin - inicio + 1) })
-    .end(datos.subarray(inicio, fin + 1));
-}
-
-export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOficina = null, secretoWebhook, rendimiento = null, ventas = null, permitirPublicar = false, limitePorMinuto = 120, documentosOficina = null }) {
+export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOficina = null, rendimiento = null, ventas = null, limitePorMinuto = 120, documentosOficina = null }) {
   const router = Router();
-  const pendientes = new Set(); // procesamientos del webhook que siguen en curso (los tests los esperan)
   router.use(json({ limit: "256kb" }));
 
-  const limitador = rateLimit({ windowMs: 60_000, limit: limitePorMinuto, skip: (req) => req.path.startsWith("/medios/"), standardHeaders: true, legacyHeaders: false, message: { error: "Demasiados pedidos." } });
+  const limitador = rateLimit({ windowMs: 60_000, limit: limitePorMinuto, standardHeaders: true, legacyHeaders: false, message: { error: "Demasiados pedidos." } });
   router.use(limitador);
 
   const conClave = (req, res, siguiente) => {
@@ -71,37 +46,11 @@ export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOfic
     return siguiente();
   };
 
-  router.post("/telegram", async (req, res, siguiente) => {
-    try {
-      if (!secretoWebhook || !iguales(req.headers["x-telegram-bot-api-secret-token"] ?? "", secretoWebhook)) return res.sendStatus(401);
-      const actualizacion = req.body;
-      if (!Number.isInteger(actualizacion?.update_id)) return res.sendStatus(200);
-      // Primero se GUARDA el mensaje y recién después se le contesta OK a Telegram: si el servicio se cae a mitad de camino,
-      // el mensaje queda pendiente y se recupera solo (servicio.recuperarActualizaciones). Un update_id ya visto no se repite.
-      if (!(await repo.registrarActualizacion(actualizacion.update_id, actualizacion))) return res.sendStatus(200);
-      res.sendStatus(200); // se contesta ya: editar con la IA puede tardar más de lo que Telegram espera
-      const trabajo = servicio
-        .manejarActualizacion(actualizacion)
-        // solo se marca si terminó bien: si falló, queda pendiente y se reintenta (hasta 3 veces)
-        .then(() => repo.marcarActualizacionProcesada(actualizacion.update_id))
-        .catch((error) => console.error(`Error en el bot de Telegram (queda pendiente): ${error.message}`));
-      pendientes.add(trabajo);
-      trabajo.finally(() => pendientes.delete(trabajo));
-    } catch (error) {
-      siguiente(error);
-    }
-  });
-
   // Venta propia con Mercado Pago (src/pagos)
   if (ventas) router.use("/ventas", ventas);
 
-  router.post("/tick", conClave, async (req, res, siguiente) => {
-    try {
-      res.json(await servicio.tick());
-    } catch (error) {
-      siguiente(error);
-    }
-  });
+  // Antes publicaba lo que tocaba; ahora el bot no publica nada. Contesta ok sin tocar la base (así un cron viejo no gasta cupo de Neon).
+  router.post("/tick", conClave, (req, res) => res.json({ ok: true, nota: "El bot ya no publica: este aviso no hace nada." }));
 
   router.post("/plan", conClave, async (req, res, siguiente) => {
     try {
@@ -119,12 +68,12 @@ export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOfic
     }
   });
 
-  // ¿La semana ya tiene plan? Lo usa el workflow del lunes, que se programa varias veces, para no armar dos
+  // ¿La semana ya tiene flujo? Lo usa el workflow del lunes, que se programa varias veces, para no armar dos
   router.get("/plan/:semana", conClave, async (req, res, siguiente) => {
     try {
       if (!esFechaISO(req.params.semana)) return res.status(400).json({ error: "La semana tiene que ser AAAA-MM-DD." });
-      const filas = await repo.piezasDeSemana(req.params.semana);
-      return res.json({ existe: filas.length > 0, piezas: filas.length });
+      const flujo = await servicio.leerFlujo(req.params.semana);
+      return res.json({ existe: flujo !== null, publicaciones: flujo?.dias.length ?? 0 });
     } catch (error) {
       return siguiente(error);
     }
@@ -150,7 +99,7 @@ export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOfic
   };
 
   // Los documentos de la oficina ya no están en la web pública: salen de acá y solo con clave
-  const documentos = documentosOficina ?? crearDocumentosOficina({ secreto: secretoOficina ?? secretoApi ?? "" });
+  const documentos = documentosOficina ?? crearDocumentosOficina();
   router.get("/oficina/documentos", conClaveOficina, (req, res, siguiente) => {
     try {
       res.set("Cache-Control", "no-store").json(documentos.documentos());
@@ -158,26 +107,16 @@ export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOfic
       siguiente(error);
     }
   });
-  router.get("/oficina/medios/:clave/:archivo", (req, res, siguiente) => {
-    try {
-      const ruta = documentos.archivo(req.params.clave, req.params.archivo, req.query.e, req.query.f);
-      if (!ruta) return res.status(404).json({ error: "No existe o venció." });
-      // Se ven desde la web de la oficina (otro dominio): el enlace firmado es lo que protege el archivo
-      return res.set({ "Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff", "Cross-Origin-Resource-Policy": "cross-site" }).sendFile(ruta, (error) => { if (error && !res.headersSent) siguiente(error); });
-    } catch (error) {
-      return siguiente(error);
-    }
-  });
-
   router.get("/oficina", conClaveOficina, async (req, res, siguiente) => {
     try {
-      const estado = await armarEstadoOficina({ repo, rendimiento, permitirPublicar });
+      const estado = await armarEstadoOficina({ repo, servicio, rendimiento });
       res.set("Cache-Control", "no-store").json(req.query.v === estado.version ? { version: estado.version, sin_cambios: true } : estado);
     } catch (error) {
       siguiente(error);
     }
   });
 
+  const pendientes = new Set(); // trabajos en segundo plano que siguen en curso (los tests los esperan)
   const segundoPlano = (trabajo) => {
     pendientes.add(trabajo);
     trabajo.finally(() => pendientes.delete(trabajo));
@@ -191,37 +130,11 @@ export function crearRutasProgramacion({ servicio, repo, secretoApi, secretoOfic
     }
   });
 
-  // Archivo subido desde el juego: el cuerpo es el archivo mismo (image/jpeg, video/mp4 o video/quicktime)
-  const LIMITE_ARCHIVO = "40mb";
-  router.post("/oficina/archivo", conClaveOficina, raw({ type: ["image/jpeg", "video/mp4", "video/quicktime"], limit: LIMITE_ARCHIVO }), async (req, res, siguiente) => {
-    try {
-      const id = Number(req.query.id);
-      if (!Number.isInteger(id)) return res.status(400).json({ error: "Falta el id de la pieza." });
-      const mime = String(req.headers["content-type"] ?? "").split(";")[0].trim();
-      const resultado = await servicio.adjuntarDesdeJuego(id, { mime, datos: Buffer.isBuffer(req.body) ? req.body : null, reemplazar: req.query.reemplazar === "1" });
-      if (!resultado.ok) return res.status(409).json({ error: resultado.motivo });
-      res.json(resultado);
-    } catch (error) {
-      siguiente(error);
-    }
-  });
-
-  router.get("/medios/:token", async (req, res, siguiente) => {
-    try {
-      if (!FORMATO_TOKEN.test(req.params.token)) return res.sendStatus(404);
-      const medio = await repo.medioPorToken(req.params.token);
-      if (!medio) return res.sendStatus(404);
-      return entregar(req, res, medio);
-    } catch (error) {
-      return siguiente(error);
-    }
-  });
-
   router.use((error, req, res, siguiente) => {
     void siguiente;
     if (error.type === "entity.parse.failed") return res.status(400).json({ error: "El pedido no es un JSON válido." });
-    if (error.type === "entity.too.large") return res.status(413).json({ error: "El archivo es demasiado grande (máximo 40 MB)." });
-    console.error(`Error en la publicación programada: ${error.message}`);
+    if (error.type === "entity.too.large") return res.status(413).json({ error: "El pedido es demasiado grande." });
+    console.error(`Error en el bot: ${error.message}`);
     return res.status(500).json({ error: "Error interno." });
   });
 

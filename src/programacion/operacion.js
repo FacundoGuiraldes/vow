@@ -1,4 +1,4 @@
-// Los datos de la operación que se editan desde los dos lados: el juego (VOW HQ) y el bot (el chat de Telegram y del juego).
+// Los datos de la operación que se editan desde los dos lados: el juego (VOW HQ) y el bot (el chat del juego).
 // Los documentos del repo son el punto de partida; lo que se cambia acá se guarda en la base ("operacion") y manda sobre ellos.
 // Todo cambio deja una novedad para el Estratega y una línea en el historial, para saber quién cambió qué y cuándo.
 import { ahoraArgentina, esFechaISO, esHoraValida, lunesDe } from "./fechas.js";
@@ -13,7 +13,7 @@ const MAX_PROPIAS = 60;
 const MAX_OCULTAS = 120;
 const MAX_HISTORIAL = 20;
 
-export const operacionVacia = () => ({ campos: {}, agenda: { propias: {}, ocultas: [] }, piezasOcultas: [], estrategia: estrategiaVacia(), historial: [] });
+export const operacionVacia = () => ({ campos: {}, agenda: { propias: {}, ocultas: [] }, estrategia: estrategiaVacia(), historial: [] });
 
 export async function leerOperacion(repo) {
   const guardada = await repo.leerEstado("operacion");
@@ -22,7 +22,6 @@ export async function leerOperacion(repo) {
   return {
     campos: guardada.campos && typeof guardada.campos === "object" ? guardada.campos : base.campos,
     agenda: { propias: guardada.agenda?.propias ?? {}, ocultas: Array.isArray(guardada.agenda?.ocultas) ? guardada.agenda.ocultas : [] },
-    piezasOcultas: Array.isArray(guardada.piezasOcultas) ? guardada.piezasOcultas : [],
     estrategia: { ...estrategiaVacia(), ...(guardada.estrategia && typeof guardada.estrategia === "object" ? guardada.estrategia : {}) },
     historial: Array.isArray(guardada.historial) ? guardada.historial : [],
   };
@@ -70,15 +69,6 @@ export async function aplicarOperacion(repo, cambio, { origen = "juego", ahora =
       if (op.agenda.ocultas.length > MAX_OCULTAS) op.agenda.ocultas = op.agenda.ocultas.slice(-MAX_OCULTAS);
       resumen = `Agenda: quitó el evento ${clave.split("|").pop()}`;
     }
-  } else if (cambio?.tipo === "pieza_ocultar") {
-    // Una pieza que solo está en los documentos del repo (no en la base) no se puede cancelar: se oculta del juego
-    if (!esFechaISO(cambio.fecha)) throw new ErrorOperacion("La fecha tiene que ser AAAA-MM-DD.");
-    const formato = limpiar(cambio.formato, 20).toLowerCase();
-    if (!formato) throw new ErrorOperacion("Falta el formato de la pieza (carrusel, reel, historia…).");
-    const clave = `${cambio.fecha}|${formato}`;
-    if (!op.piezasOcultas.includes(clave)) op.piezasOcultas.push(clave);
-    if (op.piezasOcultas.length > MAX_OCULTAS) op.piezasOcultas = op.piezasOcultas.slice(-MAX_OCULTAS);
-    resumen = `Quitó del juego la pieza ${formato} del ${cambio.fecha}`;
   } else if (typeof cambio?.tipo === "string" && cambio.tipo.startsWith("estrategia_")) {
     // La estrategia vale por semana: si cambió la semana, arranca de nuevo desde la investigación
     const lunes = lunesDe(ahoraArgentina(new Date(ahora)).fecha);
@@ -167,7 +157,6 @@ export function markdownDeOperacion(op) {
     "",
     ...ocultas,
     "",
-    ...(op.piezasOcultas?.length ? ["## Piezas de los documentos que se quitaron del juego", "", ...op.piezasOcultas.map((c) => `- ${c.replace("|", " · ")}`), ""] : []),
     "## Últimos cambios",
     "",
     ...historial,

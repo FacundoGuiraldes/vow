@@ -7,7 +7,7 @@ var EDIF={
   bot:{n:'Torre del bot',x:.4,z:-8.1,alto:6.2,sala:'bot'},
   deposito:{n:'Almacén',x:1.1,z:10.3,alto:3.6,sala:'deposito'},
   recepcion:{n:'Instagram',x:10.3,z:1.1,alto:5.2,sala:'recepcion'},
-  diseno:{n:'Taller de diseño',x:10,z:10,alto:4.2,sala:'diseno'},
+  diseno:{n:'Flujo semanal',x:10,z:10,alto:4.2,sala:'diseno'},
   caja:{n:'Caja',x:-9.2,z:7.6,alto:3.4,sala:'caja'},
   agenda:{n:'Agenda de hoy',x:-3.4,z:4.9,alto:2.8,sala:null}
 };

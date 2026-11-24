@@ -1,45 +1,31 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { planificarSemana, normalizarSaltos, recuperarPiezasEnTexto, PIEZAS_AUTO, validarPlan, MAX_TOKENS_ESTRATEGA, construirSistema, leerUltimoInforme, leerUltimoRendimiento, extraerGanchosConocidos, HERRAMIENTA_PLAN, PALABRAS_MAXIMAS_GANCHO } from "./estratega.js";
-import { revisarReglas } from "./reglas-marca.js";
+import { planificarSemana, recuperarDiasEnTexto, validarPlan, construirSistema, leerUltimoInforme, leerUltimoRendimiento, HERRAMIENTA_PLAN, MAXIMO_PUBLICACIONES, MAX_TOKENS_ESTRATEGA } from "./estratega.js";
 
 const SEMANA = "2026-10-19";
 
-// Una pieza que cumple todas las reglas, para modificarla en cada caso
-const piezaValida = (cambios = {}) => ({
+const diaValido = (cambios = {}) => ({
   fecha: "2026-10-20",
   formato: "reel",
-  pilar: "promesa",
-  gancho: "Una promesa para vos.",
-  ganchos_alternativos: ["Prometé poco. Cumplí todo.", "Tu firma no se negocia.", "Lo escrito se cumple.", "Una línea. Un compromiso."],
-  guion: "Texto sobre fondo hueso. Cada línea aparece sola, sin música fuerte.",
-  texto_en_pantalla: ["Una promesa para vos.", "La escribís vos. Nadie más la lee."],
-  epigrafe: "Es lo que sostiene todo lo demás. Anotate en la lista: link en la bio.",
-  palabras_clave: ["promesa", "constancia", "entrenar"],
-  cta: "Anotate en la lista de espera.",
-  recursos: ["Diseño en colores de marca"],
-  justificacion: "Presenta la idea central de la marca sin mostrar producto, que todavía no existe.",
+  contenido: "Un plano cerrado de unas manos atando el cordón antes de salir a entrenar. Sin cara y sin producto.",
   ...cambios,
 });
+const planValido = (dias = [diaValido()]) => ({ dias });
 
-const planValido = (piezas = [piezaValida()]) => ({ resumen: "Semana de presentación de la idea central.", piezas });
-
-// Cliente falso: responde lo que le pidamos y guarda el pedido que recibió
-const clienteFalso = (input, usage = { input_tokens: 1200, output_tokens: 800 }) => {
+// Cliente falso: responde lo que le pidamos (una respuesta por llamada) y guarda los pedidos
+const clienteFalso = (...respuestas) => {
   const pedidos = [];
   return {
     pedidos,
     messages: {
       create: async (pedido) => {
         pedidos.push(pedido);
-        // Igual que la API real con Sonnet 5.5: no acepta forzar una herramienta
-        if (["tool", "any"].includes(pedido.tool_choice?.type)) {
-          throw new Error('400 tool_choice: type "tool" and "any" are not supported for this model.');
-        }
-        return {
-          content: input === null ? [{ type: "text", text: "hola" }] : [{ type: "tool_use", id: "t1", name: "proponer_plan", input }],
-          usage,
-        };
+        if (["tool", "any"].includes(pedido.tool_choice?.type)) throw new Error('400 tool_choice: type "tool" and "any" are not supported for this model.');
+        const r = respuestas[Math.min(pedidos.length - 1, respuestas.length - 1)];
+        const usage = { input_tokens: 1200, output_tokens: 800 };
+        if (r === null) return { content: [{ type: "text", text: "hola" }], usage, stop_reason: "end_turn" };
+        if (r === "cortada") return { content: [], usage, stop_reason: "max_tokens" };
+        return { content: [{ type: "tool_use", id: "t1", name: "proponer_flujo", input: r }], usage, stop_reason: "tool_use" };
       },
     },
   };
@@ -47,722 +33,113 @@ const clienteFalso = (input, usage = { input_tokens: 1200, output_tokens: 800 })
 
 const leerFalso = async (ruta) => (String(ruta).includes("cerebro") ? "CEREBRO-DE-PRUEBA" : "REFERENCIAS-DE-PRUEBA");
 const pedido = { semanaInicio: SEMANA, fase: "base", recursos: { producto: false, gente: false } };
+const opciones = (cliente) => ({ cliente, leer: leerFalso, listar: async () => [] });
 
-test("un plan válido se acepta y informa cuántos tokens usó", async () => {
-  const cliente = clienteFalso(planValido());
-  const r = await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
+test("un flujo válido se acepta y informa cuántos tokens usó", async () => {
+  const r = await planificarSemana(pedido, opciones(clienteFalso(planValido())));
   assert.equal(r.ok, true);
   assert.deepEqual(r.errores, []);
-  assert.equal(r.plan.piezas.length, 1);
+  assert.equal(r.plan.dias.length, 1);
   assert.deepEqual(r.uso, { entrada: 1200, salida: 800 });
+  assert.equal(r.intentos, 1);
 });
 
-test("le pide el formato con la herramienta en modo auto (Sonnet 5.5 no acepta forzarla) y le pasa la marca y las referencias", async () => {
+test("pide el flujo con la herramienta en modo auto y con espacio de sobra, y le pasa la marca", async () => {
   const cliente = clienteFalso(planValido());
-  await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
-  const enviado = cliente.pedidos[0];
-  // La API real rechaza "tool" y "any" con este modelo (error 400): tiene que ser "auto"
-  assert.deepEqual(enviado.tool_choice, { type: "auto" });
-  assert.match(enviado.messages[0].content, /llamando a la herramienta proponer_plan/);
-  assert.equal(enviado.tools[0].name, "proponer_plan");
-  assert.match(enviado.system, /CEREBRO-DE-PRUEBA/);
-  assert.match(enviado.system, /REFERENCIAS-DE-PRUEBA/);
-  assert.match(enviado.messages[0].content, /2026-10-19/);
-  assert.match(enviado.messages[0].content, /producto físico: no/);
+  await planificarSemana(pedido, opciones(cliente));
+  const p = cliente.pedidos[0];
+  assert.equal(p.tool_choice.type, "auto");
+  assert.equal(p.tools[0].name, "proponer_flujo");
+  assert.ok(p.max_tokens >= MAX_TOKENS_ESTRATEGA);
+  assert.match(p.system, /CEREBRO-DE-PRUEBA/);
+  assert.match(p.messages[0].content, /2026-10-19/);
+  assert.match(p.messages[0].content, /2026-10-25/);
 });
 
-test("el sistema lee los archivos reales de marca", async () => {
-  const { texto: sistema } = await construirSistema();
-  assert.match(sistema, /Cerebro de marca/);
-  assert.match(sistema, /Vanquish/);
+test("el esquema de la herramienta solo pide fecha, formato y contenido", () => {
+  const item = HERRAMIENTA_PLAN.input_schema.properties.dias.items;
+  assert.deepEqual(item.required, ["fecha", "formato", "contenido"]);
+  assert.deepEqual(Object.keys(item.properties), ["fecha", "formato", "contenido"]);
 });
 
-test("si la respuesta no trae el plan en el formato esperado, reintenta una vez y después lo descarta", async () => {
+test("el sistema aclara que no se escriben ganchos, guiones ni epígrafes", async () => {
+  const { texto } = await construirSistema(leerFalso, { listar: async () => [] });
+  assert.match(texto, /Nada más: no escribís ganchos, guiones, epígrafes, horas ni hashtags/);
+});
+
+test("si la respuesta no trae la herramienta, reintenta una vez y después lo descarta", async () => {
   const cliente = clienteFalso(null);
-  const r = await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
+  const r = await planificarSemana(pedido, opciones(cliente));
   assert.equal(r.ok, false);
-  assert.equal(r.plan, null);
+  assert.equal(cliente.pedidos.length, 2);
   assert.match(r.errores[0], /formato esperado/);
-  assert.equal(cliente.pedidos.length, 2, "un intento y un reintento");
-  assert.deepEqual(r.uso, { entrada: 2400, salida: 1600 }, "se suma el gasto de los dos intentos");
 });
 
-test("si la primera respuesta es texto y la segunda trae el plan, se acepta", async () => {
-  const respuestas = [
-    { content: [{ type: "text", text: "Acá va el plan..." }], usage: { input_tokens: 100, output_tokens: 50 } },
-    { content: [{ type: "tool_use", id: "t2", name: "proponer_plan", input: planValido() }], usage: { input_tokens: 150, output_tokens: 700 } },
-  ];
-  const cliente = { messages: { create: async () => respuestas.shift() } };
-  const r = await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
+test("si la primera respuesta es texto y la segunda trae el flujo, se acepta", async () => {
+  const r = await planificarSemana(pedido, opciones(clienteFalso(null, planValido())));
   assert.equal(r.ok, true);
-  assert.deepEqual(r.uso, { entrada: 250, salida: 750 });
+  assert.equal(r.intentos, 2);
 });
 
-test("un plan sin piezas o con campos que faltan se rechaza", () => {
-  assert.equal(validarPlan({ resumen: "x", piezas: [] }, { semanaInicio: SEMANA }).ok, false);
-  const sinGancho = validarPlan(planValido([piezaValida({ gancho: "" })]), { semanaInicio: SEMANA });
-  assert.equal(sinGancho.ok, false);
-  assert.match(sinGancho.errores.join(" "), /falta gancho/);
+test("una respuesta cortada por el límite de tokens no se valida a medias", async () => {
+  const r = await planificarSemana(pedido, opciones(clienteFalso("cortada", planValido())));
+  assert.equal(r.ok, true);
 });
 
-test("rechaza formato o pilar inventados y fechas fuera de la semana", () => {
-  const { ok, errores } = validarPlan(
-    planValido([piezaValida({ formato: "tiktok", pilar: "humor", fecha: "2026-10-30" })]),
-    { semanaInicio: SEMANA }
-  );
-  assert.equal(ok, false);
-  assert.match(errores.join(" "), /formato inválido/);
-  assert.match(errores.join(" "), /pilar inválido/);
-  assert.match(errores.join(" "), /fuera de la semana/);
+test("un flujo que rompe las reglas tiene una segunda oportunidad con los errores", async () => {
+  const mal = planValido([diaValido({ fecha: "2026-11-30" })]);
+  const cliente = clienteFalso(mal, planValido());
+  const r = await planificarSemana(pedido, opciones(cliente));
+  assert.equal(r.ok, true);
+  assert.equal(cliente.pedidos.length, 2);
+  const ultimo = cliente.pedidos[1].messages.at(-1).content[0];
+  assert.equal(ultimo.is_error, true);
+  assert.match(ultimo.content, /fuera de la semana/);
 });
 
-test("rechaza una pieza que rompe las reglas de marca", () => {
-  const { ok, errores } = validarPlan(
-    planValido([piezaValida({ gancho: "Sin excusas, quemá grasa", cta: "Comprá ya" })]),
-    { semanaInicio: SEMANA }
-  );
-  assert.equal(ok, false);
-  assert.match(errores.join(" "), /promesa de resultados físicos/);
-  assert.match(errores.join(" "), /anotarse en la lista/);
-});
-
-test("rechaza cifras que no están en los datos cargados", () => {
-  const { ok, errores } = validarPlan(
-    planValido([piezaValida({ epigrafe: "Probamos 5 straps hasta que cedan. Anotate en la lista." })]),
-    { semanaInicio: SEMANA }
-  );
-  assert.equal(ok, false);
-  assert.match(errores.join(" "), /cifra "5"/);
-});
-
-test("no deja mostrar producto ni gente si todavía no hay", () => {
-  const sinProducto = validarPlan(planValido([piezaValida({ pilar: "producto en uso" })]), {
-    semanaInicio: SEMANA,
-    recursos: { producto: false },
-  });
-  assert.match(sinProducto.errores.join(" "), /todavía no hay producto/);
-
-  const conProducto = validarPlan(planValido([piezaValida({ pilar: "producto en uso" })]), {
-    semanaInicio: SEMANA,
-    recursos: { producto: true },
-  });
-  assert.equal(conProducto.ok, true);
-
-  const sinGente = validarPlan(planValido([piezaValida({ pilar: "gente que entrena" })]), { semanaInicio: SEMANA });
-  assert.match(sinGente.errores.join(" "), /no hay personas confirmadas/);
-});
-
-test("rechaza más de 5 piezas en la semana", () => {
-  const piezas = Array.from({ length: 6 }, () => piezaValida());
-  const { ok, errores } = validarPlan(planValido(piezas), { semanaInicio: SEMANA });
-  assert.equal(ok, false);
-  assert.match(errores.join(" "), /más de 5 piezas/);
-});
-
-test("un plan inválido devuelve los errores y no entrega el plan", async () => {
-  const cliente = clienteFalso(planValido([piezaValida({ gancho: "Quemá grasa hoy" })]));
-  const r = await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
+test("si sigue mal después del reintento, devuelve los errores y no entrega el flujo", async () => {
+  const mal = planValido([diaValido({ fecha: "2026-11-30" })]);
+  const r = await planificarSemana(pedido, opciones(clienteFalso(mal)));
   assert.equal(r.ok, false);
   assert.equal(r.plan, null);
-  assert.ok(r.propuesta, "se conserva la propuesta para poder mirarla");
-  assert.match(r.errores.join(" "), /promesa de resultados físicos/);
+  assert.ok(r.errores.length > 0);
 });
 
 test("exige una fecha de inicio válida y un cliente", async () => {
-  await assert.rejects(() => planificarSemana({ ...pedido, semanaInicio: "mañana" }, { cliente: clienteFalso({}) }), /AAAA-MM-DD/);
-  await assert.rejects(() => planificarSemana(pedido, {}), /cliente/);
+  await assert.rejects(planificarSemana({ ...pedido, semanaInicio: "mañana" }, opciones(clienteFalso(planValido()))), /AAAA-MM-DD/);
+  await assert.rejects(planificarSemana(pedido, { leer: leerFalso }), /cliente/);
 });
 
-test("acepta el gancho aprobado por Facundo", () => {
-  const r = validarPlan(planValido([piezaValida({ gancho: "Escribí tu promesa. Después cumplila." })]), { semanaInicio: SEMANA });
-  assert.equal(r.ok, true, r.errores.join(" | "));
+test("recupera la lista de días cuando llega como texto JSON", () => {
+  const texto = JSON.stringify([diaValido()]);
+  assert.equal(recuperarDiasEnTexto({ dias: texto }).dias.length, 1);
+  assert.deepEqual(recuperarDiasEnTexto({ dias: "no es json" }), { dias: "no es json" });
 });
 
-test("los ganchos que Facundo descartó (tutorial y anunciar lo que falta) ya no bloquean: quedan como advertencias de estilo", () => {
-  const tutorial = validarPlan(planValido([piezaValida({ gancho: "Cómo escribir una promesa que puedas cumplir." })]), { semanaInicio: SEMANA });
-  assert.equal(tutorial.ok, true, tutorial.errores.join(" | "));
-  assert.match(tutorial.advertencias.join(" "), /suena a tutorial/);
-
-  const falta = validarPlan(planValido([piezaValida({ gancho: "Todavía no hay prenda para mostrarte. Hay una idea.", texto_en_pantalla: ["Todavía no hay prenda para mostrarte."] })]), { semanaInicio: SEMANA });
-  assert.equal(falta.ok, true, falta.errores.join(" | "));
-  assert.match(falta.advertencias.join(" "), /anuncia lo que falta/);
+test("validarPlan: forma, semana, formatos y repetidos", () => {
+  assert.equal(validarPlan(planValido(), { semanaInicio: SEMANA }).ok, true);
+  assert.equal(validarPlan(null).ok, false);
+  assert.match(validarPlan({}).errores[0], /no tiene días/);
+  assert.match(validarPlan({ dias: [] }).errores[0], /no tiene publicaciones/);
+  assert.match(validarPlan(planValido([diaValido({ fecha: "20/10" })])).errores.join(" "), /AAAA-MM-DD/);
+  assert.match(validarPlan(planValido([diaValido({ formato: "podcast" })])).errores.join(" "), /formato inválido/);
+  assert.match(validarPlan(planValido([diaValido({ fecha: "2026-10-28" })]), { semanaInicio: SEMANA }).errores.join(" "), /fuera de la semana/);
+  assert.match(validarPlan(planValido([diaValido(), diaValido()])).errores.join(" "), /repite el formato/);
+  assert.match(validarPlan(planValido(Array.from({ length: MAXIMO_PUBLICACIONES + 1 }, (_, i) => diaValido({ fecha: `2026-10-${20 + (i % 6)}`, formato: ["reel", "carrusel", "imagen", "story"][i % 4] })))).errores.join(" "), /más de 7/);
 });
 
-test("los ganchos con tono de lista de consejos avisan (y una cifra inventada sigue bloqueando)", () => {
-  for (const gancho of ["Tips para empezar", "Guía para tu promesa"]) {
-    const r = validarPlan(planValido([piezaValida({ gancho })]), { semanaInicio: SEMANA });
-    assert.match(r.advertencias.join(" "), /suena a tutorial/, gancho);
-  }
-  const conCifra = validarPlan(planValido([piezaValida({ gancho: "5 tips para entrenar" })]), { semanaInicio: SEMANA });
-  assert.equal(conCifra.ok, false);
-  assert.match(conCifra.errores.join(" "), /cifra/);
+test("validarPlan: el contenido tiene largo razonable y cumple las reglas de marca", () => {
+  assert.match(validarPlan(planValido([diaValido({ contenido: "Algo corto" })])).errores.join(" "), /muy corto/);
+  assert.match(validarPlan(planValido([diaValido({ contenido: "x ".repeat(400) })])).errores.join(" "), /supera/);
+  assert.equal(validarPlan(planValido([diaValido({ contenido: "Un reel que muestra cómo quemá grasa rápido con la gorra de VOW." })])).ok, false);
+  assert.equal(validarPlan(planValido([diaValido({ contenido: "Una story con 5000 seguidores nuevos en la última semana de la cuenta." })])).ok, false);
 });
 
-test("un gancho largo no es un gancho fuerte: máximo 12 palabras", () => {
-  const largo = "Escribí una promesa para vos y para nadie más porque nadie la va a leer jamás";
-  const r = validarPlan(planValido([piezaValida({ gancho: largo })]), { semanaInicio: SEMANA });
-  assert.equal(r.ok, false);
-  assert.match(r.errores.join(" "), /palabras \(máximo 12\)/);
-});
-
-test("respeta la cantidad de piezas pedida (por defecto 2)", () => {
-  const tres = planValido([
-    piezaValida(),
-    piezaValida({ fecha: "2026-10-21", pilar: "proceso" }),
-    piezaValida({ fecha: "2026-10-22", pilar: "lanzamiento" }),
-  ]);
-  const porDefecto = validarPlan(tres, { semanaInicio: SEMANA });
-  assert.match(porDefecto.errores.join(" "), /Se pidieron 2 piezas y el plan trae 3/);
-  assert.equal(validarPlan(tres, { semanaInicio: SEMANA, piezas: 3 }).ok, true);
-});
-
-test("le informa a la IA cuántas piezas pedir", async () => {
-  const cliente = clienteFalso(planValido());
-  await planificarSemana({ ...pedido, piezas: 1 }, { cliente, leer: leerFalso, listar: async () => [] });
-  assert.match(cliente.pedidos[0].messages[0].content, /Cantidad de piezas: 1/);
-  const porDefecto = clienteFalso(planValido());
-  await planificarSemana(pedido, { cliente: porDefecto, leer: leerFalso, listar: async () => [] });
-  assert.match(porDefecto.pedidos[0].messages[0].content, /Cantidad de piezas: 2/);
-});
-
-test("las instrucciones incluyen el estilo de ganchos de la marca", async () => {
-  const { texto: sistema } = await construirSistema();
-  assert.match(sistema, /Fuerza y compromiso/);
-  assert.match(sistema, /Escribí tu promesa\. Después cumplila\./);
-  assert.match(sistema, /Descartados por Facundo/);
-});
-
-// --- Ganchos alternativos, ganchos conocidos y variedad ---
-const conocidosReales = async () => {
-  const { cerebro } = await construirSistema();
-  return extraerGanchosConocidos(cerebro);
-};
-
-test("lee del cerebro de marca los ganchos aprobados, pendientes y descartados", async () => {
-  const { aprobados, conocidos } = await conocidosReales();
-  assert.equal(aprobados.length, 8);
-  assert.ok(aprobados.includes("Cumplite a vos primero"));
-  assert.ok(aprobados.includes("Para los que cumplen"));
-  assert.ok(!aprobados.includes("Escribí tu promesa. Después cumplila."), "pasó a descartados");
-  assert.ok(aprobados.includes("Firmá lo que vas a sostener"));
-  assert.ok(conocidos.includes("Nadie te está mirando. Entrená igual."), "los descartados también cuentan como conocidos");
-  assert.ok(conocidos.length > aprobados.length);
-});
-
-test("los ganchos aprobados cumplen las reglas del código (marca y código no se contradicen)", async () => {
-  const { aprobados } = await conocidosReales();
-  for (const gancho of aprobados) {
-    assert.deepEqual(revisarReglas(gancho), [], gancho);
-    assert.ok(gancho.trim().split(/\s+/).length <= PALABRAS_MAXIMAS_GANCHO, gancho);
-  }
-});
-
-test("rechaza ganchos alternativos que copian un ejemplo del cerebro de marca", async () => {
-  const { conocidos } = await conocidosReales();
-  const plan = planValido([piezaValida({ ganchos_alternativos: ["Para los que cumplen.", "Tu firma no se negocia.", "Lo escrito se cumple."] })]);
-  const r = validarPlan(plan, { semanaInicio: SEMANA, ganchosConocidos: conocidos });
-  assert.equal(r.ok, false);
-  assert.match(r.errores.join(" "), /copia un ejemplo del cerebro de marca/);
-});
-
-test("pide al menos 3 alternativos, sin repetidos y que cumplan las reglas", () => {
-  const pocos = validarPlan(planValido([piezaValida({ ganchos_alternativos: ["Uno solo."] })]), { semanaInicio: SEMANA });
-  assert.match(pocos.errores.join(" "), /al menos 3 ganchos alternativos/);
-
-  const repetido = validarPlan(planValido([piezaValida({ ganchos_alternativos: ["Tu firma no se negocia.", "tu firma no se negocia", "Lo escrito se cumple."] })]), { semanaInicio: SEMANA });
-  assert.match(repetido.errores.join(" "), /repetido/);
-
-  const malo = validarPlan(planValido([piezaValida({ ganchos_alternativos: ["Quemá grasa a entrenar", "Cómo cumplir una promesa", "Lo escrito se cumple."] })]), { semanaInicio: SEMANA });
-  assert.match(malo.errores.join(" "), /promesa de resultados físicos/);
-  assert.match(malo.advertencias.join(" "), /suena a tutorial/);
-});
-
-test("el gancho principal puede ser uno aprobado, pero no más de uno por plan", async () => {
-  const { conocidos } = await conocidosReales();
-  const uno = planValido([
-    piezaValida({ gancho: "Para los que cumplen" }),
-    piezaValida({ fecha: "2026-10-22", pilar: "proceso", gancho: "Firmá con vos. Cumplí." }),
-  ]);
-  assert.equal(validarPlan(uno, { semanaInicio: SEMANA, ganchosConocidos: conocidos }).ok, true);
-
-  const dos = planValido([
-    piezaValida({ gancho: "Para los que cumplen" }),
-    piezaValida({ fecha: "2026-10-22", pilar: "proceso", gancho: "Escribí tu promesa. Después cumplila." }),
-  ]);
-  const r = validarPlan(dos, { semanaInicio: SEMANA, ganchosConocidos: conocidos });
-  assert.match(r.errores.join(" "), /Más de un gancho principal sale de la lista/);
-});
-
-test("con 2 piezas, los pilares tienen que ser distintos", () => {
-  const dosIguales = planValido([piezaValida(), piezaValida({ fecha: "2026-10-22" })]);
-  const r = validarPlan(dosIguales, { semanaInicio: SEMANA });
-  assert.match(r.errores.join(" "), /pilar "promesa" aparece 2 veces/);
-});
-
-test("las instrucciones piden ganchos nuevos y alternativos", async () => {
-  const { texto } = await construirSistema();
-  assert.match(texto, /A lo sumo UNO de los ganchos principales/);
-  assert.match(texto, /4 alternativos/);
-});
-
-test("rechaza piezas que explican la marca por dentro, pero lo deja en el guion", () => {
-  const dentro = validarPlan(planValido([piezaValida({ texto_en_pantalla: ["Nuestra paleta: beige y bordó."] })]), { semanaInicio: SEMANA });
-  assert.equal(dentro.ok, false);
-  assert.ok(dentro.errores.some((e) => e.includes("explica la marca por dentro")));
-  const enGuion = validarPlan(planValido([piezaValida({ guion: "Cada slide muestra un color de la paleta, con Unbounded para el título." })]), { semanaInicio: SEMANA });
-  assert.equal(enGuion.ok, true, enGuion.errores.join(" | "));
-});
-
-test("ganchos alternativos con elementos del gimnasio y recursos de papel avisan pero no bloquean", () => {
-  const gym = validarPlan(planValido([piezaValida({ ganchos_alternativos: ["Prometé poco. Cumplí todo.", "Tu palabra. Después la barra.", "Una línea. Un compromiso.", "Lo escrito se cumple."] })]), { semanaInicio: SEMANA });
-  assert.equal(gym.errores.some((e) => e.includes("nombra elementos del gimnasio")), false);
-  const papel = validarPlan(planValido([piezaValida({ recursos: ["Lapicera negra", "Cartulina beige"] })]), { semanaInicio: SEMANA });
-  assert.equal(papel.errores.some((e) => e.includes("promesa en papel")), false);
-});
-
-test("las instrucciones dicen que la promesa es de uno mismo y que no se nombran elementos del gym", async () => {
-  const { texto } = await construirSistema(leerFalso, { listar: async () => [] });
-  assert.match(texto, /a sí misma y cumple/);
-  assert.match(texto, /elementos del gimnasio/);
-  assert.match(texto, /le habla a quien la mira/i);
-});
-
-test("un guion que aclara qué no aparece se acepta; uno que lo pide queda como advertencia", () => {
-  const bien = validarPlan(planValido([piezaValida({ guion: "Solo texto sobre fondo hueso. No aparece papel ni lapicera, y no se habla de lo que todavía no hay." })]), { semanaInicio: SEMANA });
-  assert.equal(bien.ok, true, bien.errores.join(" | "));
-  const mal = validarPlan(planValido([piezaValida({ guion: "Unas manos escriben con lapicera sobre papel." })]), { semanaInicio: SEMANA });
-  assert.ok(mal.advertencias.some((e) => e.includes("promesa en papel")));
-});
-
-test("un guion que numera las láminas no se rechaza por cifras", () => {
-  const guion = "Carrusel tipográfico. Lámina 1: el gancho. Lámina 2: una frase. Lámina 3: cierre con la invitación a la lista.";
-  const r = validarPlan(planValido([piezaValida({ guion })]), { semanaInicio: SEMANA });
-  assert.equal(r.ok, true, r.errores.join(" | "));
-  const inventada = validarPlan(planValido([piezaValida({ guion: "Lámina 1: mostramos 5 straps." })]), { semanaInicio: SEMANA });
-  assert.ok(inventada.errores.some((e) => e.includes('la cifra "5"')));
-});
-
-test("si hay un informe del Investigador, el Estratega lo lee y se apoya en él sin que gane sobre la marca", async () => {
-  const listar = async () => ["informe-2026-10-12.md", "informe-2026-10-19.md", "informe-2026-10-20-simulado.md", "datos-2026-10-19.json", "hipotesis.json"];
-  const leidos = [];
-  const leer = async (ruta) => {
-    leidos.push(String(ruta));
-    return String(ruta).includes("informe") ? "HALLAZGOS-DE-PRUEBA" : "CONTENIDO";
-  };
-  const { texto } = await construirSistema(leer, { listar });
-  assert.match(texto, /=== INVESTIGACIÓN DE MERCADO \(informe-2026-10-19\.md\) ===\nHALLAZGOS-DE-PRUEBA/);
-  assert.ok(leidos.some((r) => r.endsWith("informe-2026-10-19.md")), "lee el más reciente");
-  assert.ok(!leidos.some((r) => r.includes("simulado") || r.includes("2026-10-12")), "ignora el simulado y los viejos");
-  assert.match(texto, /nunca gana sobre el cerebro de marca/);
-  assert.match(texto, /no uses sus cifras en los textos/);
-});
-
-test("sin informe (o si no se puede leer), el Estratega trabaja como antes", async () => {
-  const sinNada = await construirSistema(leerFalso, { listar: async () => ["hipotesis.json"] });
-  assert.ok(!sinNada.texto.includes("=== INVESTIGACIÓN DE MERCADO"));
-  const roto = await construirSistema(async (ruta) => { if (String(ruta).includes("informe")) throw new Error("no se puede leer"); return "CONTENIDO"; }, { listar: async () => ["informe-2026-10-19.md"] });
-  assert.ok(!roto.texto.includes("=== INVESTIGACIÓN DE MERCADO"));
-  const sinCarpeta = await leerUltimoInforme({ listar: async () => { throw new Error("ENOENT"); } });
-  assert.equal(sinCarpeta, null);
-});
-
-test("si hay un informe de rendimiento propio, el Estratega lee el último de su carpeta y lo usa con cuidado", async () => {
-  const listar = async (carpeta) =>
-    String(carpeta).includes("rendimiento") ? ["rendimiento-2026-10-14.md", "rendimiento-2026-10-21.md", "rendimiento-2026-10-22-simulado.md", "rendimiento-2026-10-21.json"] : [];
-  const leidos = [];
-  const leer = async (ruta) => {
-    leidos.push(String(ruta));
-    return String(ruta).includes("rendimiento-") ? "RESULTADOS-PROPIOS" : "CONTENIDO";
-  };
-  const { texto } = await construirSistema(leer, { listar });
-  assert.match(texto, /=== RENDIMIENTO DE @vow_ar \(rendimiento-2026-10-21\.md\) ===\nRESULTADOS-PROPIOS/);
-  assert.ok(leidos.some((r) => r.endsWith("docs/rendimiento/rendimiento-2026-10-21.md")), "lee el más reciente de docs/rendimiento");
-  assert.ok(!leidos.some((r) => r.includes("simulado") || r.includes("2026-10-14")), "ignora el simulado y los viejos");
-  assert.ok(!texto.includes("=== INVESTIGACIÓN DE MERCADO"), "un informe de rendimiento no se confunde con uno de investigación");
-  assert.match(texto, /con muestra chica es una señal, no una conclusión/);
-  assert.match(texto, /No uses sus cifras en los textos de la pieza/);
-});
-
-test("sin informe de rendimiento (o si no se puede leer), el Estratega no agrega el bloque", async () => {
-  const sinNada = await construirSistema(leerFalso, { listar: async () => [] });
-  assert.ok(!sinNada.texto.includes("=== RENDIMIENTO DE @vow_ar"));
-  const roto = await construirSistema(async (ruta) => { if (String(ruta).includes("rendimiento-")) throw new Error("no se puede leer"); return "CONTENIDO"; }, { listar: async () => ["rendimiento-2026-10-21.md"] });
-  assert.ok(!roto.texto.includes("=== RENDIMIENTO DE @vow_ar"));
-  assert.equal(await leerUltimoRendimiento({ listar: async () => { throw new Error("ENOENT"); } }), null);
-});
-
-test("el informe real del repo llega al Estratega", async () => {
-  const { texto } = await construirSistema();
-  assert.match(texto, /=== INVESTIGACIÓN DE MERCADO \(informe-\d{4}-\d{2}-\d{2}\.md\) ===/);
-  assert.match(texto, /## Hallazgos/);
-});
-
-const definida = { nombre: "2026-10-27-carrusel-promesa.md", formato: "carrusel", fecha: "2026-10-27", pilar: "promesa", frases: ["Cumplite a vos primero", "Lo que firmás con vos no se rompe"], texto: "# Carrusel · 27/10/2026 · pilar promesa" };
-
-test("no repite el formato y el pilar de una pieza ya definida en fechas cercanas", () => {
-  const repetida = validarPlan(planValido([piezaValida({ fecha: "2026-10-28", formato: "carrusel", pilar: "promesa" })]), { semanaInicio: "2026-10-26", piezasDefinidas: [definida] });
-  assert.ok(repetida.errores.some((e) => e.includes("ya definida del 2026-10-27")));
-  const otroPilar = validarPlan(planValido([piezaValida({ fecha: "2026-10-28", formato: "carrusel", pilar: "proceso" })]), { semanaInicio: "2026-10-26", piezasDefinidas: [definida] });
-  assert.ok(!otroPilar.errores.some((e) => e.includes("ya definida")));
-  const otraSemana = validarPlan(planValido([piezaValida({ fecha: "2026-11-09", formato: "carrusel", pilar: "promesa" })]), { semanaInicio: "2026-11-09", piezasDefinidas: [definida] });
-  assert.ok(!otraSemana.errores.some((e) => e.includes("ya definida")));
-});
-
-test("no reutiliza las frases de una pieza ya definida, ni como gancho, alternativo ni texto en pantalla", () => {
-  const principal = validarPlan(planValido([piezaValida({ gancho: "Cumplite a vos primero" })]), { semanaInicio: SEMANA, piezasDefinidas: [definida] });
-  assert.ok(principal.errores.some((e) => e.includes("reutiliza una frase")));
-  const alternativo = validarPlan(planValido([piezaValida({ ganchos_alternativos: ["Prometé poco. Cumplí todo.", "Tu firma no se negocia.", "Lo que firmás con vos no se rompe", "Una línea. Un compromiso."] })]), { semanaInicio: SEMANA, piezasDefinidas: [definida] });
-  assert.ok(alternativo.errores.some((e) => e.includes("reutiliza una frase")));
-  const enPantalla = validarPlan(planValido([piezaValida({ texto_en_pantalla: ["Cumplite a vos primero.", "Otra"] })]), { semanaInicio: SEMANA, piezasDefinidas: [definida] });
-  assert.ok(enPantalla.errores.some((e) => e.includes("reutiliza una frase")));
-});
-
-test("el Estratega conoce las piezas definidas: están en las instrucciones y en el pedido de esa semana", async () => {
-  const listar = async (carpeta) => (String(carpeta).includes("piezas") ? ["2026-10-27-carrusel-promesa.md"] : []);
-  const leer = async (ruta) => (String(ruta).includes("carrusel-promesa") ? "# Carrusel · 27/10/2026 · pilar promesa\n\n## Láminas\n1. Cumplite a vos primero\n" : "CONTENIDO");
-  const { texto } = await construirSistema(leer, { listar });
-  assert.match(texto, /=== PIEZAS YA DEFINIDAS ===\n# Carrusel · 27\/10\/2026/);
-  assert.match(texto, /no repitas su idea/);
-  const cliente = clienteFalso(planValido([piezaValida({ fecha: "2026-10-30", formato: "reel", pilar: "proceso", gancho: "Construí sin que te vean" })]));
-  const r = await planificarSemana({ semanaInicio: "2026-10-26", fase: "base", recursos: {}, piezas: 1 }, { cliente, leer, listar });
-  assert.ok(cliente.pedidos[0].messages[0].content.includes("Esa semana ya hay definidas: carrusel del 2026-10-27 (pilar promesa)"));
-  assert.equal(r.ok, true, (r.errores ?? []).join(" | "));
-});
-
-test("una propuesta que repite una pieza definida se rechaza al planificar", async () => {
-  const listar = async (carpeta) => (String(carpeta).includes("piezas") ? ["2026-10-27-carrusel-promesa.md"] : []);
-  const leer = async (ruta) => (String(ruta).includes("carrusel-promesa") ? "# Carrusel · 27/10/2026 · pilar promesa\n\n## Láminas\n1. Cumplite a vos primero\n" : "CONTENIDO");
-  const cliente = clienteFalso(planValido([piezaValida({ fecha: "2026-10-28", formato: "carrusel", pilar: "promesa" })]));
-  const r = await planificarSemana({ semanaInicio: "2026-10-26", fase: "base", recursos: {}, piezas: 1 }, { cliente, leer, listar });
-  assert.equal(r.ok, false);
-  assert.ok(r.errores.some((e) => e.includes("ya definida")));
-});
-
-test("un guion con pasos numerados como 1) 2) 3) no se rechaza por cifras", () => {
-  const guion = "Reel corto de texto. 1) Aparece el gancho. 2) Entra la segunda frase. 3) Tercera frase. 4) Cierre sobre fondo hueso.";
-  const r = validarPlan(planValido([piezaValida({ guion })]), { semanaInicio: SEMANA });
-  assert.equal(r.ok, true, r.errores.join(" | "));
-});
-
-// Cliente que contesta una lista de respuestas en orden (con su stop_reason) y guarda los pedidos
-const clienteEnSecuencia = (respuestas) => {
-  const pedidos = [];
-  return {
-    pedidos,
-    messages: {
-      create: async (pedido) => {
-        pedidos.push(pedido);
-        const r = respuestas[Math.min(pedidos.length - 1, respuestas.length - 1)];
-        const content = r.texto ? [{ type: "text", text: "hola" }] : [{ type: "tool_use", id: "t1", name: "proponer_plan", input: r.input }];
-        return { content, stop_reason: r.stop_reason ?? "tool_use", usage: { input_tokens: 100, output_tokens: r.salida ?? 50 } };
-      },
-    },
-  };
-};
-
-test("pide espacio de sobra para el plan (más de 4096 tokens)", async () => {
-  const cliente = clienteEnSecuencia([{ input: planValido() }]);
-  await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
-  assert.equal(cliente.pedidos[0].max_tokens, MAX_TOKENS_ESTRATEGA);
-  assert.ok(MAX_TOKENS_ESTRATEGA > 4096);
-});
-
-test("si la respuesta se corta por el límite de tokens, no valida el plan a medias: reintenta con el doble de espacio", async () => {
-  // Lo que llega cortado no tiene piezas: antes se informaba "El plan no tiene piezas", que despistaba
-  const cliente = clienteEnSecuencia([{ input: { resumen: "plan a medias" }, stop_reason: "max_tokens", salida: MAX_TOKENS_ESTRATEGA }, { input: planValido(), salida: 3000 }]);
-  const r = await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
-  assert.equal(r.ok, true);
-  assert.equal(cliente.pedidos.length, 2);
-  assert.equal(cliente.pedidos[1].max_tokens, MAX_TOKENS_ESTRATEGA * 2);
-  assert.deepEqual(r.uso, { entrada: 200, salida: MAX_TOKENS_ESTRATEGA + 3000 }); // se cuenta lo gastado en los dos intentos
-  assert.equal(cliente.pedidos[1].messages.length, 1); // no se reenvía la herramienta a medias
-});
-
-test("si se corta las dos veces, el error dice que se cortó (no 'no tiene piezas') y se informa el gasto", async () => {
-  const cortado = { input: { resumen: "a medias" }, stop_reason: "max_tokens", salida: 8192 };
-  const cliente = clienteEnSecuencia([cortado, cortado]);
-  const r = await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
-  assert.equal(r.ok, false);
-  assert.deepEqual(r.errores, ["La respuesta se cortó por el límite de tokens: el plan quedó incompleto."]);
-  assert.equal(r.propuesta, undefined);
-  assert.equal(r.uso.salida, 16384);
-});
-
-test("un plan que termina justo bien (stop_reason tool_use) no se reintenta", async () => {
-  const cliente = clienteEnSecuencia([{ input: planValido() }]);
-  await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
-  assert.equal(cliente.pedidos.length, 1);
-});
-
-test("el motivo del fallo es el del último intento: cortada una vez y después solo texto, no dice que se cortó", async () => {
-  const cliente = clienteEnSecuencia([{ input: { resumen: "a medias" }, stop_reason: "max_tokens", salida: 8192 }, { texto: true }]);
-  const r = await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
-  assert.equal(r.ok, false);
-  assert.deepEqual(r.errores, ["La respuesta no trajo el plan en el formato esperado."]);
-});
-
-test("los errores de reglas y cifras dicen en qué campo de la pieza está el problema", () => {
-  const plan = planValido([piezaValida({ guion: "Texto del 27/10 sobre fondo hueso.", epigrafe: "Somos 500. Anotate en la lista: link en la bio.", texto_en_pantalla: ["Quemá grasa.", "Sin apuro."] })]);
-  const { errores } = validarPlan(plan, { semanaInicio: SEMANA, piezas: 1 });
-  assert.ok(errores.some((e) => e.includes("Pieza 1 (guion): la cifra \"27\"")), errores.join(" | "));
-  assert.ok(errores.some((e) => e.includes("Pieza 1 (epigrafe): la cifra \"500\"")), errores.join(" | "));
-  assert.ok(errores.some((e) => e.includes("Pieza 1 (texto_en_pantalla): promesa de resultados físicos")), errores.join(" | "));
-});
-
-test("un guion con un papel negado se perdona pero el mismo texto en el epígrafe no, aunque sean iguales", () => {
-  const frase = "No aparece lapicera.";
-  const enGuion = validarPlan(planValido([piezaValida({ guion: frase })]), { semanaInicio: SEMANA, piezas: 1 });
-  assert.equal(enGuion.errores.filter((e) => e.includes("promesa en papel")).length, 0);
-  const enEpigrafe = validarPlan(planValido([piezaValida({ guion: frase, epigrafe: `${frase} Anotate en la lista: link en la bio.` })]), { semanaInicio: SEMANA, piezas: 1 });
-  assert.ok(enEpigrafe.advertencias.some((e) => e.includes("(epigrafe): promesa en papel")), enEpigrafe.advertencias.join(" | "));
-});
-
-test("distingue un plan sin la lista de piezas de uno con la lista vacía", () => {
-  const sin = validarPlan({ resumen: "x" }, { semanaInicio: SEMANA });
-  assert.deepEqual(sin.errores, ['El plan no tiene piezas: "piezas" no vino.']);
-  const comoTexto = validarPlan({ resumen: "x", piezas: "[{\"fecha\":\"2026-10-20\"}]" }, { semanaInicio: SEMANA });
-  assert.deepEqual(comoTexto.errores, ['El plan no tiene piezas: "piezas" llegó como string.']);
-  const vacia = validarPlan({ resumen: "x", piezas: [] }, { semanaInicio: SEMANA });
-  assert.deepEqual(vacia.errores, ["El plan no tiene piezas."]);
-});
-
-test("informa cuántos intentos hicieron falta", async () => {
-  const uno = await planificarSemana(pedido, { cliente: clienteEnSecuencia([{ input: planValido() }]), leer: leerFalso, listar: async () => [] });
-  assert.equal(uno.intentos, 1);
-  const dos = await planificarSemana(pedido, { cliente: clienteEnSecuencia([{ input: { resumen: "a medias" }, stop_reason: "max_tokens" }, { input: planValido() }]), leer: leerFalso, listar: async () => [] });
-  assert.equal(dos.intentos, 2);
-  const fallo = await planificarSemana(pedido, { cliente: clienteEnSecuencia([{ texto: true }]), leer: leerFalso, listar: async () => [] });
-  assert.equal(fallo.intentos, 2);
-});
-
-test("los años de lanzamiento (2026 del Drop 00 y 2027 del Drop 01) se pueden usar en los textos, pero otro año no", () => {
-  const con = (anio) => planValido([piezaValida({ epigrafe: `Drop 01 en ${anio}. Anotate en la lista: link en la bio.` })]);
-  assert.equal(validarPlan(con(2027), { semanaInicio: SEMANA, piezas: 1 }).ok, true);
-  assert.equal(validarPlan(con(2026), { semanaInicio: SEMANA, piezas: 1 }).ok, true);
-  const otro = validarPlan(con(2028), { semanaInicio: SEMANA, piezas: 1 });
-  assert.equal(otro.ok, false);
-  assert.ok(otro.errores.some((e) => e.includes('la cifra "2028"')), otro.errores.join(" | "));
-});
-
-test("el prompt del Estratega le dice qué números se permiten (01 y 2027 del Drop 01; 00 y 2026 del Drop 00)", async () => {
-  const { texto } = await construirSistema(leerFalso, { listar: async () => [] });
-  assert.ok(texto.includes('salvo "01" de "Drop 01" con su año "2027", y "00" de "Drop 00" con su año "2026"'));
-  assert.ok(texto.includes("Al Drop 00 solo lo nombrás como adelanto"));
-});
-
-test("el error de una cifra muestra en qué frase está, para poder decidir si es un error real o una regla demasiado estricta", () => {
-  const plan = planValido([piezaValida({ guion: "Plano fijo con 3 prendas sobre la mesa y luz natural de ventana.", epigrafe: "Somos 500. Anotate en la lista: link en la bio." })]);
-  const { errores } = validarPlan(plan, { semanaInicio: SEMANA, piezas: 1 });
-  const delGuion = errores.find((e) => e.startsWith('Pieza 1 (guion): la cifra "3"'));
-  assert.ok(delGuion, errores.join(" | "));
-  assert.match(delGuion, /no está en los datos cargados \("[^"]*3 prendas[^"]*"\)\.$/);
-  const delEpigrafe = errores.find((e) => e.startsWith('Pieza 1 (epigrafe): la cifra "500"'));
-  assert.match(delEpigrafe, /\("Somos 500\. Anotate/);
-});
-
-test("el error de una cifra en un gancho alternativo también muestra la frase", () => {
-  const plan = planValido([piezaValida({ ganchos_alternativos: ["Prometé poco. Cumplí todo.", "Quedan 3 días", "Lo escrito se cumple."] })]);
-  const { errores } = validarPlan(plan, { semanaInicio: SEMANA, piezas: 1 });
-  const e = errores.find((x) => x.includes("alternativo 2") && x.includes('la cifra "3"'));
-  assert.ok(e, errores.join(" | "));
-  assert.match(e, /\("Quedan 3 días"\)\.$/);
-});
-
-test("el guion puede nombrar medidas de producción, pero el gancho y el epígrafe no", () => {
-  const ok = planValido([piezaValida({ guion: "Carrusel de 6 láminas, una frase por lámina. Plano de 3 segundos." })]);
-  assert.equal(validarPlan(ok, { semanaInicio: SEMANA, piezas: 1 }).errores.filter((e) => e.includes("cifra")).length, 0);
-  const dato = planValido([piezaValida({ guion: "Quedan 3 días para el drop." })]);
-  assert.ok(validarPlan(dato, { semanaInicio: SEMANA, piezas: 1 }).errores.some((e) => e.includes("(guion)") && e.includes('"3"')));
-  const epi = planValido([piezaValida({ epigrafe: "Carrusel de 6 láminas." })]);
-  assert.ok(validarPlan(epi, { semanaInicio: SEMANA, piezas: 1 }).errores.some((e) => e.includes("(epigrafe)") && e.includes('"6"')));
-});
-
-test("una story puede venir sin epígrafe; el resto de los formatos no", () => {
-  const story = (cambios) => validarPlan(planValido([piezaValida({ formato: "story", ...cambios })]), { semanaInicio: SEMANA, piezas: 1 });
-  assert.equal(story({ epigrafe: "" }).ok, true, story({ epigrafe: "" }).errores.join(" | "));
-  assert.equal(story({ epigrafe: undefined }).ok, true);
-  assert.ok(story({ epigrafe: 5 }).errores.includes("Pieza 1: el epígrafe no es texto."));
-  for (const formato of ["reel", "carrusel", "imagen"]) {
-    const r = validarPlan(planValido([piezaValida({ formato, epigrafe: "" })]), { semanaInicio: SEMANA, piezas: 1 });
-    assert.ok(r.errores.includes("Pieza 1: falta epigrafe."), formato);
-  }
-  // una story sin epígrafe igual tiene que tener gancho y acción
-  assert.ok(story({ epigrafe: "", cta: "" }).errores.includes("Pieza 1: falta cta."));
-});
-
-test("una pieza puede cerrar con su interacción, pero el cta tiene que ser una acción concreta", () => {
-  const story = piezaValida({ formato: "story", epigrafe: "", cta: "Votá en la encuesta.", gancho: "El short, en dos largos. ¿Cuál?" });
-  assert.equal(validarPlan(planValido([story]), { semanaInicio: SEMANA }).ok, true);
-  const reel = piezaValida({ cta: "Mirá el reel." });
-  const { ok, errores } = validarPlan(planValido([reel]), { semanaInicio: SEMANA });
-  assert.equal(ok, false);
-  assert.match(errores.join(" "), /anotarse en la lista/);
-  const storyVacia = piezaValida({ formato: "story", epigrafe: "", cta: "Mirá el short." });
-  assert.equal(validarPlan(planValido([storyVacia]), { semanaInicio: SEMANA }).ok, false);
-});
-
-test("el sistema del Estratega incluye el banco de contenido y el método", async () => {
-  const leer = async (ruta) => (String(ruta).includes("banco") ? "BANCO-DE-PRUEBA" : "TEXTO");
-  const { texto } = await construirSistema(leer, { listar: async () => [] });
-  assert.match(texto, /BANCO DE CONTENIDO/);
-  assert.match(texto, /BANCO-DE-PRUEBA/);
-  assert.match(texto, /FOCO DE LA SEMANA/);
-});
-
-test("sin el archivo del banco de contenido el Estratega sigue funcionando", async () => {
-  const leer = async (ruta) => {
-    if (String(ruta).includes("banco")) throw new Error("no existe");
-    return "TEXTO";
-  };
-  const { texto } = await construirSistema(leer, { listar: async () => [] });
-  assert.doesNotMatch(texto, /BANCO DE CONTENIDO \(/);
-});
-
-// Cliente que responde distinto según la herramienta que se le ofrece (plan o crítica)
-const clienteConCritica = ({ planes, criticas }) => {
-  const pedidos = [];
-  let p = 0;
-  let c = 0;
-  return {
-    pedidos,
-    messages: {
-      create: async (pedido) => {
-        pedidos.push(pedido);
-        const esCritica = pedido.tools?.[0]?.name === "evaluar_plan";
-        const input = esCritica ? criticas[Math.min(c++, criticas.length - 1)] : planes[Math.min(p++, planes.length - 1)];
-        return { content: [{ type: "tool_use", id: `t${pedidos.length}`, name: esCritica ? "evaluar_plan" : "proponer_plan", input }], usage: { input_tokens: 100, output_tokens: 50 } };
-      },
-    },
-  };
-};
-const notas = (n, mejora = "") => ({ concrecion: n, compartible: n, gancho: n, hacer_posible: n, marca: n, mejora });
-
-test("con crítica: un plan flojo se reescribe una vez y se queda la versión mejor", async () => {
-  const mejor = planValido([piezaValida({ gancho: "El short, en dos largos. ¿Cuál?", texto_en_pantalla: ["¿Cuál va?"] })]);
-  const cliente = clienteConCritica({ planes: [planValido(), mejor], criticas: [{ piezas: [notas(2, "Mostrá algo concreto")] }, { piezas: [notas(4)] }] });
-  const r = await planificarSemana({ ...pedido, piezas: 1 }, { cliente, leer: leerFalso, listar: async () => [], criticar: true });
-  assert.equal(r.ok, true);
-  assert.equal(r.plan.piezas[0].gancho, "El short, en dos largos. ¿Cuál?");
-  assert.equal(r.critica.mejorada, true);
-  assert.ok(r.critica.despues > r.critica.antes);
-  assert.equal(cliente.pedidos.length, 4);
-});
-
-test("con crítica: si la versión mejorada no mejora o no pasa las reglas, se queda el plan original", async () => {
-  const peor = planValido([piezaValida({ gancho: "Sin excusas, entrená" })]);
-  const cliente = clienteConCritica({ planes: [planValido(), peor], criticas: [{ piezas: [notas(2, "x")] }] });
-  const r = await planificarSemana({ ...pedido, piezas: 1 }, { cliente, leer: leerFalso, listar: async () => [], criticar: true });
-  assert.equal(r.ok, true);
-  assert.equal(r.plan.piezas[0].gancho, "Una promesa para vos.");
-  assert.equal(r.critica.mejorada, false);
-});
-
-test("con crítica: un plan bueno no se toca y una crítica rota no frena el plan", async () => {
-  const bueno = clienteConCritica({ planes: [planValido()], criticas: [{ piezas: [notas(5)] }] });
-  const r1 = await planificarSemana({ ...pedido, piezas: 1 }, { cliente: bueno, leer: leerFalso, listar: async () => [], criticar: true });
-  assert.equal(r1.ok, true);
-  assert.equal(bueno.pedidos.length, 2);
-  const roto = clienteConCritica({ planes: [planValido()], criticas: [{ piezas: [{ concrecion: 9 }] }] });
-  const r2 = await planificarSemana({ ...pedido, piezas: 1 }, { cliente: roto, leer: leerFalso, listar: async () => [], criticar: true });
-  assert.equal(r2.ok, true);
-  assert.equal(r2.critica.ok, false);
-});
-
-test("sin criticar (por defecto) no se hace ninguna llamada extra", async () => {
-  const cliente = clienteFalso(planValido());
-  await planificarSemana({ ...pedido, piezas: 1 }, { cliente, leer: leerFalso, listar: async () => [] });
-  assert.equal(cliente.pedidos.length, 1);
-});
-
-test("los patrones de éxito de las cuentas de referencia entran al sistema con su enlace y se pide equilibrar marca y datos", async () => {
-  const listar = async () => ["patrones-2026-10-20.md", "patrones-2026-10-27.md"];
-  const leer = async (ruta) => (String(ruta).includes("patrones-2026-10-27") ? "PATRONES-ULTIMOS" : "TEXTO");
-  const { texto } = await construirSistema(leer, { listar });
-  assert.match(texto, /QUÉ FUNCIONÓ EN EL MERCADO/);
-  assert.match(texto, /PATRONES-ULTIMOS/);
-  assert.doesNotMatch(texto, /patrones-2026-10-20/);
-  assert.match(texto, /equilibrio entre el estilo de VOW/);
-});
-
-test("el estilo de marca avisa pero no bloquea; la verdad y la ley siguen bloqueando", () => {
-  const estilo = validarPlan(planValido([piezaValida({ gancho: "Algo se viene.", texto_en_pantalla: ["Algo llega pronto."] })]), { semanaInicio: SEMANA });
-  assert.equal(estilo.ok, true, estilo.errores.join(" | "));
-  assert.match(estilo.advertencias.join(" "), /teaser vacío/);
-  const verdad = validarPlan(planValido([piezaValida({ epigrafe: "Últimas unidades. Anotate en la lista." })]), { semanaInicio: SEMANA });
-  assert.equal(verdad.ok, false);
-  assert.match(verdad.errores.join(" "), /urgencia falsa/);
-});
-
-test("un salto de línea escrito como \\n literal se convierte en un salto real, también en el plan que devuelve la IA", async () => {
-  assert.equal(normalizarSaltos("Uno.\\n\\nDos."), "Uno.\n\nDos.");
-  assert.deepEqual(normalizarSaltos({ a: ["x\\ny"], n: 3 }), { a: ["x\ny"], n: 3 });
-  const cliente = clienteFalso(planValido([piezaValida({ epigrafe: "Es lo que sostiene todo.\\n\\nAnotate en la lista: link en la bio." })]));
-  const r = await planificarSemana({ ...pedido, piezas: 1 }, { cliente, leer: leerFalso, listar: async () => [] });
-  assert.equal(r.ok, true);
-  assert.equal(r.plan.piezas[0].epigrafe, "Es lo que sostiene todo.\n\nAnotate en la lista: link en la bio.");
-});
-
-test("el sistema del Estratega incluye la psicología de marketing y la prueba de concreción", async () => {
-  const { texto } = await construirSistema();
-  assert.match(texto, /=== PSICOLOGÍA DE MARKETING/);
-  assert.match(texto, /Reciprocidad/);
-  assert.match(texto, /PRUEBA DE CONCRECIÓN/);
-  assert.match(texto, /modelo_psicologia/);
-});
-
-test("un reel puede cerrar con guardar o mandar si otra pieza del plan pide anotarse", () => {
-  const guardable = piezaValida({ cta: "Guardalo para tu próximo entrenamiento." });
-  const pide = piezaValida({ formato: "story", epigrafe: "", cta: "Anotate en la lista de espera." });
-  assert.equal(validarPlan(planValido([guardable, pide]), { semanaInicio: SEMANA }).errores.some((e) => /acción final/.test(e)), false);
-});
-
-test("un plan de varias piezas donde ninguna pide anotarse se rechaza", () => {
-  const a = piezaValida({ cta: "Guardalo." });
-  const b = piezaValida({ formato: "story", epigrafe: "", cta: "Votá en la encuesta." });
-  const { ok, errores } = validarPlan(planValido([a, b]), { semanaInicio: SEMANA });
-  assert.equal(ok, false);
-  assert.match(errores.join(" "), /Ninguna pieza pide anotarse/);
-});
-
-test("un cta que junta dos acciones se rechaza", () => {
-  const { errores } = validarPlan(planValido([piezaValida({ cta: "Guardalo y anotate en la lista de espera." })]), { semanaInicio: SEMANA });
-  assert.match(errores.join(" "), /junta dos acciones/);
-});
-
-test("recupera la lista de piezas cuando la IA la manda como texto JSON", async () => {
-  const plan = planValido();
-  const comoTexto = { ...plan, piezas: JSON.stringify(plan.piezas) };
-  assert.deepEqual(recuperarPiezasEnTexto(comoTexto).piezas, plan.piezas);
-  assert.deepEqual(recuperarPiezasEnTexto({ resumen: "x", piezas: "no es json" }).piezas, "no es json");
-  const cliente = clienteEnSecuencia([{ input: comoTexto }]);
-  const r = await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
-  assert.equal(r.ok, true, r.errores?.join(" | "));
-  assert.equal(cliente.pedidos.length, 1, "no hizo falta otra llamada");
-});
-
-test("un plan que no pasa las reglas tiene una segunda oportunidad con los errores a la vista", async () => {
-  const cliente = clienteEnSecuencia([{ input: { resumen: "x", piezas: [] } }, { input: planValido() }]);
-  const r = await planificarSemana(pedido, { cliente, leer: leerFalso, listar: async () => [] });
-  assert.equal(r.ok, true, r.errores?.join(" | "));
-  assert.equal(r.intentos, 2);
-  const segundo = cliente.pedidos[1].messages.at(-1).content[0];
-  assert.equal(segundo.type, "tool_result");
-  assert.match(segundo.content, /El plan no tiene piezas/);
-  // y si tampoco la corrige, se informan los errores
-  const sinArreglo = await planificarSemana(pedido, { cliente: clienteEnSecuencia([{ input: { resumen: "x", piezas: [] } }]), leer: leerFalso, listar: async () => [] });
-  assert.equal(sinArreglo.ok, false);
-  assert.match(sinArreglo.errores.join(" "), /no tiene piezas/);
-});
-
-test("con cantidad automática, la IA decide cuántas piezas (hasta el máximo)", async () => {
-  const cliente = clienteEnSecuencia([{ input: planValido() }]);
-  await planificarSemana({ ...pedido, piezas: PIEZAS_AUTO }, { cliente, leer: leerFalso, listar: async () => [] });
-  assert.match(cliente.pedidos[0].messages[0].content, /la decidís vos, entre 1 y 5/);
-  const piezas = [0, 1, 2].map((i) => piezaValida({ fecha: `2026-10-${20 + i}` }));
-  const tres = validarPlan(planValido(piezas), { semanaInicio: SEMANA, piezas: PIEZAS_AUTO });
-  assert.ok(!tres.errores.some((e) => e.includes("Se pidieron")), tres.errores.join(" | "));
-  const fija = validarPlan(planValido(piezas), { semanaInicio: SEMANA, piezas: 2 });
-  assert.ok(fija.errores.some((e) => e.includes("Se pidieron 2 piezas")));
-  const seis = validarPlan(planValido([...piezas, ...piezas]), { semanaInicio: SEMANA, piezas: PIEZAS_AUTO });
-  assert.ok(seis.errores.some((e) => e.includes("Hay más de 5 piezas")));
+test("lee el último informe y el último rendimiento de su carpeta, y tolera que no haya", async () => {
+  const listar = async () => ["informe-2026-10-05.md", "informe-2026-10-12.md", "rendimiento-2026-10-12.md"];
+  const leer = async (ruta) => `texto de ${String(ruta).split("/").pop()}`;
+  assert.equal((await leerUltimoInforme({ leer, listar })).nombre, "informe-2026-10-12.md");
+  assert.equal((await leerUltimoRendimiento({ leer, listar })).nombre, "rendimiento-2026-10-12.md");
+  assert.equal(await leerUltimoInforme({ leer, listar: async () => [] }), null);
+  assert.equal(await leerUltimoInforme({ leer, listar: async () => { throw new Error("no existe"); } }), null);
 });

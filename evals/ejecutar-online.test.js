@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import { clasificarError, compararConLineaBase, correrEvalsOnline, lineaBaseDesdeInforme, resumir } from "./ejecutar-online.js";
 
 const pedidos = [
-  { id: "a", semana: "2026-11-02", fase: "base", piezas: 1 },
-  { id: "b", semana: "2026-11-09", fase: "base", piezas: 2 },
-  { id: "c", semana: "2026-11-16", fase: "base", piezas: 2 },
+  { id: "a", semana: "2026-11-02", fase: "base" },
+  { id: "b", semana: "2026-11-09", fase: "base" },
+  { id: "c", semana: "2026-11-16", fase: "base" },
 ];
 const crearCliente = () => ({});
 
@@ -61,9 +61,9 @@ test("repeticiones corre cada pedido varias veces y los distingue por número", 
 test("le pasa al planificador los datos del pedido y un cliente propio", async () => {
   const recibido = [];
   const planificar = async (pedido, { cliente }) => { recibido.push({ pedido, cliente }); return bueno(); };
-  const pedido = { id: "x", semana: "2026-11-02", fase: "expectativa", piezas: 2, recursos: { producto: true }, notas: "N" };
+  const pedido = { id: "x", semana: "2026-11-02", fase: "expectativa", recursos: { producto: true }, notas: "N" };
   await correrEvalsOnline({ pedidos: [pedido], crearCliente: (p) => ({ para: p.id }), planificar });
-  assert.deepEqual(recibido[0].pedido, { semanaInicio: "2026-11-02", fase: "expectativa", recursos: { producto: true }, notas: "N", piezas: 2 });
+  assert.deepEqual(recibido[0].pedido, { semanaInicio: "2026-11-02", fase: "expectativa", recursos: { producto: true }, notas: "N" });
   assert.deepEqual(recibido[0].cliente, { para: "x" });
 });
 
@@ -112,8 +112,8 @@ test("compararConLineaBase sin línea base no falla y lo avisa", () => {
 });
 
 test("un plan rechazado guarda lo que propuso la IA y cuántos intentos hizo; uno aprobado no guarda la propuesta", async () => {
-  const propuesta = { resumen: "x", piezas: "texto en vez de lista" };
-  const planificar = falso({ "2026-11-02": { ...bueno(), intentos: 1, propuesta: { resumen: "bien" } }, "2026-11-09": { ...malo(["El plan no tiene piezas."]), intentos: 2, propuesta } });
+  const propuesta = { dias: "texto en vez de lista" };
+  const planificar = falso({ "2026-11-02": { ...bueno(), intentos: 1, propuesta: { resumen: "bien" } }, "2026-11-09": { ...malo(["El flujo no tiene publicaciones."]), intentos: 2, propuesta } });
   const { resultados } = await correrEvalsOnline({ pedidos: pedidos.slice(0, 2), crearCliente, planificar });
   assert.equal(resultados[0].propuesta, null);
   assert.equal(resultados[0].intentos, 1);
