@@ -48,10 +48,10 @@ function calcularTareas(){
     if(p.sala==='diseno'&&/pieza|carrusel|reel|l[aá]mina|publicaci/i.test(t))return; /* ya no hay piezas para aprobar: solo se lee el flujo */
     T[quienPend(p)].push({id:kPend(p),t:t,alta:a,p:p});
   });
-  var te=tests();if(te.falla)T.bot.push({id:'bot|tests',t:'Los tests fallan: '+te.txt,alta:true,fija:true});
+  var te=tests();if(te.falla)T.hq.push({id:'hq|tests',t:'Los tests fallan: '+te.txt,alta:true,fija:true});
   TAREAS=T;ESTADO_EDIF={};
   ORDEN.forEach(function(k){ESTADO_EDIF[k]={alta:T[k].filter(function(x){return x.alta}).length,media:T[k].filter(function(x){return !x.alta}).length}});
-  var ta=0,tm=0;ORDEN.forEach(function(k){if(k!=='hq'){ta+=ESTADO_EDIF[k].alta;tm+=ESTADO_EDIF[k].media}});ESTADO_EDIF.hq={alta:ta,media:tm};
+  var ta=ESTADO_EDIF.hq.alta,tm=ESTADO_EDIF.hq.media;ORDEN.forEach(function(k){if(k!=='hq'){ta+=ESTADO_EDIF[k].alta;tm+=ESTADO_EDIF[k].media}});ESTADO_EDIF.hq={alta:ta,media:tm};
 }
 function cumplirTarea(t){if(t.p)cumplirPend(t.p)}
 
@@ -72,7 +72,7 @@ function burbujaDe(k){
   var T=TAREAS[k]||[],s=ESTADO_EDIF[k]||{alta:0,media:0};
   if(!(s.alta||s.media))return null;
   var n=s.alta+s.media,uno=T.length===1?T[0]:null,ic=ICO_EDIF[k]||'alerta';
-  if(k==='bot'&&tests().falla)return {ico:'alerta',roja:true,txt:'Tests mal',n:n,accion:'abrir',urg:true};
+  if(k==='hq'&&tests().falla)return {ico:'alerta',roja:true,txt:'Tests mal',n:n,accion:'abrir',urg:true};
   if(k==='hq')return {ico:ic,txt:'',n:n,accion:'abrir',urg:!!s.alta,suave:!s.alta};
   if(uno&&uno.p&&!uno.fija)return {ico:ic,txt:'¿Hecho?',n:1,accion:'cumplir',tarea:uno,urg:!!s.alta,suave:!s.alta};
   return {ico:ic,txt:'',n:n,accion:'abrir',urg:!!s.alta,suave:!s.alta};
@@ -95,7 +95,7 @@ function tocarBurbuja(k){
   /* marcar como hecho pide un segundo toque: así un toque de más no decide nada */
   if(!(ARMADA[k]&&ARMADA[k]>Date.now())){ARMADA[k]=Date.now()+3500;pintarBurbuja(k);setTimeout(function(){pintarBurbuja(k)},3600);return}
   ARMADA[k]=0;pintarBurbuja(k);
-  if(conectado!=='vivo'){aviso('Sin conexión con el bot: no se puede hacer ahora.',5000);return}
+  if(conectado!=='vivo'){aviso('Sin conexión con el servidor: no se puede hacer ahora.',5000);return}
   if(b.accion==='cumplir')cumplirTarea(b.tarea);
 }
 /* ================= agenda del día (cartel de la plaza) ================= */
@@ -111,7 +111,7 @@ function lineaDato(k){
   var e=D.estrategia||{},b=D.bot||{};
   if(k==='hq'){var n=ESTADO_EDIF.hq.alta+ESTADO_EDIF.hq.media;return n?n+' pendiente'+(n>1?'s':''):'todo al día'}
   if(k==='diseno'){var p=proximoFlujo();return p?(dias(pd(p.fecha))===0?'hoy':dd(pd(p.fecha)))+' · '+fmtFormato(p.formato).toLowerCase():'sin flujo'}
-  if(k==='bot'){if(conectado!=='vivo')return 'sin conexión';return 'activo'+(tests().falla?' · tests mal':'')}
+  if(k==='bot'){if(conectado!=='vivo')return 'sin conexión';return 'asistente listo'}
   if(k==='estrategia'){if(D.estr){var nl=D.estr.lineas.length;return nl+(nl===1?' línea':' líneas')+' esta semana'}var f=pd(e.plan);return f?'plan '+rel(dias(f)):'sin plan'}
   if(k==='recepcion'){var c=D.rendimiento&&D.rendimiento.cuenta;return c&&c.seguidores!=null?fmtN(c.seguidores)+' seguidores':'@vow_ar'}
   if(k==='deposito'){var st=D.inv&&D.inv.stock;if(!st)return conectado==='vivo'?'sin datos':'sin conexión';var tu=totalUnidades(st);return tu?tu+(tu===1?' unidad':' unidades'):'sin stock'}
@@ -133,19 +133,18 @@ function pintarRecursos(){
   var n=ESTADO_EDIF.hq.alta,p=proximoFlujo(),c=D.rendimiento&&D.rendimiento.cuenta;
   pil('bandeja',String(n+ESTADO_EDIF.hq.media),'PENDIENTES',n>0,'hq',n+ESTADO_EDIF.hq.media);
   pil('play',p?(dias(pd(p.fecha))===0?'hoy':dd(pd(p.fecha)))+' '+fmtFormato(p.formato).toLowerCase():'—','PRÓXIMA',false,'diseno');
-  pil('torre',conectado!=='vivo'?'sin datos':'activo','BOT',tests().falla,'bot');
   if(c&&c.seguidores!=null)pil('corazon',fmtN(c.seguidores),'SEGUIDORES',false,'recepcion',c.seguidores,fmtN);
 }
 function actualizarEstado(){
   var av=$('sinCon'),vivo=conectado==='vivo';
   av.hidden=vivo||conectado==='vacio';
   if(!vivo){
-    av.textContent='';av.appendChild(el('span',null,conectado==='error'?'No llega al bot'+(ERR_TXT?' ('+ERR_TXT+')':'')+'. No se ve ni se guarda nada hasta que conecte.':conectado==='clave'?'La clave no es válida. Sin conexión no se guarda nada.':'Sin conexión con el bot: no se ve ni se guarda nada.'));
+    av.textContent='';av.appendChild(el('span',null,conectado==='error'?'No llega al servidor'+(ERR_TXT?' ('+ERR_TXT+')':'')+'. No se ve ni se guarda nada hasta que conecte.':conectado==='clave'?'La clave no es válida. Sin conexión no se guarda nada.':'Sin conexión con el servidor: no se ve ni se guarda nada.'));
     if(conectado==='clave'||conectado==='no'){var b=el('button','ck sec','Poner clave');b.type='button';b.addEventListener('click',function(){pedirClave('Ingresá la clave de la oficina.')});av.appendChild(b)}
   }
   var e=$('est'),l=$('luz');l.className='';
-  if(conectado==='no')e.textContent=leerClave()?'conectando con el bot…':'bloqueado: falta la clave';
-  else if(conectado==='error')e.textContent='sin conexión con el bot · '+(ERR_TXT||'error');
+  if(conectado==='no')e.textContent=leerClave()?'conectando…':'bloqueado: falta la clave';
+  else if(conectado==='error')e.textContent='sin conexión · '+(ERR_TXT||'error');
   else if(conectado==='clave')e.textContent='falta la clave de la oficina';
   else if(conectado==='vacio')e.textContent='todavía no hay datos';
   else e.textContent='en vivo';
@@ -159,7 +158,7 @@ function actualizarMundo(){
   var sk=(D.inv&&D.inv.stock)||{},hay={gorras:(sk['gorra-negra']||0)+(sk['gorra-beige']||0),medias:sk.medias||0,shakers:(sk['shaker-negro']||0)+(sk['shaker-claro']||0)};
   Object.keys(hay).forEach(function(x){if(CAJAS[x])CAJAS[x].visible=hay[x]>0});
   if(CAJA_PANT){var sc=JSON.stringify(D.inv&&D.inv.totales&&D.inv.totales.hoy);if(sc!==CAJA_PANT.sig){CAJA_PANT.sig=sc;redibujar(CAJA_PANT)}}
-  if(LUCES.bot)LUCES.bot.material.color.set(conectado!=='vivo'?0x888888:tests().falla?0xd0564a:0x7da36b);
+  if(LUCES.bot)LUCES.bot.material.color.set(conectado!=='vivo'?0x888888:0x7da36b);
   if(PHONE)redibujar(PHONE);if(PANTALLA)redibujar(PANTALLA);if(CARTEL){var sg;try{sg=JSON.stringify(agendaHoy())+new Date().getDate()}catch(e){sg=''}if(sg!==CARTEL.sig){CARTEL.sig=sg;redibujar(CARTEL)}}
 }
 var sigPanel='';
@@ -213,16 +212,16 @@ function formNota(){
   return fo;
 }
 
-/* ================= datos editables: el juego y el bot los cambian y los dos lo ven ================= */
+/* ================= datos editables: el juego y el asistente los cambian y los dos lo ven ================= */
 var EDITANDO={},EDTXT={};
 function enviarOp(cambio,okMsg){
-  if(conectado!=='vivo'){aviso('Sin conexión con el bot: no se guardó.',6000);return Promise.resolve(false)}
-  return api('/oficina/accion',{body:{accion:'operacion',cambio:cambio}}).then(function(r){if(r&&r.operacion&&VIVO)VIVO.operacion=r.operacion;aviso(okMsg||'Guardado: el bot ya lo sabe');return leerVivo(true).then(function(){return true})}).catch(function(e){aviso(e.estado===401?'Clave inválida: no se guardó':'No se guardó: '+(e.message||'error'),6000);if(e.estado===401)pedirClave('La clave no es válida.');return false});
+  if(conectado!=='vivo'){aviso('Sin conexión con el servidor: no se guardó.',6000);return Promise.resolve(false)}
+  return api('/oficina/accion',{body:{accion:'operacion',cambio:cambio}}).then(function(r){if(r&&r.operacion&&VIVO)VIVO.operacion=r.operacion;aviso(okMsg||'Guardado: el asistente ya lo sabe');return leerVivo(true).then(function(){return true})}).catch(function(e){aviso(e.estado===401?'Clave inválida: no se guardó':'No se guardó: '+(e.message||'error'),6000);if(e.estado===401)pedirClave('La clave no es válida.');return false});
 }
 function filaEditable(clave,etiqueta,valor){
   var op=(D._op&&D._op.campos)||{},propio=op[clave]!=null;
   var f=el('div','fila'),t=el('div','tx');t.appendChild(el('strong',null,etiqueta+': '));t.appendChild(document.createTextNode(valor||'sin dato'));
-  if(propio)t.appendChild(el('div','mono','cambiado desde el juego o el bot'));
+  if(propio)t.appendChild(el('div','mono','cambiado desde el juego o el asistente'));
   var a=el('div','acc');
   a.appendChild(boton('Editar','ck sec',function(){EDITANDO[clave]=!EDITANDO[clave];abrirEdif(panelAbierto,true);if(EDITANDO[clave])setTimeout(function(){var i=document.querySelector('#cuerpo form.nota input');if(i)i.focus()},30)}));
   f.appendChild(t);f.appendChild(a);
@@ -252,7 +251,7 @@ function seccionAgenda(r,sinHoy){
   ['bot','deposito','estrategia','diseno','recepcion','caja'].forEach(function(k){var o=el('option',null,SALA[k].n);o.value=k;se.appendChild(o)});
   var r1=el('div','fil2');r1.appendChild(fe);r1.appendChild(ho);var r2=el('div','fil2');r2.appendChild(se);r2.appendChild(sb);
   fo.appendChild(r1);fo.appendChild(tx);fo.appendChild(r2);
-  fo.addEventListener('submit',function(ev2){ev2.preventDefault();if(!fe.value||!tx.value.trim()){aviso('Falta la fecha o qué pasa ese día');return}enviarOp({tipo:'agenda_agregar',fecha:fe.value,hora:ho.value,sala:se.value,texto:tx.value},'Agendado: el bot ya lo sabe').then(function(ok){if(ok)abrirEdif(panelAbierto,true)})});
+  fo.addEventListener('submit',function(ev2){ev2.preventDefault();if(!fe.value||!tx.value.trim()){aviso('Falta la fecha o qué pasa ese día');return}enviarOp({tipo:'agenda_agregar',fecha:fe.value,hora:ho.value,sala:se.value,texto:tx.value},'Agendado: el asistente ya lo sabe').then(function(ok){if(ok)abrirEdif(panelAbierto,true)})});
   de.appendChild(fo);r.appendChild(de);
 }
 var PANEL={};
@@ -267,20 +266,23 @@ PANEL.agenda=function(){
 };
 PANEL.hq=function(){
   var r=document.createElement('div'),T=TAREAS,otros=[];
+  T.hq.forEach(function(x){otros.push({x:x,k:'hq'})});
   ORDEN.forEach(function(k){if(k==='hq')return;T[k].forEach(function(x){otros.push({x:x,k:k})})});
   otros.sort(function(a,b){return (b.x.alta?1:0)-(a.x.alta?1:0)});
   if(otros.length){r.appendChild(el('h4',null,'Pendientes ('+otros.length+')'));otros.forEach(function(o){var f=filaTarea(o.x);f.querySelector('.tx').insertBefore(el('span','chip '+(o.x.alta?'pend':'ok'),EDIF[o.k].n),f.querySelector('.tx').firstChild);r.appendChild(f)})}
   if(!otros.length)r.appendChild(el('p','vacio','Todo al día: no hay nada pendiente.'));
-  var dn=el('details');dn.appendChild(el('summary',null,'Anotarle algo al bot'));dn.appendChild(formNota());r.appendChild(dn);
+  var dn=el('details');dn.appendChild(el('summary',null,'Anotarle algo al asistente'));dn.appendChild(formNota());r.appendChild(dn);
+  var s=D.sistema||{},te=tests(),ds=el('details');ds.appendChild(el('summary',null,'Estado del sistema'));
+  ds.appendChild(dato('Tests',s.tests||'sin datos',te.falla?'mal':''));ds.appendChild(dato('Evals',s.evals||'sin datos'));r.appendChild(ds);
   var n=otros.length;return {t:'Centro de control',s:n?n+' pendiente'+(n>1?'s':'')+' tuyo'+(n>1?'s':''):'todo al día',b:r};
 };
 PANEL.diseno=function(){
   var r=document.createElement('div'),ls=lista('flujo').slice().sort(function(a,b){return (a.semana||'')<(b.semana||'')?-1:1}),lu=lunesDe(hoy()),hay0=false,n0=0;
   function semanaDe(w){var d=pd(w.semana);return d?Math.round((lunesDe(d)-lu)/864e5):null}
   function bloque(w,tit){
-    r.appendChild(el('h4',null,tit));
     var dl=(w&&w.dias||[]).filter(function(x){return x&&x.fecha}).sort(function(a,b){return a.fecha<b.fecha?-1:1});
-    if(!dl.length){r.appendChild(el('p','vacio','Todavía no hay flujo para esta semana.'));return 0}
+    if(!dl.length)return 0;
+    r.appendChild(el('h4',null,tit+' · '+dl.length+(dl.length===1?' publicación':' publicaciones')));
     dl.forEach(function(x){
       var d=pd(x.fecha),f=el('div','flu-d'+(d&&dias(d)===0?' hoy':'')),c=el('div','flu-c'),fe=el('div','flu-f');
       var nom=x.dia?String(x.dia).charAt(0).toUpperCase()+String(x.dia).slice(1):'';
@@ -294,25 +296,26 @@ PANEL.diseno=function(){
   var act=ls.filter(function(w){return semanaDe(w)===0})[0],prox=ls.filter(function(w){return semanaDe(w)===7})[0];
   var otras=ls.filter(function(w){var k=semanaDe(w);return k!==0&&k!==7});
   n0=bloque(act,'Esta semana');
-  bloque(prox,'Próxima semana');
-  otras.forEach(function(w){var d=pd(w.semana);bloque(w,'Semana del '+(d?dd(d):w.semana))});
-  if(conectado!=='vivo')r.insertBefore(el('p','vacio','Sin conexión con el bot: no se ve el flujo.'),r.firstChild);
+  var n1=bloque(prox,'Próxima semana'),n2=0;
+  otras.forEach(function(w){var d=pd(w.semana);n2+=bloque(w,'Semana del '+(d?dd(d):w.semana))});
+  if(!n0&&!n1&&!n2)r.appendChild(el('p','vacio','Todavía no hay un flujo armado. El Estratega lo propone cada lunes.'));
+  if(conectado!=='vivo')r.insertBefore(el('p','vacio','Sin conexión con el servidor: no se ve el flujo.'),r.firstChild);
   listaTareas(r,TAREAS.diseno);
-  return {t:'Flujo semanal',s:n0?n0+(n0===1?' publicación':' publicaciones')+' esta semana':'',b:r};
+  return {t:'Flujo semanal',s:n0?n0+(n0===1?' publicación':' publicaciones')+' esta semana':(n1?n1+(n1===1?' publicación':' publicaciones')+' la semana que viene':''),b:r};
 };
 PANEL.bot=function(){
-  var r=document.createElement('div'),b=D.bot||{},s=D.sistema||{},te=tests(),nv=(b.novedades||[]).filter(function(x){return /todavía no lo leyó/.test(x.t||'')}),ch=b.chat;
-  if(conectado!=='vivo')r.appendChild(el('p','vacio','Sin conexión con el bot: no se ve su estado ni la charla.'));
-  else r.appendChild(dato('Estado','activo','bien'));
-  r.appendChild(dato('Tests',s.tests||'sin datos',te.falla?'mal':''));r.appendChild(dato('Evals',s.evals||'sin datos'));
-  listaTareas(r,TAREAS.bot);
-  if(nv.length){r.appendChild(el('h4',null,'Novedades sin usar'));nv.slice(0,3).forEach(function(x){r.appendChild(el('div','fila',(x.t||'').replace(/ \(todavía no lo leyó el Estratega\)/,'')))})}
-  if(conectado==='vivo'&&Array.isArray(ch)&&ch.length){r.appendChild(el('h4',null,'Última charla'));ch.slice(-3).forEach(function(x){var f=el('div','fila'),t=el('div','tx');t.appendChild(el('strong',null,x.rol==='usuario'?'Vos: ':'Bot: '));t.appendChild(document.createTextNode(x.texto||''));f.appendChild(t);r.appendChild(f)})}
-  return {t:'Torre del bot',s:'',b:r};
+  var r=document.createElement('div'),b=D.bot||{},nv=(b.novedades||[]).filter(function(x){return /todavía no lo leyó/.test(x.t||'')}),ch=b.chat;
+  if(conectado!=='vivo'){r.appendChild(el('p','vacio','Sin conexión con el servidor: no se ve la charla ni las notas.'));return {t:'Chat',s:'',b:r}}
+  var ab=el('div','acc');ab.style.marginTop='0';ab.appendChild(botonIco('chat','Abrir el chat','ck si',function(){abrirChat()}));r.appendChild(ab);
+  if(nv.length){r.appendChild(el('h4',null,'Notas para el próximo plan ('+nv.length+')'));nv.slice(0,5).forEach(function(x){r.appendChild(el('div','fila',(x.t||'').replace(/ \(todavía no lo leyó el Estratega\)/,'')))})}
+  r.appendChild(el('h4',null,'Última charla'));
+  if(Array.isArray(ch)&&ch.length)ch.slice(-3).forEach(function(x){var f=el('div','fila'),t=el('div','tx');t.appendChild(el('strong',null,x.rol==='usuario'?'Vos: ':'Asistente: '));t.appendChild(document.createTextNode(x.texto||''));f.appendChild(t);r.appendChild(f)});
+  else r.appendChild(el('p','vacio','Todavía no charlaste con el asistente.'));
+  return {t:'Chat',s:nv.length?nv.length+(nv.length===1?' nota para el plan':' notas para el plan'):'',b:r};
 };
 PANEL.recepcion=function(){
   var r=document.createElement('div'),x=D.rendimiento;
-  if(!x){r.appendChild(el('p','vacio',conectado==='vivo'?'Instagram todavía no está conectado al servicio.':'Conectá el juego al bot para ver Instagram.'));return {t:'Instagram',s:'',b:r}}
+  if(!x){r.appendChild(el('p','vacio',conectado==='vivo'?'Instagram todavía no está conectado al servicio.':'Sin conexión con el servidor: no se ve Instagram.'));return {t:'Instagram',s:'',b:r}}
   if(x.error){r.appendChild(el('p','mono','No se pudo leer Instagram: '+x.error));return {t:'Instagram',s:'',b:r}}
   var c=x.cuenta||{},t=x.totales||{};
   r.appendChild(dato('Seguidores',c.seguidores!=null?fmtN(c.seguidores):'—'));
@@ -325,13 +328,13 @@ PANEL.recepcion=function(){
     f.appendChild(tx);r.appendChild(f)});
   return {t:'Instagram',s:'@'+(c.usuario||'vow_ar'),b:r};
 };
-/* ================= Almacén y Caja: stock y ventas, conectados al sistema (el bot ve y mueve lo mismo) ================= */
+/* ================= Almacén y Caja: stock y ventas, conectados al sistema (el asistente ve y mueve lo mismo) ================= */
 var STOCK_N={'gorra-negra':'Gorra negra','gorra-beige':'Gorra beige','shaker-negro':'Shaker negro','shaker-claro':'Shaker claro',medias:'Medias (pares)'};
 var STOCKF={},STOCKT={},CAJAV={lineas:[{producto:'gorra',cantidad:1,gorra:'negra',shaker:'negro'}],nota:''},ESTAB={},ESTTXT={},ESTNUEVA='';
 function pesos(n){return '$'+Number(n||0).toLocaleString('es-AR')}
 function enviarInv(cambio,okMsg){
-  if(conectado!=='vivo'){aviso('Sin conexión con el bot: no se guardó.',6000);return Promise.resolve(false)}
-  return api('/oficina/accion',{body:{accion:'inventario',cambio:cambio}}).then(function(r){if(r&&r.inventario&&VIVO)VIVO.inventario=r.inventario;aviso(okMsg||(r&&r.resumen)||'Guardado: el bot ya lo sabe',4200);return leerVivo(true).then(function(){return true})}).catch(function(e){aviso(e.estado===401?'Clave inválida: no se guardó':(e.estado===400?e.message:'No se guardó: '+(e.message||'error')),7000);if(e.estado===401)pedirClave('La clave no es válida.');return false});
+  if(conectado!=='vivo'){aviso('Sin conexión con el servidor: no se guardó.',6000);return Promise.resolve(false)}
+  return api('/oficina/accion',{body:{accion:'inventario',cambio:cambio}}).then(function(r){if(r&&r.inventario&&VIVO)VIVO.inventario=r.inventario;aviso(okMsg||(r&&r.resumen)||'Guardado: el asistente ya lo sabe',4200);return leerVivo(true).then(function(){return true})}).catch(function(e){aviso(e.estado===401?'Clave inválida: no se guardó':(e.estado===400?e.message:'No se guardó: '+(e.message||'error')),7000);if(e.estado===401)pedirClave('La clave no es válida.');return false});
 }
 function totalUnidades(st){return Object.keys(st).reduce(function(a,k){return a+(st[k]||0)},0)}
 function filaStock(sku,n){
@@ -351,7 +354,7 @@ function filaStock(sku,n){
 }
 PANEL.deposito=function(){
   var r=document.createElement('div'),st=D.inv&&D.inv.stock;
-  if(!st){r.appendChild(el('p','vacio',conectado==='vivo'?'Todavía no hay stock cargado.':'Sin conexión con el bot: no se ve el stock.'));return {t:'Almacén',s:'',b:r}}
+  if(!st){r.appendChild(el('p','vacio',conectado==='vivo'?'Todavía no hay stock cargado.':'Sin conexión con el servidor: no se ve el stock.'));return {t:'Almacén',s:'',b:r}}
   Object.keys(STOCK_N).forEach(function(sku){r.appendChild(filaStock(sku,st[sku]||0))});
   r.appendChild(el('p','mono','El stock baja solo cuando se registra una venta en la Caja. «Llegó» suma mercadería; «Contar» corrige el número si no coincide.'));
   var t=totalUnidades(st);return {t:'Almacén',s:t?t+(t===1?' unidad':' unidades'):'sin stock todavía',b:r};
@@ -365,7 +368,7 @@ function skusDeLinea(l,cat){
 function textoLinea(l,cat){var c=cat[l.producto]||{nombre:l.producto},col=Object.keys(l.colores||{}).map(function(g){return (STOCK_N[l.colores[g]]||l.colores[g]).toLowerCase()});return l.cantidad+' × '+c.nombre+(col.length?' ('+col.join(', ')+')':'')}
 PANEL.caja=function(){
   var r=document.createElement('div'),inv=D.inv;
-  if(!inv){r.appendChild(el('p','vacio',conectado==='vivo'?'Todavía no hay datos de la Caja.':'Sin conexión con el bot: no se pueden registrar ventas.'));return {t:'Caja',s:'',b:r}}
+  if(!inv){r.appendChild(el('p','vacio',conectado==='vivo'?'Todavía no hay datos de la Caja.':'Sin conexión con el servidor: no se pueden registrar ventas.'));return {t:'Caja',s:'',b:r}}
   var cat=inv.catalogo,hoyT=inv.totales.hoy,L=CAJAV.lineas,necesita={},total=0,faltan=[];
   r.appendChild(el('h4',null,'Registrar una venta'));
   L.forEach(function(l,i){
@@ -404,7 +407,7 @@ PANEL.caja=function(){
     r.appendChild(el('h4',null,'Últimas ventas'));
     inv.ventas.slice(0,8).forEach(function(v){
       var f=el('div','fila'+(v.anulada?' anulada':'')),t=el('div','tx'),d=pd(v.fecha);f.appendChild(el('div','fe',d?dd(d):v.fecha));
-      t.appendChild(document.createTextNode(v.items.map(function(l){return textoLinea(l,cat)}).join(' + ')));t.appendChild(el('div','mono',pesos(v.importe)+(v.nota?' · '+v.nota:'')+(v.anulada?' · anulada':'')+' · '+(v.origen==='bot'?'por el bot':'desde la Caja')));f.appendChild(t);
+      t.appendChild(document.createTextNode(v.items.map(function(l){return textoLinea(l,cat)}).join(' + ')));t.appendChild(el('div','mono',pesos(v.importe)+(v.nota?' · '+v.nota:'')+(v.anulada?' · anulada':'')+' · '+(v.origen==='bot'?'por el asistente':'desde la Caja')));f.appendChild(t);
       if(!v.anulada){var a=el('div','acc');a.appendChild(botonIco('borrador','Anular','ck sec',function(){if(!confirm('¿Anular esta venta? El stock vuelve al Almacén.'))return;enviarInv({tipo:'anular_venta',id:v.id},'Venta anulada: el stock volvió al Almacén').then(function(ok){if(ok)abrirEdif(panelAbierto,true)})}));f.appendChild(a)}
       r.appendChild(f);
     });
@@ -414,27 +417,25 @@ PANEL.caja=function(){
 PANEL.estrategia=function(){
   var r=document.createElement('div'),e=D.estrategia||{},w=D.estr,pl=pd(e.plan),inf=pd(e.informe);
   if(!w){
-    r.appendChild(el('p','vacio',conectado==='vivo'?'Todavía no hay estrategia de la semana.':'Sin conexión con el bot: acá solo se ven los documentos del repo.'));
+    r.appendChild(el('p','vacio',conectado==='vivo'?'Todavía no hay estrategia de la semana.':'Sin conexión con el servidor: acá solo se ven los documentos del repo.'));
     r.appendChild(dato('Plan',pl?ddy(pl)+' · '+rel(dias(pl)):'sin plan'));r.appendChild(dato('Informe de investigación',inf?ddy(inf)+' · '+rel(dias(inf)):'sin informe'));
   }else{
     var lu=pd(w.semana);
-    r.appendChild(dato('Semana del',lu?dd(lu):w.semana));
-    r.appendChild(dato('Sale de la investigación del',w.fuente?(function(){var x=pd(w.fuente);return x?ddy(x):w.fuente})():'sin informe',w.fuente?'':'mal'));
     r.appendChild(filaEditable('estrategia.foco','Foco de la semana',e.foco));
     r.appendChild(el('h4',null,'Estrategia de esta semana'));
     if(!w.lineas.length)r.appendChild(el('p','vacio','No hay líneas esta semana. Agregá una abajo.'));
     w.lineas.forEach(function(l){
       var f=el('div','fila col'),t=el('div','tx'),ab=ESTAB[l.k];
       var tt=el('div','clamp',l.t);tt.title='Tocá para ver todo';tt.addEventListener('click',function(){tt.classList.toggle('abierto')});t.appendChild(tt);
-      var m=l.origen==='propia'?'agregada por vos o el bot':(l.editada?'de la investigación · editada':'de la investigación');t.appendChild(el('div','mono',m));
+      var m=l.origen==='propia'?'agregada por vos o el asistente':(l.editada?'de la investigación · editada':'de la investigación');t.appendChild(el('div','mono',m));
       var a=el('div','acc');
       a.appendChild(botonIco('lapiz','Editar','ck sec',function(){ESTAB[l.k]=!ab;abrirEdif(panelAbierto,true);setTimeout(function(){var i=document.querySelector('#cuerpo form.est textarea');if(i)i.focus()},30)}));
-      a.appendChild(botonIco('borrador','Quitar','ck sec',function(){enviarOp({tipo:'estrategia_quitar',clave:l.k},'Quitado de la estrategia: el bot ya lo sabe').then(function(ok){if(ok)abrirEdif(panelAbierto,true)})}));
+      a.appendChild(botonIco('borrador','Quitar','ck sec',function(){enviarOp({tipo:'estrategia_quitar',clave:l.k},'Quitado de la estrategia: el asistente ya lo sabe').then(function(ok){if(ok)abrirEdif(panelAbierto,true)})}));
       f.appendChild(t);f.appendChild(a);
       if(ab){
         var fo=el('form','nota est'),ta=el('textarea');ta.rows=4;ta.maxLength=600;ta.value=ESTTXT[l.k]!=null?ESTTXT[l.k]:l.t;ta.addEventListener('input',function(){ESTTXT[l.k]=ta.value});
         var rw=el('div','fil2'),sb=el('button','ck si','Guardar');sb.type='submit';rw.appendChild(sb);rw.appendChild(boton('Cancelar','ck sec',function(){delete ESTAB[l.k];delete ESTTXT[l.k];abrirEdif(panelAbierto,true)}));
-        fo.appendChild(ta);fo.appendChild(rw);fo.addEventListener('submit',function(ev){ev.preventDefault();enviarOp({tipo:'estrategia_editar',clave:l.k,texto:ta.value},'Estrategia cambiada: el bot ya lo sabe').then(function(ok){if(ok){delete ESTAB[l.k];delete ESTTXT[l.k];abrirEdif(panelAbierto,true)}})});
+        fo.appendChild(ta);fo.appendChild(rw);fo.addEventListener('submit',function(ev){ev.preventDefault();enviarOp({tipo:'estrategia_editar',clave:l.k,texto:ta.value},'Estrategia cambiada: el asistente ya lo sabe').then(function(ok){if(ok){delete ESTAB[l.k];delete ESTTXT[l.k];abrirEdif(panelAbierto,true)}})});
         t.appendChild(fo);
       }
       r.appendChild(f);
@@ -442,11 +443,12 @@ PANEL.estrategia=function(){
     var fa=el('form','nota'),ia=el('input');ia.type='text';ia.maxLength=600;ia.placeholder='Agregar una línea a la estrategia de esta semana';ia.value=ESTNUEVA;ia.addEventListener('input',function(){ESTNUEVA=ia.value});
     var ra=el('div','fil2'),sa=el('button','ck si','Agregar');sa.type='submit';ra.appendChild(sa);
     if(w.cambiada)ra.appendChild(botonIco('cambiar','Volver a la investigación','ck sec',function(){if(!confirm('¿Descartar los cambios de esta semana y volver a lo que dice la investigación?'))return;enviarOp({tipo:'estrategia_restaurar'},'Vuelve a lo que dice la investigación').then(function(ok){if(ok){ESTAB={};ESTTXT={};abrirEdif(panelAbierto,true)}})}));
-    fa.appendChild(ia);fa.appendChild(ra);fa.addEventListener('submit',function(ev){ev.preventDefault();if(!ia.value.trim()){aviso('Escribí la línea');return}enviarOp({tipo:'estrategia_agregar',texto:ia.value},'Agregado a la estrategia: el bot ya lo sabe').then(function(ok){if(ok){ESTNUEVA='';abrirEdif(panelAbierto,true)}})});
+    fa.appendChild(ia);fa.appendChild(ra);fa.addEventListener('submit',function(ev){ev.preventDefault();if(!ia.value.trim()){aviso('Escribí la línea');return}enviarOp({tipo:'estrategia_agregar',texto:ia.value},'Agregado a la estrategia: el asistente ya lo sabe').then(function(ok){if(ok){ESTNUEVA='';abrirEdif(panelAbierto,true)}})});
     r.appendChild(fa);
+    var fu=w.fuente?(function(){var x=pd(w.fuente);return x?ddy(x):w.fuente})():null;
+    r.appendChild(el('p','mono','Semana del '+(lu?dd(lu):w.semana)+' · '+(fu?'sale de la investigación del '+fu:'todavía no hay informe de investigación')));
   }
   listaTareas(r,TAREAS.estrategia);
-  if(D.planTexto){var d1=el('details');d1.appendChild(el('summary',null,'Leer el plan de publicaciones'));d1.appendChild(md(D.planTexto));r.appendChild(d1)}
   if(D.informeTexto){var d2=el('details');d2.appendChild(el('summary',null,'Leer el informe de investigación'));d2.appendChild(md(D.informeTexto));r.appendChild(d2)}
   return {t:'Estrategia',s:w?(w.lineas.length+(w.lineas.length===1?' línea':' líneas')+' esta semana'):'',b:r};
 };
@@ -472,7 +474,7 @@ $('hX').addEventListener('click',cerrarHoja);
 $('bAnotar').addEventListener('click',function(){var f=$('nrap');f.hidden=!f.hidden;if(!f.hidden)$('nrapIn').focus()});
 $('nrap').addEventListener('submit',function(ev){ev.preventDefault();var i=$('nrapIn'),t=i.value.trim();if(!t)return;agregarNota(t,'bot','nota');i.value='';$('nrap').hidden=true});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&panelAbierto)cerrarHoja()});
-/* ================= chat con el bot ================= */
+/* ================= chat con el asistente ================= */
 var CH={abierto:false,local:[],enviando:false,error:'',visto:'',sinLeer:0,avisados:0,listo:false,sig:''};
 try{CH.visto=localStorage.getItem('vow_chat_visto')||''}catch(e){}
 function chatVivo(){return (VIVO&&VIVO.chat)||[]}
@@ -500,7 +502,7 @@ function pintarChat(forzar){
   var box=$('chMsgs'),pegado=!box.childNodes.length||box.scrollHeight-box.scrollTop-box.clientHeight<90;
   box.textContent='';
   var items=itemsChat();
-  if(!items.length&&!CH.enviando){var v=document.createElement('div');v.id='chVacio';v.textContent=conectado==='vivo'?'Escribile lo que necesites: ver el flujo de la semana, consultar el stock, anotar algo.':'Sin conexión con el bot. Revisá el aviso de arriba.';box.appendChild(v)}
+  if(!items.length&&!CH.enviando){var v=document.createElement('div');v.id='chVacio';v.textContent=conectado==='vivo'?'Escribile lo que necesites: ver el flujo de la semana, consultar el stock, anotar algo.':'Sin conexión con el servidor. Revisá el aviso de arriba.';box.appendChild(v)}
   items.forEach(function(m){
     var b=document.createElement('div');b.className='bub '+(m.rol==='usuario'?'yo':'bot');
     b.appendChild(document.createTextNode(m.texto));
@@ -508,7 +510,7 @@ function pintarChat(forzar){
     if(meta.length){var s=document.createElement('span');s.className='meta';s.textContent=meta.join(' · ');b.appendChild(s)}
     box.appendChild(b);
   });
-  if(CH.enviando){var p=document.createElement('div');p.className='bub bot pensando';p.setAttribute('aria-label','El bot está escribiendo');p.innerHTML='<i></i><i></i><i></i>';box.appendChild(p)}
+  if(CH.enviando){var p=document.createElement('div');p.className='bub bot pensando';p.setAttribute('aria-label','El asistente está escribiendo');p.innerHTML='<i></i><i></i><i></i>';box.appendChild(p)}
   if(CH.error){var e=document.createElement('div');e.className='bub err';e.textContent=CH.error;box.appendChild(e)}
   if(pegado||forzar)box.scrollTop=box.scrollHeight;
   $('chSend').disabled=CH.enviando;
@@ -521,7 +523,7 @@ function abrirChat(){
 function cerrarChat(){CH.abierto=false;$('app').classList.remove('chat-on');$('chat').classList.remove('on');$('chIn').blur()}
 function enviarChat(txt){
   txt=String(txt||'').trim();if(!txt||CH.enviando)return;
-  if(conectado!=='vivo'){CH.error='Sin conexión con el bot: el mensaje no se mandó. Revisá el aviso de arriba.';pintarChat(true);return}
+  if(conectado!=='vivo'){CH.error='Sin conexión con el servidor: el mensaje no se mandó. Revisá el aviso de arriba.';pintarChat(true);return}
   CH.error='';CH.enviando=true;CH.local=[{rol:'usuario',texto:txt,canal:'juego',t0:Date.now()}];$('chIn').value='';pintarChat(true);
   api('/oficina/accion',{body:{accion:'chat',texto:txt}}).then(function(r){
     CH.enviando=false;
@@ -529,7 +531,7 @@ function enviarChat(txt){
   }).catch(function(e){
     CH.enviando=false;CH.local=[];$('chIn').value=txt;
     if(e.estado===401){conectado='clave';pedirClave('La clave no es válida.')}
-    CH.error='No pude hablar con el bot: '+(e.message&&e.message!=='Failed to fetch'?e.message.replace(/\.$/,''):'no llega al servidor')+'. Tu mensaje sigue escrito: probá de nuevo.';pintarChat(true);
+    CH.error='No pude hablar con el asistente: '+(e.message&&e.message!=='Failed to fetch'?e.message.replace(/\.$/,''):'no llega al servidor')+'. Tu mensaje sigue escrito: probá de nuevo.';pintarChat(true);
   });
 }
 $('bChat').addEventListener('click',abrirChat);

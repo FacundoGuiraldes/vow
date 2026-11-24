@@ -25,7 +25,7 @@ Este repositorio es la base técnica de la marca:
 
 **VOW HQ** es el panel de control de la marca, pero en vez de tablas y menús es una **aldea isométrica en 3D** (three.js, con ciclo de día y noche): cada edificio es un área real del sistema y todo lo que se ve está conectado en vivo con el servicio y con el chat de la IA. Los globos rojos marcan lo que necesita la mirada de una persona. Se abre en [`/oficina/`](https://vow-17x.pages.dev/oficina/) de la web.
 
-![Recorrido de VOW HQ: abrir edificios, cargar stock, registrar una venta y hablar con el bot](docs/img/hq/recorrido.gif)
+![Recorrido de VOW HQ: abrir edificios, cargar stock, registrar una venta y hablar con el asistente](docs/img/hq/recorrido.gif)
 
 *Recorrido acelerado (datos de demostración). [Ver el video completo (54 s)](docs/img/hq/recorrido.mp4).*
 
@@ -33,9 +33,9 @@ Este repositorio es la base técnica de la marca:
 
 | Edificio | Para qué sirve |
 |---|---|
-| **Centro de control** | Muestra lo pendiente y deja anotarle algo al bot. |
+| **Centro de control** | Muestra lo pendiente, deja anotarle algo al asistente y guarda el estado del sistema (tests y evals). |
 | **Flujo semanal** | El calendario de la semana (y de la próxima): qué se publica cada día, en qué formato y de qué trata. Es solo para leer: lo arma el Estratega los lunes. |
-| **Torre del bot** | Estado del bot, tests y evals, y la charla reciente con el bot. |
+| **Chat** | Abre el chat con el asistente, y muestra las notas que esperan al próximo plan y la charla reciente. |
 | **Estrategia** | Las líneas de la semana que salieron de la última investigación. Se pueden editar, quitar, agregar o restaurar hasta el lunes. |
 | **Instagram** | Rendimiento de @vow_ar (alcance, guardados, compartidos) cuando la cuenta está conectada al servicio. |
 | **Almacén** | Stock por producto (gorras, shakers y medias). Arranca en 0 hasta registrar la llegada de la mercadería. |
@@ -43,12 +43,12 @@ Este repositorio es la base técnica de la marca:
 
 ### Una sola fuente de verdad
 
-Lo que se hace en el juego y lo que se dice en el chat del bot es lo mismo: las dos cosas llaman a las mismas herramientas del servicio (ver stock, registrar una llegada o una venta, editar la estrategia, agregar eventos a la agenda, y más). Todo se guarda en la base, le llega al Estratega como novedad para el próximo plan y el workflow `Sincronizar operación` lo copia cada 30 minutos a [`docs/operacion/`](docs/operacion/).
+Lo que se hace en el juego y lo que se dice en el chat del asistente es lo mismo: las dos cosas llaman a las mismas herramientas del servicio (ver stock, registrar una llegada o una venta, editar la estrategia, agregar eventos a la agenda, y más). Todo se guarda en la base, le llega al Estratega como novedad para el próximo plan y el workflow `Sincronizar operación` lo copia cada 30 minutos a [`docs/operacion/`](docs/operacion/).
 
 <table>
 <tr>
 <td width="50%"><img src="docs/img/hq/estrategia.jpg" alt="Panel de Estrategia con las líneas de la semana"><br><sub>Estrategia: líneas de la semana, editables hasta el lunes.</sub></td>
-<td width="50%"><img src="docs/img/hq/torre-del-bot.jpg" alt="Panel de la Torre del bot"><br><sub>Torre del bot: estado del bot, tests y charla reciente.</sub></td>
+<td width="50%"><img src="docs/img/hq/chat.jpg" alt="Panel del Chat con las notas para el próximo plan y la última charla"><br><sub>Chat: notas para el próximo plan y última charla.</sub></td>
 </tr>
 <tr>
 <td width="50%"><img src="docs/img/hq/almacen.jpg" alt="Panel del Almacén con el stock por producto"><br><sub>Almacén: stock por producto, con «Llegó» y «Contar».</sub></td>

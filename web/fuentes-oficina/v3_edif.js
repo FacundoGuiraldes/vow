@@ -114,7 +114,7 @@ function taller(){
 }
 function logoMini(g,x,y,z,w){var L=lienzo(64,64,function(c,W,H){logoV(c,6,4,52,'#ece8e1')});var m=plano(L,w,w,x,y,z,0);g.add(m);return m}
 
-/* ================= Torre del bot: antena, servidores y luces ================= */
+/* ================= Torre del chat: antena, servidores y luces ================= */
 function torre(){
   var g=nuevo('bot');
   bx(g,3.4,.3,3.4,adoqM(),0,0,0,{dn:.5});
@@ -125,7 +125,7 @@ function torre(){
     if(!m.glow){c.fillStyle='#10161a';c.fillRect(sx-5,sy-5,sw+10,sh+10);c.fillStyle='#1c262c';c.fillRect(sx,sy,sw,sh)}
     for(var r=0;r<6;r++)for(var k=0;k<9;k++){var on=((r*7+k*3)%5)<3;if(m.glow){c.fillStyle=on?(r%3?'#7de3b0':'#ffb066'):'#0a0a0a';c.fillRect(sx+6+k*sw/9.5,sy+6+r*sh/6.4,sw/14,sh/12)}else{c.fillStyle='#2f3d44';c.fillRect(sx+6+k*sw/9.5,sy+6+r*sh/6.4,sw/14,sh/12)}}
     ventana(c,m,1.6*u,.28*u,.55*u,.7*u,{on:true,vidrio:'#6e98a4'});
-    placa(c,m,.2*u,.04*u,.8*u,.2*u,0x151413,false,'BOT',null)});
+    placa(c,m,.2*u,.04*u,.8*u,.2*u,0x151413,false,'CHAT',null)});
   var fx=fachada(2.6,1.2,function(c,W,H,m){var u=W/2.6;if(!m.glow){c.fillStyle='#c9c4b8';c.fillRect(0,0,W,H);for(var i=1;i<5;i++){c.fillStyle='rgba(0,0,0,.14)';c.fillRect(i*W/5,0,2,H)}ruido(c,W,H,500,'rgba(0,0,0,.08)','rgba(255,255,255,.1)',2);banda(c,m,0,0,W,.1*u,0x24221f)}
     ventana(c,m,.4*u,.3*u,.5*u,.6*u,{on:true,vidrio:'#6e98a4'});ventana(c,m,1.6*u,.3*u,.5*u,.6*u,{on:true,vidrio:'#6e98a4'})});
   cuerpo(g,2.6,1.2,2.6,CARB,fz,fx,0,.3,0);bx(g,2.78,.16,2.78,BEIGE,0,1.5,0,{borde:false});
