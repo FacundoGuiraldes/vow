@@ -3,9 +3,9 @@
 export const negocio = {
   marca: 'VOW',
   responsable: 'Facundo Guiraldes',
-  razonSocial: null,        // nombre o razón social que figura en ARCA (ex AFIP)
-  cuit: null,               // CUIT
-  condicionIva: null,       // por ejemplo "Responsable Monotributo"
+  razonSocial: 'Guiraldes Facundo', // nombre o razón social que figura en ARCA (ex AFIP)
+  cuit: '20-43920819-9', // CUIT
+  condicionIva: 'Responsable Monotributo', // por ejemplo "Responsable Monotributo"
   domicilio: null,          // domicilio legal o de atención
   email: 'vow2026ar@gmail.com',
   instagram: 'vow_ar',
