@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import express from "express";
 import { firmaValida } from "./mercadopago.js";
-import { confirmarPago, crearPedido, ErrorPedido, RESERVA_MS, stockDisponible } from "./pedidos.js";
+import { confirmarPago, crearPedido, ErrorPedido, marcarDespachado, pedidosParaEnviar, RESERVA_MS, stockDisponible } from "./pedidos.js";
 import { alCambiarElStock } from "../programacion/stock-eventos.js";
 import { crearRutasVentas } from "./rutas.js";
 import { aplicarInventario, leerInventario } from "../programacion/inventario.js";
@@ -99,6 +99,67 @@ describe("confirmarPago", () => {
     assert.equal(await confirmarPago({ repo, pago: pagoDe(a) }), "pagado sin stock");
     assert.equal((await leerInventario(repo)).stock["shaker-claro"], 0);
     assert.ok((await repo.novedadesPendientes()).some((n) => /devolverle el dinero/.test(n.texto)));
+  });
+});
+
+describe("pedidos para enviar", () => {
+  const pagoDe = (r) => ({ id: 777, external_reference: r.id, status: "approved", currency_id: "ARS", transaction_amount: r.importe });
+  const conEnvio = async (repo, mp) => crearPedido({ repo, mp, ...base, cotizarEnvio: async () => ({ costo: 5000, servicio: "Correo Argentino" }), cuerpo: { items: [{ producto: "oath", cantidad: 1, gorra: "negra", shaker: "claro" }], comprador: COMPRADOR, entrega: ENVIO } });
+
+  test("al cobrar avisa a VOW con qué mandar, a quién y a dónde", async () => {
+    const { repo, mp } = await armar();
+    const r = await conEnvio(repo, mp);
+    const avisos = [];
+    await confirmarPago({ repo, pago: pagoDe(r), avisarPedido: async (a) => avisos.push(a) });
+    assert.equal(avisos.length, 1);
+    assert.match(avisos[0].asunto, /enviar/);
+    for (const parte of [/Pack Oath/, /gorra negra/, /Ana Pérez/, /ana@mail\.com/, /11 5555-1234/, /Salguero 100/, /CP 1425/, /5\.000/]) assert.match(avisos[0].texto, parte);
+  });
+
+  test("si el mail falla, la venta igual queda registrada", async () => {
+    const { repo, mp } = await armar();
+    const r = await conEnvio(repo, mp);
+    const error = console.error;
+    console.error = () => {};
+    try {
+      assert.equal(await confirmarPago({ repo, pago: pagoDe(r), avisarPedido: async () => { throw new Error("gmail caído"); } }), "venta registrada");
+    } finally {
+      console.error = error;
+    }
+    assert.equal((await pedidosParaEnviar(repo)).length, 1);
+  });
+
+  test("el pedido pagado aparece para enviar hasta que se marca despachado, con seguimiento", async () => {
+    const { repo, mp } = await armar();
+    const r = await conEnvio(repo, mp);
+    assert.deepEqual(await pedidosParaEnviar(repo), []);
+    await confirmarPago({ repo, pago: pagoDe(r) });
+    const [p] = await pedidosParaEnviar(repo);
+    assert.equal(p.id, r.id);
+    assert.equal(p.envia, true);
+    assert.match(p.direccion, /Salguero 100/);
+    assert.ok(p.productos.some((x) => /Pack Oath/.test(x)));
+    const hecho = await marcarDespachado({ repo, id: r.id, seguimiento: "  CU123456789AR ", ahora: Date.parse("2026-12-01T15:00:00Z") });
+    assert.equal(hecho.seguimiento, "CU123456789AR");
+    assert.deepEqual(await pedidosParaEnviar(repo), []);
+    await assert.rejects(() => marcarDespachado({ repo, id: r.id }), (e) => e instanceof ErrorPedido && e.estado === 409);
+  });
+
+  test("no se despacha lo que no existe ni lo que no se pagó", async () => {
+    const { repo, mp } = await armar();
+    const r = await conEnvio(repo, mp);
+    await assert.rejects(() => marcarDespachado({ repo, id: r.id }), (e) => e instanceof ErrorPedido && e.estado === 404);
+    await assert.rejects(() => marcarDespachado({ repo, id: "no-existe" }), (e) => e instanceof ErrorPedido && e.estado === 404);
+  });
+
+  test("un pedido pagado sin stock avisa que hay que devolver el dinero y no va a la lista de envíos", async () => {
+    const { repo, mp } = await armar({ "shaker-claro": 1, medias: 5 });
+    const r = await crearPedido({ repo, mp, ...base, cuerpo: { items: [{ producto: "kept", cantidad: 1, shaker: "claro" }], comprador: COMPRADOR, entrega: { tipo: "retiro" } } });
+    await aplicarInventario(repo, { tipo: "ajuste", sku: "shaker-claro", cantidad: 0 }, { origen: "juego" });
+    const avisos = [];
+    await confirmarPago({ repo, pago: pagoDe(r), avisarPedido: async (a) => avisos.push(a) });
+    assert.match(avisos[0].asunto, /SIN stock/);
+    assert.deepEqual(await pedidosParaEnviar(repo), []);
   });
 });
 

@@ -2,6 +2,8 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { crearDia, crearEscenario } from "./ayuda-pruebas.js";
 import { aplicarAccion, armarEstadoOficina, ErrorAccion } from "./oficina.js";
+import { aplicarInventario } from "./inventario.js";
+import { confirmarPago, crearPedido } from "../pagos/pedidos.js";
 import { crearRendimientoJuego } from "./rendimiento-juego.js";
 
 describe("la oficina", () => {
@@ -47,6 +49,27 @@ describe("la oficina", () => {
     assert.equal(estado.rendimiento.totales.alcance, 5);
     const roto = await armarEstadoOficina({ repo: e.repo, rendimiento: { obtener: async () => { throw new Error("token vencido"); } } });
     assert.equal(roto.rendimiento.error, "token vencido");
+  });
+});
+
+describe("envíos en la oficina", () => {
+  test("lo pagado aparece en el estado y se cierra con la acción despachar", async () => {
+    const e = crearEscenario();
+    await aplicarInventario(e.repo, { tipo: "entrada", sku: "medias", cantidad: 5 });
+    const mp = { crearPreferencia: async () => ({ init_point: "https://mp.test" }) };
+    const comprador = { nombre: "Ana Pérez", email: "ana@mail.com", telefono: "11 5555-1234" };
+    const entrega = { tipo: "envio", cp: "1425", calle: "Salguero", numero: "100", localidad: "CABA", provincia: "Buenos Aires" };
+    const r = await crearPedido({ repo: e.repo, mp, urlPublica: "https://api.test", urlLanding: "https://vow.test", cotizarEnvio: async () => ({ costo: 4000, servicio: "Correo Argentino" }), cuerpo: { items: [{ producto: "medias", cantidad: 2 }], comprador, entrega } });
+    assert.deepEqual((await armarEstadoOficina({ repo: e.repo })).envios, []);
+    await confirmarPago({ repo: e.repo, pago: { id: 9, external_reference: r.id, status: "approved", currency_id: "ARS", transaction_amount: r.importe } });
+    const estado = await armarEstadoOficina({ repo: e.repo });
+    assert.equal(estado.envios.length, 1);
+    assert.equal(estado.envios[0].comprador.nombre, "Ana Pérez");
+    const resp = await aplicarAccion(e, { accion: "despachar", id: r.id, seguimiento: "CU1AR" });
+    assert.equal(resp.ok, true);
+    assert.deepEqual(resp.envios, []);
+    assert.ok((await e.repo.novedadesPendientes()).some((n) => /Despachado desde la oficina.*CU1AR/.test(n.texto)));
+    await assert.rejects(() => aplicarAccion(e, { accion: "despachar", id: r.id }), (err) => err instanceof ErrorAccion && err.estado === 409);
   });
 });
 

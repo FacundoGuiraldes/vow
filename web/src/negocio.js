@@ -3,11 +3,16 @@
 export const negocio = {
   marca: 'VOW',
   responsable: 'Facundo Guiraldes',
-  razonSocial: null,        // nombre o razón social que figura en ARCA (ex AFIP)
-  cuit: null,               // CUIT
-  condicionIva: null,       // por ejemplo "Responsable Monotributo"
-  domicilio: null,          // domicilio legal o de atención
+  razonSocial: 'Guiraldes Facundo', // nombre o razón social que figura en ARCA (ex AFIP)
+  cuit: '20-43920819-9', // CUIT
+  condicionIva: 'Responsable Monotributo', // por ejemplo "Responsable Monotributo"
+  domicilio: 'Gdor. Marcelino Ugarte 2257, B1636 Olivos, Provincia de Buenos Aires', // domicilio de atención (el mismo del retiro)
   email: 'vow2026ar@gmail.com',
   instagram: 'vow_ar',
-  pais: 'Argentina'
+  pais: 'Argentina',
+  // Punto de retiro en persona (se muestra en la tienda y en los términos)
+  retiro: {
+    direccion: 'Gdor. Marcelino Ugarte 2257, B1636 Olivos, Provincia de Buenos Aires',
+    horario: 'de 12 a 21 hs, desde el día siguiente a la compra'
+  }
 };

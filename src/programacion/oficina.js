@@ -3,6 +3,7 @@
 //   aplicarAccion      → lo que el juego puede hacer: charlar con el bot, editar estrategia, mover stock y ventas, marcar pendientes, anotar
 // Lo que se marca en el juego queda también como novedad: el Estratega lo lee en el próximo flujo.
 import { ErrorOperacion, aplicarOperacion, leerOperacion } from "./operacion.js";
+import { ErrorPedido, marcarDespachado, pedidosParaEnviar } from "../pagos/pedidos.js";
 import { ErrorInventario, aplicarInventario, leerInventario, vistaInventario } from "./inventario.js";
 import { lineasDeInvestigacion, vistaEstrategia } from "./estrategia-semana.js";
 import { ahoraArgentina, lunesDe } from "./fechas.js";
@@ -33,7 +34,7 @@ async function guardarJuego(repo, juego) {
 
 export async function armarEstadoOficina({ repo, servicio = null, rendimiento = null, ahora = Date.now(), investigacion = lineasDeInvestigacion }) {
   const hoy = ahoraArgentina(new Date(ahora)).fecha;
-  const [flujo, novedades, chat, juego, operacion, inventario, lineas] = await Promise.all([
+  const [flujo, novedades, chat, juego, operacion, inventario, lineas, envios] = await Promise.all([
     servicio ? servicio.flujosVigentes(hoy) : [],
     repo.novedadesRecientes(20),
     repo.leerEstado("chat"),
@@ -41,6 +42,7 @@ export async function armarEstadoOficina({ repo, servicio = null, rendimiento = 
     leerOperacion(repo),
     leerInventario(repo),
     investigacion(),
+    pedidosParaEnviar(repo),
   ]);
   let rend = null;
   if (rendimiento) {
@@ -59,6 +61,7 @@ export async function armarEstadoOficina({ repo, servicio = null, rendimiento = 
     operacion,
     estrategia_semana: vistaEstrategia(operacion.estrategia, lineas, lunesDe(hoy)),
     inventario: vistaInventario(inventario, hoy),
+    envios,
     rendimiento: rend,
   };
   // La versión cambia solo cuando cambia algo: el juego pregunta seguido y, si no cambió, el servidor contesta cortito
@@ -101,6 +104,18 @@ export async function aplicarAccion(deps, accion, ahora = Date.now()) {
       return { ok: true, resumen, ...(id ? { id } : {}), inventario: vistaInventario(inventario, ahoraArgentina(new Date(ahora)).fecha) };
     } catch (error) {
       if (error instanceof ErrorInventario) throw new ErrorAccion(error.message, 400);
+      throw error;
+    }
+  }
+
+  // Pedidos pagados: marcar que ya se despachó (con el código de seguimiento si hay)
+  if (tipo === "despachar") {
+    try {
+      const r = await marcarDespachado({ repo, id: accion.id, seguimiento: accion.seguimiento, ahora });
+      await repo.agregarNovedad(`Despachado desde la oficina: pedido ${r.id.slice(0, 8)} de ${r.comprador}${r.seguimiento ? ` (seguimiento ${r.seguimiento})` : ""}.`);
+      return { ok: true, resumen: `Pedido de ${r.comprador} despachado.`, envios: await pedidosParaEnviar(repo) };
+    } catch (error) {
+      if (error instanceof ErrorPedido) throw new ErrorAccion(error.message, error.estado);
       throw error;
     }
   }

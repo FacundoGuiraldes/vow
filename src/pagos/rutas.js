@@ -13,7 +13,7 @@ import { ErrorArrepentimiento } from "./arrepentimiento.js";
 import { disponibilidadDe } from "./disponibilidad.js";
 import { ErrorPedido, confirmarPago, crearPedido, stockDisponible } from "./pedidos.js";
 
-export function crearRutasVentas({ repo, mp, secretoWebhook, ventaAbierta = false, cotizarEnvio = null, codigos = null, consultaCodigo = null, arrepentimientos = null, urlPublica, urlLanding, intervaloEventosMs = 10_000 }) {
+export function crearRutasVentas({ repo, mp, secretoWebhook, ventaAbierta = false, cotizarEnvio = null, avisarPedido = null, codigos = null, consultaCodigo = null, arrepentimientos = null, urlPublica, urlLanding, intervaloEventosMs = 10_000 }) {
   const router = Router();
   const limitePedidos = rateLimit({ windowMs: 60_000, limit: 10, standardHeaders: true, legacyHeaders: false, message: { error: "Demasiados pedidos. Probá en un minuto." } });
 
@@ -120,7 +120,7 @@ export function crearRutasVentas({ repo, mp, secretoWebhook, ventaAbierta = fals
       if (req.body?.type !== "payment" || !/^\d{1,20}$/.test(dataId)) return res.status(200).json({ ok: true, resultado: "ignorado" });
       const pago = await mp.obtenerPago(dataId);
       if (!pago) return res.status(200).json({ ok: true, resultado: "ignorado" }); // un pago que no existe no se reintenta
-      return res.status(200).json({ ok: true, resultado: await confirmarPago({ repo, pago, codigos }) });
+      return res.status(200).json({ ok: true, resultado: await confirmarPago({ repo, pago, codigos, avisarPedido }) });
     } catch (error) {
       console.error(`Error con un aviso de Mercado Pago (Mercado Pago reintenta): ${error.message}`);
       return siguiente(error);

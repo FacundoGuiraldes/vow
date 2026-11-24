@@ -44,6 +44,7 @@ Pendientes que bloquean o conviene cerrar antes de vender:
 4. Mandar los mails desde el chat de VOW HQ en tandas chicas (5 a 10 personas): `ver`, después `enviar` confirmando la cantidad. La respuesta de cada mail se mira antes de seguir con más.
 5. Avisar en Instagram que los anotados tienen un 10 % y que lo pueden consultar en la tienda con el mail con el que se anotaron. Así nadie depende de que el mail llegue a la bandeja.
 6. Anotar la fecha y hora del lanzamiento: es el `LISTA_CORTE` del Drop 01.
+7. Cambiar en la web el "lunes 30 de noviembre" (cinta en `web/src/content.js`; etiqueta del hero, nota del hero, preguntas y descripción para redes en `web/index.html`) por un texto de Drop 00 ya abierto.
 
 ## Mails y spam
 

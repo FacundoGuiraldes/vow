@@ -86,6 +86,12 @@ export async function construirProgramacion({ pool, env = process.env, fetchFn =
           await correo.enviar({ para: env.MAIL_USUARIO, asunto: "Botón de arrepentimiento: hay un pedido nuevo", html: `<p>${escapado}</p>`, texto });
         },
       }),
+      // Cada pedido cobrado le llega a VOW por mail con qué mandar y a dónde (y queda en "Para enviar" en VOW HQ)
+      avisarPedido: async ({ asunto, texto }) => {
+        if (!correo) return console.warn(`Pedido pagado (sin correo configurado para avisar): ${texto.replace(/\n/g, " | ")}`);
+        const escapado = texto.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/\n/g, "<br>");
+        await correo.enviar({ para: env.MAIL_USUARIO, asunto, html: `<p>${escapado}</p>`, texto });
+      },
       cotizarEnvio: Number.isInteger(costoFijo) && costoFijo > 0 ? async () => ({ costo: costoFijo, servicio: "Correo Argentino" }) : null,
       urlPublica: env.URL_PUBLICA.replace(/\/$/, ""),
       urlLanding: env.URL_LANDING.replace(/\/$/, ""),

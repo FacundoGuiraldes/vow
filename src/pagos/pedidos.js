@@ -1,6 +1,7 @@
 // Pedidos de la venta propia. Todo se calcula acá, en el servidor: el navegador solo dice qué quiere y a dónde, nunca cuánto cuesta.
 //   crearPedido   valida lo pedido, calcula el total con los precios del sistema, guarda el pedido y arma el link de pago
-//   confirmarPago cuando Mercado Pago avisa que se aprobó, descuenta el stock del Almacén (una sola vez por pedido)
+//   confirmarPago cuando Mercado Pago avisa que se aprobó, descuenta el stock del Almacén (una sola vez por pedido) y avisa a VOW qué mandar y a dónde
+//   pedidosParaEnviar / marcarDespachado la lista de lo pagado que falta mandar y el cierre con el código de seguimiento
 import { randomBytes } from "node:crypto";
 import { ErrorCodigo } from "../descuentos/codigos.js";
 import { ErrorInventario, PRODUCTOS, aplicarInventario, leerInventario, lineaDeVenta } from "../programacion/inventario.js";
@@ -167,8 +168,88 @@ export async function crearPedido({ repo, mp, cuerpo, cotizarEnvio = null, codig
   return { id, importe, envio, ...(codigo ? { descuento: { porcentaje, ahorro: subtotal - subtotalConDescuento } } : {}), link: preferencia.init_point };
 }
 
+async function avisar(avisarPedido, aviso) {
+  if (!avisarPedido) return;
+  try {
+    await avisarPedido(aviso);
+  } catch (error) {
+    console.error(`No se pudo avisar del pedido por mail (el pedido igual quedó registrado): ${error.message}`);
+  }
+}
+
+const pesos = (n) => `$${Number(n).toLocaleString("es-AR")}`;
+
+// Lo que hay que preparar: "2 × Gorra negra (gorra negra)" por línea. Una línea que ya no se entiende se muestra como vino.
+export function productosDelPedido(pedido) {
+  return (pedido.lineas ?? []).map((l) => {
+    try {
+      const v = lineaDeVenta(l);
+      const colores = Object.values(v.colores).map((s) => PRODUCTOS[s].nombre.toLowerCase());
+      return `${v.cantidad} × ${v.nombre}${colores.length ? ` (${colores.join(", ")})` : ""}`;
+    } catch {
+      return `${l.cantidad ?? 1} × ${l.producto}`;
+    }
+  });
+}
+
+export function direccionDelPedido(entrega) {
+  if (entrega?.tipo !== "envio") return "Retira en persona";
+  const calle = `${entrega.calle} ${entrega.numero}${entrega.piso ? `, ${entrega.piso}` : ""}`;
+  return `${calle} · ${entrega.localidad}, ${entrega.provincia} · CP ${entrega.cp}`;
+}
+
+// El mail que le llega a VOW cuando se cobra un pedido: todo lo necesario para armar el paquete sin abrir nada más
+export function textoDeAvisoDePedido(id, pedido, { sinStock = false } = {}) {
+  const c = pedido.comprador;
+  const lineas = [
+    sinStock ? `PEDIDO PAGADO SIN STOCK (${id.slice(0, 8)}): devolvé el dinero desde Mercado Pago.` : `Pedido pagado ${id.slice(0, 8)}: ${pesos(pedido.importe)}${pedido.codigo ? ` (con código de descuento ${pedido.codigo})` : ""}.`,
+    "",
+    ...productosDelPedido(pedido).map((p) => `· ${p}`),
+    "",
+    `Comprador: ${c.nombre} · ${c.email} · ${c.telefono}`,
+    pedido.entrega?.tipo === "envio" ? `Enviar a: ${direccionDelPedido(pedido.entrega)}` : "Entrega: retira en persona en Olivos, desde el día siguiente a la compra y de 12 a 21 hs (coordinar el horario con el comprador).",
+    pedido.envio?.costo ? `Envío cobrado: ${pesos(pedido.envio.costo)} (${pedido.envio.servicio})` : "",
+    "",
+    sinStock ? "" : "Cuando lo despaches, marcalo en VOW HQ (Caja → Para enviar) con el código de seguimiento.",
+  ];
+  return lineas.filter((l, i, a) => l !== "" || (a[i - 1] !== "" && i < a.length - 1)).join("\n").trim();
+}
+
+// Pedidos pagados que todavía no se despacharon, los más viejos primero
+export async function pedidosParaEnviar(repo) {
+  const pedidos = await leerPedidos(repo);
+  return Object.entries(pedidos)
+    .filter(([, p]) => p.estado === "pagado" && p.despacho?.estado === "pendiente")
+    .sort((a, b) => a[1].creado.localeCompare(b[1].creado))
+    .map(([id, p]) => ({
+      id,
+      corto: id.slice(0, 8),
+      pagado: p.pagadoEn ?? p.creado,
+      comprador: p.comprador,
+      envia: p.entrega?.tipo === "envio",
+      direccion: direccionDelPedido(p.entrega),
+      productos: productosDelPedido(p),
+      importe: p.importe,
+    }));
+}
+
+// Cierra un pedido: lo mandó (con seguimiento opcional) o lo entregó en mano. Solo pedidos pagados que estaban pendientes de despacho.
+export function marcarDespachado({ repo, id, seguimiento = "", ahora = Date.now() }) {
+  return enCola(async () => {
+    const pedidos = await leerPedidos(repo);
+    const pedido = pedidos[String(id)];
+    if (!pedido || pedido.estado !== "pagado") throw new ErrorPedido("Ese pedido no existe o todavía no está pagado.", 404);
+    if (pedido.despacho?.estado !== "pendiente") throw new ErrorPedido("Ese pedido ya figura como despachado.", 409);
+    const codigo = texto(seguimiento, 40);
+    pedidos[id] = { ...pedido, despacho: { estado: "despachado", en: new Date(ahora).toISOString(), ...(codigo ? { seguimiento: codigo } : {}) } };
+    await guardarPedidos(repo, pedidos);
+    return { id, seguimiento: codigo, comprador: pedido.comprador.nombre };
+  });
+}
+
 // pago: lo que devuelve GET /v1/payments/{id}. Devuelve un texto de lo que hizo.
-export function confirmarPago({ repo, pago, codigos = null, ahora = Date.now() }) {
+// avisarPedido({ asunto, texto }): se llama cuando entra un pedido pagado (un fallo al avisar nunca deshace la venta)
+export function confirmarPago({ repo, pago, codigos = null, avisarPedido = null, ahora = Date.now() }) {
   return enCola(async () => {
     const id = String(pago?.external_reference ?? "");
     const pedidos = await leerPedidos(repo);
@@ -190,9 +271,10 @@ export function confirmarPago({ repo, pago, codigos = null, ahora = Date.now() }
     const nota = `Mercado Pago ${pago.id} · ${pedido.comprador.nombre}`;
     try {
       const { id: venta } = await aplicarInventario(repo, { tipo: "venta", items: pedido.lineas, nota }, { origen: "web", ahora });
-      pedidos[id] = { ...pedido, estado: "pagado", pago: String(pago.id), venta };
+      pedidos[id] = { ...pedido, estado: "pagado", pago: String(pago.id), venta, pagadoEn: new Date(ahora).toISOString(), despacho: { estado: "pendiente" } };
       await guardarPedidos(repo, pedidos);
       if (pedido.codigo && codigos) await codigos.consumir(pedido.codigo, id);
+      await avisar(avisarPedido, { asunto: `VOW: pedido pagado, hay que ${pedido.entrega?.tipo === "envio" ? "enviar" : "entregar"} (${pesos(pedido.importe)})`, texto: textoDeAvisoDePedido(id, pedidos[id]) });
       return "venta registrada";
     } catch (error) {
       if (!(error instanceof ErrorInventario)) throw error;
@@ -201,6 +283,7 @@ export function confirmarPago({ repo, pago, codigos = null, ahora = Date.now() }
       await guardarPedidos(repo, pedidos);
       if (pedido.codigo && codigos) await codigos.consumir(pedido.codigo, id);
       await repo.agregarNovedad(`Ventas: el pedido ${id.slice(0, 8)} (${pedido.comprador.nombre}, ${pedido.comprador.email}) se pagó (pago ${pago.id}) pero ya no hay stock. Hay que devolverle el dinero desde Mercado Pago.`.slice(0, 1000));
+      await avisar(avisarPedido, { asunto: "VOW: pedido pagado SIN stock, hay que devolver el dinero", texto: textoDeAvisoDePedido(id, pedido, { sinStock: true }) });
       return "pagado sin stock";
     }
   });

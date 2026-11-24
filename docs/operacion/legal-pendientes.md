@@ -21,14 +21,14 @@
 
 Los datos del vendedor se cargan en `web/src/negocio.js`; lo que está en `null` no se muestra. Hoy se muestra solo marca, responsable, mail, Instagram y país.
 
-1. **CUIT, razón social y condición frente al IVA** (monotributo o responsable inscripto) y **domicilio** de contacto. La normativa de defensa del consumidor pide identificar al proveedor; sin estos datos no conviene vender.
-2. **Inscripción como contribuyente** y facturación electrónica de las ventas (consultar con un contador).
+1. **CUIT, razón social y condición frente al IVA** (monotributo o responsable inscripto) y **domicilio** de contacto. *Actualización 24/11/2026: CUIT, razón social y condición (Responsable Monotributo) ya están cargados desde la constancia de ARCA; el domicilio publicado es el de atención y retiro (Gdor. Marcelino Ugarte 2257, Olivos). Conviene que el contador confirme que alcanza como domicilio del proveedor.* La normativa de defensa del consumidor pide identificar al proveedor; sin estos datos no conviene vender.
+2. **Inscripción como contribuyente** y facturación electrónica de las ventas. *Actualización 24/11/2026: Facundo ya agregó las categorías de monotributo para vender mercadería y tiene punto de venta habilitado para facturar. Queda emitir la factura de cada venta.*
 3. **Registro de la base de datos** de la lista de espera ante la AAIP (Ley 25.326, Registro Nacional de Bases de Datos). Consultar con un abogado si corresponde y cuándo.
 4. **Confirmar la política de devolución**: los textos prometen que VOW paga la devolución por arrepentimiento (lo dice la ley) y que el reembolso va por Mercado Pago. Confirmar plazos reales y quién atiende `vow2026ar@gmail.com`.
 5. **Responder los arrepentimientos**: cada uno llega por mail a la cuenta de VOW con su código; hay que contestar por mail y coordinar la devolución.
 6. **Derechos de las imágenes**: confirmar el origen de `web/public/img/coming-soon.webp` (¿imagen generada con IA, diseño propio o de un tercero?) y del logo. Si es de IA, revisar los términos de la herramienta para uso comercial. Cuando haya fotos reales de producto, tener la autorización de quien las saque y de las personas que aparezcan.
-7. **Marca**: buscar y registrar "VOW" en el INPI (clases 25 y 35) para evitar un conflicto con una marca existente.
-8. **Fecha de lanzamiento**: la web dice "lanzamiento en 2027" (cinta y preguntas) y "Drop 01 en desarrollo". Si cambia el plan, actualizar `web/src/content.js` y la sección de preguntas.
+7. **Marca**: buscar y registrar "VOW" en el INPI (clases 25 y 35) para evitar un conflicto con una marca existente. *Actualización 24/11/2026: el trámite ya está solicitado y está en curso; se vende mientras tanto.*
+8. **Fecha de lanzamiento**: la web anuncia el Drop 00 para el lunes 30 de noviembre de 2026 (cinta, etiqueta del hero, nota del hero, preguntas y descripción para redes) y el Drop 01 en 2027. *Después del lanzamiento hay que quitar el "lunes 30 de noviembre" de esos textos.* Si cambia el plan, actualizar `web/src/content.js` y `web/index.html`.
 9. **Promesa del descuento**: la web dice que anotarse da un código para la primera compra. Hay que cumplirlo (ver `docs/lanzamiento.md`).
 10. **Mails**: ya llevan opción de baja. Atender las bajas a tiempo y sacar de la lista a quien las pida.
 11. **Si algún día se agrega analítica, píxeles o videos embebidos**: hay que actualizar la política de cookies y pedir consentimiento antes de activarlos.
