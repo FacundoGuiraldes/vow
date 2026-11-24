@@ -1,4 +1,6 @@
-var foco={x:0,z:1.2},focoT={x:0,z:1.2},zoom=1,zoomT=1,desX=0,desY=0,desXT=0,desYT=0,selId=null;
+/* en pantallas anchas se aleja un poco la cámara: así el último cartel de la aldea no queda tapado por los botones de abajo */
+function zoomBase(){return innerWidth/innerHeight>1.3?.9:1}
+var foco={x:0,z:1.2},focoT={x:0,z:1.2},zoom=zoomBase(),zoomT=zoomBase(),desX=0,desY=0,desXT=0,desYT=0,selId=null;
 /* cámara cinemática: al abrir o cerrar un edificio se acerca con curva suave y un leve giro (respeta "reducir movimiento") */
 var cine=null,yaw=0,CINE_SEG=.95,REDUCIDO=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches);
 function iniciarCine(){
@@ -19,7 +21,7 @@ function ajustarCam(){
   cam.setViewOffset(w,h,desX*w,desY*h,w,h);cam.updateProjectionMatrix();cam.updateMatrixWorld();
 }
 var sheetOn=false;
-function pedirDesfase(){var ancho=innerWidth>=760,hj=$('hoja');var sw=hj?hj.offsetWidth:430,sh=hj?hj.offsetHeight:innerHeight*.6;desXT=sheetOn&&ancho?(sw+18)/(2*innerWidth):0;desYT=sheetOn&&!ancho?sh/(2*innerHeight):0;zoomT=sheetOn?(ancho?1.25:1.35):1}
+function pedirDesfase(){var ancho=innerWidth>=760,hj=$('hoja');var sw=hj?hj.offsetWidth:430,sh=hj?hj.offsetHeight:innerHeight*.6;desXT=sheetOn&&ancho?(sw+18)/(2*innerWidth):0;desYT=sheetOn&&!ancho?sh/(2*innerHeight):0;zoomT=sheetOn?(ancho?1.25:1.35):zoomBase()}
 function selecc(id){
   selId=id;sheetOn=!!id;pedirDesfase();
   if(id){var e=EDIF[id],l=Math.hypot(e.x,e.z),k=l>12?12/l:1;focoT.x=e.x*k;focoT.z=e.z*k}else{focoT.x=0;focoT.z=1.2}

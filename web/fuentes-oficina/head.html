@@ -77,6 +77,7 @@ canvas#gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-a
 .fila .tx{flex:1;min-width:0;overflow-wrap:anywhere}
 .acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .fila .acc{margin-top:0;flex:0 0 auto;justify-content:flex-end}
+.fila.col .acc{margin-top:8px;gap:6px}.fila.col .acc .ck{min-height:34px;padding:0 13px;font-size:12.5px}
 .ck{font:600 13px var(--f-body);min-height:40px;padding:0 16px;border:0;border-radius:20px;background:#1d1c1a;color:var(--hueso);box-shadow:0 4px 12px rgba(0,0,0,.18);cursor:pointer}
 .ck.si{background:linear-gradient(var(--bordo2),var(--bordo));color:#fff;box-shadow:0 6px 16px rgba(192,64,90,.35)}
 .ck.sec{background:#fff;color:#16140f;box-shadow:inset 0 0 0 1px #cfc8b8,0 2px 6px rgba(0,0,0,.06)}
@@ -106,7 +107,7 @@ form.nota .fil2{display:flex;gap:8px}form.nota .fil2 select{flex:1;min-width:0}
 #clave h3{margin:0;font:700 15px var(--f-display);text-transform:uppercase;letter-spacing:.05em}#clave p{margin:0;font:14px/1.4 var(--f-body)}
 #clave input{font:16px var(--f-body);min-height:46px;padding:0 12px;border:1px solid #d6cfc0;border-radius:14px;background:#fff;color:#16140f}
 #clave .fil{display:flex;gap:8px}#clave button{flex:1;min-height:46px;font:600 15px var(--f-body);border:0;border-radius:23px;background:#1d1c1a;color:var(--hueso)}#clave button.sec{background:#fff;color:#16140f;box-shadow:inset 0 0 0 1px #cfc8b8}
-/* chat con el bot */
+/* chat con el asistente */
 #bChat{position:relative}
 #bChatN{position:absolute;right:-4px;top:-6px;min-width:22px;height:22px;padding:0 6px;box-sizing:border-box;border-radius:11px;background:#fff;color:var(--bordo);font:700 12px/22px var(--f-display);text-align:center;box-shadow:0 3px 10px rgba(0,0,0,.45)}
 #bChatN[hidden]{display:none}
@@ -210,10 +211,10 @@ button:focus-visible{outline:3px solid var(--beige);outline-offset:2px}
   <div id="velo"></div>
   <div id="capa"></div>
   <div id="top"><div id="marca"><i id="luz"></i>VOW HQ <small id="est">conectando…</small></div><div id="sinCon" hidden></div><div id="res"></div><div id="pista">Tocá un edificio · arrastrá · pellizcá</div></div>
-  <form id="nrap" hidden autocomplete="off"><input id="nrapIn" type="text" maxlength="300" placeholder="Anotale algo al bot…" enterkeyhint="send"><button type="submit">Anotar</button></form>
-  <div id="abajo"><button class="gran sec" id="bAnotar" type="button">Anotar</button><button class="gran" id="bChat" type="button">Hablar con el bot<span id="bChatN" hidden></span></button></div>
+  <form id="nrap" hidden autocomplete="off"><input id="nrapIn" type="text" maxlength="300" placeholder="Anotale algo al asistente…" enterkeyhint="send"><button type="submit">Anotar</button></form>
+  <div id="abajo"><button class="gran sec" id="bAnotar" type="button">Anotar</button><button class="gran" id="bChat" type="button">Chat<span id="bChatN" hidden></span></button></div>
   <div id="hoja" role="dialog" aria-modal="false"><header><h2 id="hT"></h2><button class="x" id="hX" type="button" aria-label="Cerrar">✕</button></header><div id="cuerpo"></div></div>
-  <div id="chat" role="dialog" aria-modal="false" aria-label="Chat con el bot"><header><h2>Bot VOW<small>Stock, ventas, estrategia y novedades</small></h2><button class="x" id="chX" type="button" aria-label="Cerrar">✕</button></header><div id="chMsgs"></div><div id="chChips"></div><form id="chForm" autocomplete="off"><input id="chIn" type="text" placeholder="Escribile al bot…" enterkeyhint="send" maxlength="2000"><button id="chSend" type="submit">Enviar</button></form></div>
+  <div id="chat" role="dialog" aria-modal="false" aria-label="Chat con el asistente"><header><h2>Asistente VOW<small>Stock, ventas, estrategia y novedades</small></h2><button class="x" id="chX" type="button" aria-label="Cerrar">✕</button></header><div id="chMsgs"></div><div id="chChips"></div><form id="chForm" autocomplete="off"><input id="chIn" type="text" placeholder="Escribile al bot…" enterkeyhint="send" maxlength="2000"><button id="chSend" type="submit">Enviar</button></form></div>
 </div>
 <div id="clave" role="dialog" aria-label="Clave de la oficina"><form id="claveForm" autocomplete="off"><h3>Clave de la oficina</h3><p id="claveMsg"></p><input id="claveIn" type="password" placeholder="Clave" autocomplete="off" autocapitalize="off"><div class="fil"><button type="button" class="sec" id="claveCerrar">Ahora no</button><button type="submit">Entrar</button></div></form></div>
 <div id="toast" role="status"></div>

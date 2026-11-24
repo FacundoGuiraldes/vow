@@ -72,7 +72,7 @@ function armarD(){
     d.rendimiento=v.rendimiento||null;d.actualizado=(v.generado||'').slice(0,10)||d.actualizado;
   }
   /* lunes 8:00: el plan semanal se arma solo */
-  var h=new Date(),i;for(i=0;i<8;i++){var x=new Date(h.getFullYear(),h.getMonth(),h.getDate()+i);if(x.getDay()===1&&(i>0||h.getHours()<8)){agenda.push({f:x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'),h:'08:00',sala:'bot',t:'Plan semanal automático'});break}}
+  var h=new Date(),i;for(i=0;i<8;i++){var x=new Date(h.getFullYear(),h.getMonth(),h.getDate()+i);if(x.getDay()===1&&(i>0||h.getHours()<8)){agenda.push({f:x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'),h:'08:00',sala:'diseno',t:'Plan semanal automático'});break}}
   var op=(v&&v.operacion)||null;d._op=op;d.inv=(v&&v.inventario)||null;d.estr=(v&&v.estrategia_semana)||null;
   if(op){
     var cs=op.campos||{};
@@ -112,13 +112,13 @@ function cargarCI(){
   }).catch(function(){})}
   return Promise.all([uno('tests.yml','tests'),uno('evals-online.yml','evals')]).then(function(){if(VIVO||DOCS.D)refrescar()});
 }
-/* ----- acciones: se ven al instante y llegan al bot; si el servidor las rechaza, se deshacen ----- */
+/* ----- acciones: se ven al instante y llegan al asistente; si el servidor las rechaza, se deshacen ----- */
 function enviar(body,ok,mal){
   return api('/oficina/accion',{body:body}).then(function(r){if(r&&r.juego&&VIVO)VIVO.juego=r.juego;ok&&ok();return true}).catch(function(e){mal&&mal();aviso(e.estado===401?'Clave inválida: no se guardó':'No se pudo guardar: '+(e.message||'error'));if(e.estado===401)pedirClave('La clave no es válida.');return false})
 }
 function cumplirPend(p,nota){nota=(nota||'').trim().slice(0,200);
   var k=kPend(p),tx=p.t+(nota?' — '+nota:''),o={t:tx,sala:p.sala,cuando:ahoraISO()};PEND_H[k]=o;refrescar();
-  enviar({accion:'cumplir',clave:k,texto:tx,sala:p.sala},function(){aviso('Cumplido: le llega al bot y al próximo plan');leerVivo().then(function(){delete PEND_H[k];refrescar()})},function(){delete PEND_H[k];refrescar()});
+  enviar({accion:'cumplir',clave:k,texto:tx,sala:p.sala},function(){aviso('Cumplido: le llega al asistente y al próximo plan');leerVivo().then(function(){delete PEND_H[k];refrescar()})},function(){delete PEND_H[k];refrescar()});
 }
 function deshacerHecho(k){
   PEND_H[k]=null;refrescar();
@@ -127,7 +127,7 @@ function deshacerHecho(k){
 function agregarNota(t,sala,tipo){
   t=(t||'').trim();if(!t)return;var k='n'+Date.now().toString(36),o={t:t,sala:sala,tipo:tipo,cuando:ahoraISO()};PEND_N[k]=o;refrescar();
   var fin=function(){delete PEND_N[k];refrescar()};
-  enviar({accion:'nota',clave:k,texto:t,sala:sala,tipo:tipo==='confirmado'?'confirmado':'anotacion'},function(){aviso('Anotado: le llega al bot');leerVivo().then(fin)},fin);
+  enviar({accion:'nota',clave:k,texto:t,sala:sala,tipo:tipo==='confirmado'?'confirmado':'anotacion'},function(){aviso('Anotado: le llega al asistente');leerVivo().then(fin)},fin);
 }
 function quitarNota(k){
   PEND_N[k]=null;refrescar();var fin=function(){delete PEND_N[k];refrescar()};
