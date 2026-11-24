@@ -1279,7 +1279,7 @@ function actualizarMundo(){
     PLACAS[k].querySelector('span').textContent=lineaDato(k);
     pintarBurbuja(k);
   });
-  var sk=(D.inv&&D.inv.stock)||{},hay={gorras:(sk['gorra-negra']||0)+(sk['gorra-beige']||0),medias:sk.medias||0,shakers:(sk['shaker-negro']||0)+(sk['shaker-claro']||0)};
+  var sk=(D.inv&&D.inv.stock)||{},hay={gorras:(sk['gorra-negra']||0)+(sk['gorra-beige']||0),medias:Object.keys(sk).filter(function(k){return k.indexOf('medias')===0}).reduce(function(a,k){return a+(sk[k]||0)},0),shakers:(sk['shaker-negro']||0)+(sk['shaker-claro']||0)};
   Object.keys(hay).forEach(function(x){if(CAJAS[x])CAJAS[x].visible=hay[x]>0});
   if(CAJA_PANT){var sc=JSON.stringify(D.inv&&D.inv.totales&&D.inv.totales.hoy);if(sc!==CAJA_PANT.sig){CAJA_PANT.sig=sc;redibujar(CAJA_PANT)}}
   if(LUCES.bot)LUCES.bot.material.color.set(conectado!=='vivo'?0x888888:0x7da36b);
@@ -1453,8 +1453,8 @@ PANEL.recepcion=function(){
   return {t:'Instagram',s:'@'+(c.usuario||'vow_ar'),b:r};
 };
 /* ================= Almacén y Caja: stock y ventas, conectados al sistema (el asistente ve y mueve lo mismo) ================= */
-var STOCK_N={'gorra-negra':'Gorra negra','gorra-beige':'Gorra beige','shaker-negro':'Shaker negro','shaker-claro':'Shaker claro',medias:'Medias (pares)'};
-var STOCKF={},STOCKT={},CAJAV={lineas:[{producto:'gorra',cantidad:1,gorra:'negra',shaker:'negro'}],nota:''},ESTAB={},ESTTXT={},ESTNUEVA='';
+var STOCK_N={'gorra-negra':'Gorra negra','gorra-beige':'Gorra beige','shaker-negro':'Shaker negro','shaker-claro':'Shaker claro','medias-negro-grande':'Medias negras Grande (37-40)','medias-negro-super':'Medias negras Súper (41-44)','medias-hueso-grande':'Medias hueso Grande (37-40)','medias-hueso-super':'Medias hueso Súper (41-44)','medias-beige-grande':'Medias beige Grande (37-40)','medias-beige-super':'Medias beige Súper (41-44)'};
+var STOCKF={},STOCKT={},CAJAV={lineas:[{producto:'gorra',cantidad:1,gorra:'negra',shaker:'negro',medias:'negro',talle:'grande'}],nota:''},ESTAB={},ESTTXT={},ESTNUEVA='';
 function pesos(n){return '$'+Number(n||0).toLocaleString('es-AR')}
 function enviarInv(cambio,okMsg){
   if(conectado!=='vivo'){aviso('Sin conexión con el servidor: no se guardó.',6000);return Promise.resolve(false)}
@@ -1486,7 +1486,7 @@ PANEL.deposito=function(){
 /* una línea de la venta: cuántas unidades de cada producto descuenta, y si alcanza */
 function skusDeLinea(l,cat){
   var c=cat[l.producto];if(!c)return null;var out={};
-  c.usa.forEach(function(u){var g=u[0],n=u[1]*(Number(l.cantidad)||0),sku=g==='medias'?'medias':g==='gorra'?'gorra-'+l.gorra:'shaker-'+l.shaker;out[sku]=(out[sku]||0)+n});
+  c.usa.forEach(function(u){var g=u[0],n=u[1]*(Number(l.cantidad)||0),sku=g==='medias'?'medias-'+l.medias+'-'+l.talle:g==='gorra'?'gorra-'+l.gorra:'shaker-'+l.shaker;out[sku]=(out[sku]||0)+n});
   return out;
 }
 function textoLinea(l,cat){var c=cat[l.producto]||{nombre:l.producto},col=Object.keys(l.colores||{}).map(function(g){return (STOCK_N[l.colores[g]]||l.colores[g]).toLowerCase()});return l.cantidad+' × '+c.nombre+(col.length?' ('+col.join(', ')+')':'')}
@@ -1521,10 +1521,11 @@ PANEL.caja=function(){
     se.addEventListener('change',function(){l.producto=se.value;abrirEdif(panelAbierto,true)});
     q.type='number';q.min=1;q.max=1000;q.step=1;q.inputMode='numeric';q.value=l.cantidad;q.className='cant-in';q.addEventListener('input',function(){l.cantidad=q.value===''?'':Number(q.value);actualizarTotalCaja()});q.addEventListener('change',function(){abrirEdif(panelAbierto,true)});
     f1.appendChild(se);f1.appendChild(q);bx.appendChild(f1);
-    if(c.pide.indexOf('gorra')>-1||c.pide.indexOf('shaker')>-1){
+    if(c.pide.indexOf('gorra')>-1||c.pide.indexOf('shaker')>-1||c.pide.indexOf('medias')>-1){
       var f2=el('div','fil2');
       if(c.pide.indexOf('gorra')>-1){var sg=el('select');[['negra','Gorra negra'],['beige','Gorra beige']].forEach(function(x){var o=el('option',null,x[1]);o.value=x[0];sg.appendChild(o)});sg.value=l.gorra;sg.addEventListener('change',function(){l.gorra=sg.value;abrirEdif(panelAbierto,true)});f2.appendChild(sg)}
       if(c.pide.indexOf('shaker')>-1){var ss=el('select');[['negro','Shaker negro'],['claro','Shaker claro']].forEach(function(x){var o=el('option',null,x[1]);o.value=x[0];ss.appendChild(o)});ss.value=l.shaker;ss.addEventListener('change',function(){l.shaker=ss.value;abrirEdif(panelAbierto,true)});f2.appendChild(ss)}
+      if(c.pide.indexOf('medias')>-1){var sm=el('select'),st2=el('select');[['negro','Medias negras'],['hueso','Medias hueso'],['beige','Medias beige']].forEach(function(x){var o=el('option',null,x[1]);o.value=x[0];sm.appendChild(o)});[['grande','Grande (37-40)'],['super','Súper (41-44)']].forEach(function(x){var o=el('option',null,x[1]);o.value=x[0];st2.appendChild(o)});sm.value=l.medias;st2.value=l.talle;sm.addEventListener('change',function(){l.medias=sm.value;abrirEdif(panelAbierto,true)});st2.addEventListener('change',function(){l.talle=st2.value;abrirEdif(panelAbierto,true)});f2.appendChild(sm);f2.appendChild(st2)}
       bx.appendChild(f2);
     }
     var n=Number(l.cantidad)||0,sub=c.precio*n;total+=sub;
@@ -1534,13 +1535,13 @@ PANEL.caja=function(){
     bx.appendChild(pie);r.appendChild(bx);
   });
   Object.keys(necesita).forEach(function(k){if((inv.stock[k]||0)<necesita[k])faltan.push((STOCK_N[k]||k).toLowerCase()+': hay '+(inv.stock[k]||0)+', necesita '+necesita[k])});
-  if(L.length<5)r.appendChild(botonIco('caja','Sumar otro producto','ck sec',function(){L.push({producto:'gorra',cantidad:1,gorra:'negra',shaker:'negro'});abrirEdif(panelAbierto,true)}));
+  if(L.length<5)r.appendChild(botonIco('caja','Sumar otro producto','ck sec',function(){L.push({producto:'gorra',cantidad:1,gorra:'negra',shaker:'negro',medias:'negro',talle:'grande'});abrirEdif(panelAbierto,true)}));
   var nota=el('input');nota.type='text';nota.maxLength=140;nota.placeholder='Nota (opcional): quién compró o cómo pagó';nota.value=CAJAV.nota||'';nota.className='nota-in';nota.addEventListener('input',function(){CAJAV.nota=nota.value});r.appendChild(nota);
   var tot=el('div','vtotal');tot.appendChild(el('span',null,'Total'));var tb=el('b',null,pesos(total));tb.id='cajaTotal';tot.appendChild(tb);r.appendChild(tot);
   if(faltan.length)r.appendChild(el('p','mono aviso-stock','No alcanza el stock ('+faltan.join('; ')+'). Primero registrá la llegada en el Almacén.'));
   var reg=botonIco('ok','Registrar venta','ck si',function(){
     if(!L.length||L.some(function(l){return !(Number(l.cantidad)>=1)})){aviso('Revisá las cantidades');return}
-    enviarInv({tipo:'venta',items:L.map(function(l){var c=cat[l.producto],o={producto:l.producto,cantidad:Number(l.cantidad)};if(c.pide.indexOf('gorra')>-1)o.gorra=l.gorra;if(c.pide.indexOf('shaker')>-1)o.shaker=l.shaker;return o}),nota:CAJAV.nota}).then(function(ok){if(ok){CAJAV={lineas:[{producto:'gorra',cantidad:1,gorra:'negra',shaker:'negro'}],nota:''};abrirEdif(panelAbierto,true)}});
+    enviarInv({tipo:'venta',items:L.map(function(l){var c=cat[l.producto],o={producto:l.producto,cantidad:Number(l.cantidad)};if(c.pide.indexOf('gorra')>-1)o.gorra=l.gorra;if(c.pide.indexOf('shaker')>-1)o.shaker=l.shaker;if(c.pide.indexOf('medias')>-1){o.medias=l.medias;o.talle=l.talle}return o}),nota:CAJAV.nota}).then(function(ok){if(ok){CAJAV={lineas:[{producto:'gorra',cantidad:1,gorra:'negra',shaker:'negro',medias:'negro',talle:'grande'}],nota:''};abrirEdif(panelAbierto,true)}});
   });
   if(faltan.length)reg.disabled=true;var wr=el('div');wr.style.cssText='margin-bottom:8px';wr.appendChild(reg);r.appendChild(wr);
   function actualizarTotalCaja(){var t=0;L.forEach(function(l){t+=(cat[l.producto]||{precio:0}).precio*(Number(l.cantidad)||0)});var e=$('cajaTotal');if(e)e.textContent=pesos(t)}

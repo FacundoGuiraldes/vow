@@ -108,7 +108,7 @@ export async function crearPedido({ repo, mp, cuerpo, cotizarEnvio = null, codig
   // Aparta el stock ya, en la misma cola que los pagos: lo que otro pedido sin pagar tiene apartado no se ofrece de nuevo
   const total = {};
   for (const l of lineas) for (const [sku, n] of Object.entries(l.descuenta)) total[sku] = (total[sku] ?? 0) + n;
-  const lineasGuardadas = crudos.map((c) => ({ producto: c.producto, cantidad: c.cantidad ?? 1, ...(c.gorra ? { gorra: c.gorra } : {}), ...(c.shaker ? { shaker: c.shaker } : {}), ...(c.color ? { color: c.color } : {}) }));
+  const lineasGuardadas = crudos.map((c) => ({ producto: c.producto, cantidad: c.cantidad ?? 1, ...(c.gorra ? { gorra: c.gorra } : {}), ...(c.shaker ? { shaker: c.shaker } : {}), ...(c.medias ? { medias: c.medias } : {}), ...(c.talle ? { talle: c.talle } : {}), ...(c.color ? { color: c.color } : {}) }));
   await enCola(async () => {
     const pedidos = await leerPedidos(repo);
     const inv = await leerInventario(repo);

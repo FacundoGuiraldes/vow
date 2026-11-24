@@ -55,11 +55,11 @@ describe("la oficina", () => {
 describe("envíos en la oficina", () => {
   test("lo pagado aparece en el estado y se cierra con la acción despachar", async () => {
     const e = crearEscenario();
-    await aplicarInventario(e.repo, { tipo: "entrada", sku: "medias", cantidad: 5 });
+    await aplicarInventario(e.repo, { tipo: "entrada", sku: "medias-negro-grande", cantidad: 5 });
     const mp = { crearPreferencia: async () => ({ init_point: "https://mp.test" }) };
     const comprador = { nombre: "Ana Pérez", email: "ana@mail.com", telefono: "11 5555-1234" };
     const entrega = { tipo: "envio", cp: "1425", calle: "Salguero", numero: "100", localidad: "CABA", provincia: "Buenos Aires" };
-    const r = await crearPedido({ repo: e.repo, mp, urlPublica: "https://api.test", urlLanding: "https://vow.test", cotizarEnvio: async () => ({ costo: 4000, servicio: "Correo Argentino" }), cuerpo: { items: [{ producto: "medias", cantidad: 2 }], comprador, entrega } });
+    const r = await crearPedido({ repo: e.repo, mp, urlPublica: "https://api.test", urlLanding: "https://vow.test", cotizarEnvio: async () => ({ costo: 4000, servicio: "Correo Argentino" }), cuerpo: { items: [{ producto: "medias", cantidad: 2, medias: "negro", talle: "grande" }], comprador, entrega } });
     assert.deepEqual((await armarEstadoOficina({ repo: e.repo })).envios, []);
     await confirmarPago({ repo: e.repo, pago: { id: 9, external_reference: r.id, status: "approved", currency_id: "ARS", transaction_amount: r.importe } });
     const estado = await armarEstadoOficina({ repo: e.repo });
@@ -205,14 +205,14 @@ describe("Almacén y Caja: stock y ventas conectados entre el juego y el bot", (
   test("el stock arranca en 0; una llegada lo suma y una venta lo resta sola, con el precio del sistema", async () => {
     const e = crearEscenario({ investigacion });
     const vacio = await armarEstadoOficina({ repo: e.repo, investigacion });
-    assert.deepEqual(Object.values(vacio.inventario.stock), [0, 0, 0, 0, 0]);
+    assert.deepEqual(Object.values(vacio.inventario.stock), Array(10).fill(0));
     await llegada(e, "gorra-negra", 10);
-    await llegada(e, "medias", 132);
-    const r = await aplicarAccion(e, { accion: "inventario", cambio: { tipo: "venta", items: [{ producto: "pledge", cantidad: 2, gorra: "negra" }, { producto: "medias2", cantidad: 1 }], nota: "Ana" } });
+    await llegada(e, "medias-negro-grande", 132);
+    const r = await aplicarAccion(e, { accion: "inventario", cambio: { tipo: "venta", items: [{ producto: "pledge", cantidad: 2, medias: "negro", talle: "grande", gorra: "negra" }, { producto: "medias2", cantidad: 1, medias: "negro", talle: "grande" }], nota: "Ana" } });
     assert.equal(r.inventario.stock["gorra-negra"], 8);
-    assert.equal(r.inventario.stock.medias, 132 - 2 - 2);
+    assert.equal(r.inventario.stock["medias-negro-grande"], 132 - 2 - 2);
     assert.equal(r.inventario.totales.ventas, 1);
-    assert.equal(r.inventario.totales.importe, 2 * 34900 + 17900);
+    assert.equal(r.inventario.totales.importe, 2 * 32900 + 15900);
     const estado = await armarEstadoOficina({ repo: e.repo, investigacion });
     assert.equal(estado.inventario.stock["gorra-negra"], 8);
     assert.ok((await e.repo.novedadesPendientes()).some((n) => /Caja \(oficina\): Venta: 2 × Pack Pledge/.test(n.texto)));
@@ -225,9 +225,9 @@ describe("Almacén y Caja: stock y ventas conectados entre el juego y el bot", (
     await mala({ tipo: "venta", items: [{ producto: "shaker", cantidad: 2, shaker: "negro" }] });
     await mala({ tipo: "venta", items: [{ producto: "shaker", cantidad: 1, shaker: "negro", precio: 1 }] });
     await mala({ tipo: "venta", items: [{ producto: "shaker", cantidad: 1 }] });
-    await mala({ tipo: "venta", items: [{ producto: "oath", cantidad: 1, gorra: "beige", shaker: "negro" }] });
+    await mala({ tipo: "venta", items: [{ producto: "oath", cantidad: 1, medias: "negro", talle: "grande", gorra: "beige", shaker: "negro" }] });
     await mala({ tipo: "entrada", sku: "remera", cantidad: 3 });
-    await mala({ tipo: "entrada", sku: "medias", cantidad: -4 });
+    await mala({ tipo: "entrada", sku: "medias-negro-grande", cantidad: -4 });
     const estado = await armarEstadoOficina({ repo: e.repo, investigacion });
     assert.equal(estado.inventario.stock["shaker-negro"], 1);
     assert.equal(estado.inventario.ventas.length, 0);
@@ -235,11 +235,11 @@ describe("Almacén y Caja: stock y ventas conectados entre el juego y el bot", (
 
   test("anular una venta devuelve el stock, y dos ventas juntas no se pisan", async () => {
     const e = crearEscenario({ investigacion });
-    await llegada(e, "medias", 10);
-    const [a, b] = await Promise.all([1, 2].map(() => aplicarAccion(e, { accion: "inventario", cambio: { tipo: "venta", items: [{ producto: "medias", cantidad: 3 }] } })));
-    assert.equal((await armarEstadoOficina({ repo: e.repo, investigacion })).inventario.stock.medias, 4);
+    await llegada(e, "medias-negro-grande", 10);
+    const [a, b] = await Promise.all([1, 2].map(() => aplicarAccion(e, { accion: "inventario", cambio: { tipo: "venta", items: [{ producto: "medias", cantidad: 3, medias: "negro", talle: "grande" }] } })));
+    assert.equal((await armarEstadoOficina({ repo: e.repo, investigacion })).inventario.stock["medias-negro-grande"], 4);
     const t = await aplicarAccion(e, { accion: "inventario", cambio: { tipo: "anular_venta", id: a.id } });
-    assert.equal(t.inventario.stock.medias, 7);
+    assert.equal(t.inventario.stock["medias-negro-grande"], 7);
     await assert.rejects(aplicarAccion(e, { accion: "inventario", cambio: { tipo: "anular_venta", id: a.id } }), (error) => error.estado === 400);
     assert.equal(t.inventario.totales.ventas, 1);
     void b;
@@ -252,20 +252,20 @@ describe("Almacén y Caja: stock y ventas conectados entre el juego y el bot", (
         const sinColor = await ejecutar("registrar_venta", { items: [{ producto: "gorra", cantidad: 1 }] });
         await ejecutar("registrar_llegada", { producto: "gorra-beige", cantidad: 5 });
         const v = await ejecutar("registrar_venta", { items: [{ producto: "gorra", cantidad: 2, gorra: "beige" }, { producto: "shaker", cantidad: 1, shaker: "claro" }] });
-        const cambiaPrecio = await ejecutar("registrar_venta", { items: [{ producto: "medias", cantidad: 1, precio: 1 }] });
+        const cambiaPrecio = await ejecutar("registrar_venta", { items: [{ producto: "medias", cantidad: 1, medias: "negro", talle: "grande", precio: 1 }] });
         return `Antes ${antes.stock["shaker-claro"]}. ${sinColor.error ? "Faltaba el color." : ""} ${v.error ?? "Vendido."} ${cambiaPrecio.error ? "Precio fijo." : ""}`;
       },
     };
     const e = crearEscenario({ llm, investigacion });
     await llegada(e, "shaker-claro", 4);
-    await llegada(e, "medias", 1);
+    await llegada(e, "medias-negro-grande", 1);
     const r = await aplicarAccion(e, { accion: "chat", texto: "vendí 2 gorras beige y un shaker claro" });
     assert.match(r.respuesta, /Antes 4\. Faltaba el color\. Vendido\. Precio fijo\./);
     const estado = await armarEstadoOficina({ repo: e.repo, investigacion });
     assert.equal(estado.inventario.stock["gorra-beige"], 3);
     assert.equal(estado.inventario.stock["shaker-claro"], 3);
     assert.equal(estado.inventario.ventas[0].origen, "bot");
-    assert.equal(estado.inventario.totales.importe, 2 * 29900 + 12900);
+    assert.equal(estado.inventario.totales.importe, 2 * 27900 + 11900);
   });
 });
 
