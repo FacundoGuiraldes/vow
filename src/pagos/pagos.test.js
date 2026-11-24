@@ -14,7 +14,7 @@ const firmar = (dataId, requestId, ts = "1700000000") => `ts=${ts},v1=${createHm
 const COMPRADOR = { nombre: "Ana Pérez", email: "ANA@mail.com", telefono: "11 5555-1234" };
 const ENVIO = { tipo: "envio", cp: "1425", calle: "Salguero", numero: "100", localidad: "CABA", provincia: "Buenos Aires" };
 
-async function armar(stock = { "gorra-negra": 5, medias: 10, "shaker-claro": 3 }) {
+async function armar(stock = { "gorra-negra": 5, "medias-negro-grande": 10, "shaker-claro": 3 }) {
   const repo = crearRepositorioMemoria();
   for (const [sku, cantidad] of Object.entries(stock)) await aplicarInventario(repo, { tipo: "entrada", sku, cantidad });
   const preferencias = [];
@@ -38,10 +38,10 @@ describe("firma de Mercado Pago", () => {
 describe("crearPedido", () => {
   test("calcula el total con los precios del sistema y suma el envío", async () => {
     const { repo, mp, preferencias } = await armar();
-    const r = await crearPedido({ repo, mp, ...base, cotizarEnvio: async () => ({ costo: 5000, servicio: "Correo Argentino" }), cuerpo: { items: [{ producto: "pledge", cantidad: 1, gorra: "negra" }], comprador: COMPRADOR, entrega: ENVIO } });
-    assert.equal(r.importe, 34900 + 5000);
+    const r = await crearPedido({ repo, mp, ...base, cotizarEnvio: async () => ({ costo: 5000, servicio: "Correo Argentino" }), cuerpo: { items: [{ producto: "pledge", cantidad: 1, medias: "negro", talle: "grande", gorra: "negra" }], comprador: COMPRADOR, entrega: ENVIO } });
+    assert.equal(r.importe, 32900 + 5000);
     assert.match(r.link, /^https:\/\/mp\.test\/pagar\//);
-    assert.deepEqual(preferencias[0].items.map((i) => i.unit_price), [34900, 5000]);
+    assert.deepEqual(preferencias[0].items.map((i) => i.unit_price), [32900, 5000]);
     assert.equal(preferencias[0].payer.email, "ana@mail.com");
     assert.equal(preferencias[0].external_reference, r.id);
     assert.equal((await leerInventario(repo)).stock["gorra-negra"], 5, "crear el pedido no descuenta stock");
@@ -57,18 +57,18 @@ describe("crearPedido", () => {
     const pedir = (cuerpo, extra = {}) => crearPedido({ repo, mp, ...base, ...extra, cuerpo });
     await assert.rejects(pedir({ items: [{ producto: "gorra", cantidad: 9, gorra: "negra" }], comprador: COMPRADOR, entrega: { tipo: "retiro" } }), /stock suficiente/);
     await assert.rejects(pedir({ items: [], comprador: COMPRADOR, entrega: { tipo: "retiro" } }), /carrito está vacío/);
-    await assert.rejects(pedir({ items: [{ producto: "medias", cantidad: 1 }], comprador: { ...COMPRADOR, email: "x" }, entrega: { tipo: "retiro" } }), /email/);
-    await assert.rejects(pedir({ items: [{ producto: "medias", cantidad: 1 }], comprador: COMPRADOR, entrega: { ...ENVIO, cp: "abc" } }), /código postal/);
-    await assert.rejects(pedir({ items: [{ producto: "medias", cantidad: 1 }], comprador: COMPRADOR, entrega: ENVIO }), /solo hay retiro/);
+    await assert.rejects(pedir({ items: [{ producto: "medias", cantidad: 1, medias: "negro", talle: "grande" }], comprador: { ...COMPRADOR, email: "x" }, entrega: { tipo: "retiro" } }), /email/);
+    await assert.rejects(pedir({ items: [{ producto: "medias", cantidad: 1, medias: "negro", talle: "grande" }], comprador: COMPRADOR, entrega: { ...ENVIO, cp: "abc" } }), /código postal/);
+    await assert.rejects(pedir({ items: [{ producto: "medias", cantidad: 1, medias: "negro", talle: "grande" }], comprador: COMPRADOR, entrega: ENVIO }), /solo hay retiro/);
     await assert.rejects(pedir({ items: [{ producto: "gorra", cantidad: 1 }], comprador: COMPRADOR, entrega: { tipo: "retiro" } }), /color/);
-    const r = await pedir({ items: [{ producto: "medias", cantidad: 2 }], comprador: COMPRADOR, entrega: { tipo: "retiro" } });
-    assert.equal(r.importe, 19800);
+    const r = await pedir({ items: [{ producto: "medias", cantidad: 2, medias: "negro", talle: "grande" }], comprador: COMPRADOR, entrega: { tipo: "retiro" } });
+    assert.equal(r.importe, 17800);
   });
 });
 
 describe("confirmarPago", () => {
   const pagoDe = (r, extra = {}) => ({ id: 555, external_reference: r.id, status: "approved", currency_id: "ARS", transaction_amount: r.importe, ...extra });
-  const pedirUno = async (repo, mp) => crearPedido({ repo, mp, ...base, cuerpo: { items: [{ producto: "kept", cantidad: 1, shaker: "claro" }], comprador: COMPRADOR, entrega: { tipo: "retiro" } } });
+  const pedirUno = async (repo, mp) => crearPedido({ repo, mp, ...base, cuerpo: { items: [{ producto: "kept", cantidad: 1, medias: "negro", talle: "grande", shaker: "claro" }], comprador: COMPRADOR, entrega: { tipo: "retiro" } } });
 
   test("un pago aprobado descuenta el stock una sola vez", async () => {
     const { repo, mp } = await armar();
@@ -77,7 +77,7 @@ describe("confirmarPago", () => {
     assert.equal(await confirmarPago({ repo, pago: pagoDe(r) }), "ya registrado");
     const inv = await leerInventario(repo);
     assert.equal(inv.stock["shaker-claro"], 2);
-    assert.equal(inv.stock.medias, 9);
+    assert.equal(inv.stock["medias-negro-grande"], 9);
     assert.match(Object.values(inv.ventas)[0].nota, /Mercado Pago 555/);
   });
 
@@ -93,7 +93,7 @@ describe("confirmarPago", () => {
   });
 
   test("si el stock se corrige a mano antes del pago, avisa para devolver el dinero", async () => {
-    const { repo, mp } = await armar({ "shaker-claro": 1, medias: 5 });
+    const { repo, mp } = await armar({ "shaker-claro": 1, "medias-negro-grande": 5 });
     const a = await pedirUno(repo, mp);
     await aplicarInventario(repo, { tipo: "ajuste", sku: "shaker-claro", cantidad: 0 }, { origen: "juego" });
     assert.equal(await confirmarPago({ repo, pago: pagoDe(a) }), "pagado sin stock");
@@ -104,7 +104,7 @@ describe("confirmarPago", () => {
 
 describe("pedidos para enviar", () => {
   const pagoDe = (r) => ({ id: 777, external_reference: r.id, status: "approved", currency_id: "ARS", transaction_amount: r.importe });
-  const conEnvio = async (repo, mp) => crearPedido({ repo, mp, ...base, cotizarEnvio: async () => ({ costo: 5000, servicio: "Correo Argentino" }), cuerpo: { items: [{ producto: "oath", cantidad: 1, gorra: "negra", shaker: "claro" }], comprador: COMPRADOR, entrega: ENVIO } });
+  const conEnvio = async (repo, mp) => crearPedido({ repo, mp, ...base, cotizarEnvio: async () => ({ costo: 5000, servicio: "Correo Argentino" }), cuerpo: { items: [{ producto: "oath", cantidad: 1, medias: "negro", talle: "grande", gorra: "negra", shaker: "claro" }], comprador: COMPRADOR, entrega: ENVIO } });
 
   test("al cobrar avisa a VOW con qué mandar, a quién y a dónde", async () => {
     const { repo, mp } = await armar();
@@ -153,8 +153,8 @@ describe("pedidos para enviar", () => {
   });
 
   test("un pedido pagado sin stock avisa que hay que devolver el dinero y no va a la lista de envíos", async () => {
-    const { repo, mp } = await armar({ "shaker-claro": 1, medias: 5 });
-    const r = await crearPedido({ repo, mp, ...base, cuerpo: { items: [{ producto: "kept", cantidad: 1, shaker: "claro" }], comprador: COMPRADOR, entrega: { tipo: "retiro" } } });
+    const { repo, mp } = await armar({ "shaker-claro": 1, "medias-negro-grande": 5 });
+    const r = await crearPedido({ repo, mp, ...base, cuerpo: { items: [{ producto: "kept", cantidad: 1, medias: "negro", talle: "grande", shaker: "claro" }], comprador: COMPRADOR, entrega: { tipo: "retiro" } } });
     await aplicarInventario(repo, { tipo: "ajuste", sku: "shaker-claro", cantidad: 0 }, { origen: "juego" });
     const avisos = [];
     await confirmarPago({ repo, pago: pagoDe(r), avisarPedido: async (a) => avisos.push(a) });
@@ -164,10 +164,10 @@ describe("pedidos para enviar", () => {
 });
 
 describe("reserva de stock", () => {
-  const pedirUno = (repo, mp, ahora) => crearPedido({ repo, mp, ...base, ahora, cuerpo: { items: [{ producto: "kept", cantidad: 1, shaker: "claro" }], comprador: COMPRADOR, entrega: { tipo: "retiro" } } });
+  const pedirUno = (repo, mp, ahora) => crearPedido({ repo, mp, ...base, ahora, cuerpo: { items: [{ producto: "kept", cantidad: 1, medias: "negro", talle: "grande", shaker: "claro" }], comprador: COMPRADOR, entrega: { tipo: "retiro" } } });
 
   test("un pedido sin pagar aparta el stock: el segundo no puede pedir lo último", async () => {
-    const { repo, mp } = await armar({ "shaker-claro": 1, medias: 5 });
+    const { repo, mp } = await armar({ "shaker-claro": 1, "medias-negro-grande": 5 });
     await pedirUno(repo, mp, Date.now());
     await assert.rejects(pedirUno(repo, mp, Date.now()), (e) => e instanceof ErrorPedido && e.estado === 409);
     assert.equal((await stockDisponible(repo))["shaker-claro"], 0);
@@ -175,13 +175,13 @@ describe("reserva de stock", () => {
   });
 
   test("dos pedidos al mismo tiempo: solo uno se queda con la última unidad", async () => {
-    const { repo, mp } = await armar({ "shaker-claro": 1, medias: 5 });
+    const { repo, mp } = await armar({ "shaker-claro": 1, "medias-negro-grande": 5 });
     const r = await Promise.allSettled([pedirUno(repo, mp, Date.now()), pedirUno(repo, mp, Date.now())]);
     assert.equal(r.filter((x) => x.status === "fulfilled").length, 1);
   });
 
   test("la reserva vence a los 30 minutos y el stock vuelve a estar disponible", async () => {
-    const { repo, mp } = await armar({ "shaker-claro": 1, medias: 5 });
+    const { repo, mp } = await armar({ "shaker-claro": 1, "medias-negro-grande": 5 });
     const hace = Date.now() - RESERVA_MS - 1000;
     await pedirUno(repo, mp, hace);
     assert.equal((await stockDisponible(repo))["shaker-claro"], 1);
@@ -189,18 +189,18 @@ describe("reserva de stock", () => {
   });
 
   test("si falla Mercado Pago, la reserva se libera", async () => {
-    const { repo } = await armar({ "shaker-claro": 1, medias: 5 });
+    const { repo } = await armar({ "shaker-claro": 1, "medias-negro-grande": 5 });
     const mpRoto = { crearPreferencia: async () => { throw new Error("caído"); } };
     await assert.rejects(pedirUno(repo, mpRoto, Date.now()), /caído/);
     assert.equal((await stockDisponible(repo))["shaker-claro"], 1);
   });
 
   test("cada cambio de stock o de pedidos avisa", async () => {
-    const { repo, mp } = await armar({ "shaker-claro": 3, medias: 5 });
+    const { repo, mp } = await armar({ "shaker-claro": 3, "medias-negro-grande": 5 });
     let avisos = 0;
     const dejar = alCambiarElStock(() => avisos++);
     await pedirUno(repo, mp, Date.now());
-    await aplicarInventario(repo, { tipo: "entrada", sku: "medias", cantidad: 1 });
+    await aplicarInventario(repo, { tipo: "entrada", sku: "medias-negro-grande", cantidad: 1 });
     dejar();
     assert.ok(avisos >= 2);
   });
@@ -266,22 +266,22 @@ describe("rutas de ventas", () => {
     await levantar({ ventaAbierta: true });
     const estado = await (await fetch(`${url}/estado`)).json();
     assert.equal(estado.abierta, true);
-    assert.equal(estado.productos.find((p) => p.id === "gorra").precio, 29900);
+    assert.equal(estado.productos.find((p) => p.id === "gorra").precio, 27900);
     assert.ok(!JSON.stringify(estado).includes("stock"));
-    assert.deepEqual(estado.productos.find((p) => p.id === "oath").pide, ["gorra", "shaker"]);
+    assert.deepEqual(estado.productos.find((p) => p.id === "oath").pide, ["gorra", "medias", "shaker"]);
     assert.deepEqual(estado.colores.gorra, { negra: true, beige: false });
     assert.deepEqual(estado.colores.shaker, { negro: false, claro: true });
-    const r = await fetch(`${url}/pedidos`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: [{ producto: "medias", cantidad: 1 }], comprador: COMPRADOR, entrega: { tipo: "retiro" } }) });
+    const r = await fetch(`${url}/pedidos`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: [{ producto: "medias", cantidad: 1, medias: "negro", talle: "grande" }], comprador: COMPRADOR, entrega: { tipo: "retiro" } }) });
     assert.equal(r.status, 201);
     const pedido = await r.json();
     pagos["777"] = { id: 777, external_reference: pedido.id, status: "approved", currency_id: "ARS", transaction_amount: pedido.importe };
     const aviso = (firma) => fetch(`${url}/mercadopago?data.id=777&type=payment`, { method: "POST", headers: { "Content-Type": "application/json", "x-request-id": "r-9", "x-signature": firma }, body: JSON.stringify({ type: "payment", data: { id: "777" } }) });
     assert.equal((await aviso("ts=1,v1=" + "0".repeat(64))).status, 401);
-    assert.equal((await leerInventario(repo)).stock.medias, 10);
+    assert.equal((await leerInventario(repo)).stock["medias-negro-grande"], 10);
     const ok = await aviso(firmar("777", "r-9"));
     assert.equal(ok.status, 200);
     assert.equal((await ok.json()).resultado, "venta registrada");
-    assert.equal((await leerInventario(repo)).stock.medias, 9);
+    assert.equal((await leerInventario(repo)).stock["medias-negro-grande"], 9);
     // Un aviso firmado de un pago que no existe (como la simulación del panel) se ignora: no devuelve 500 ni se reintenta
     const inexistente = await fetch(`${url}/mercadopago?data.id=123456&type=payment`, { method: "POST", headers: { "Content-Type": "application/json", "x-request-id": "r-10", "x-signature": firmar("123456", "r-10") }, body: JSON.stringify({ type: "payment", data: { id: "123456" } }) });
     assert.equal(inexistente.status, 200);

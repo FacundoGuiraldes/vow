@@ -69,32 +69,45 @@ Todo es producción argentina: no pasa por Aduana. Facundo factura como monotrib
 | Shakers | 20 | $6.270 | $125.400 |
 | **Total** | | | **$789.400** |
 
-## Precios y packs (propuesta de Facundo, sin confirmar)
+## Stock real del Drop 00 (contado el 24/11/2026)
+
+| Producto | Cantidad |
+|---|---|
+| Gorra negra | 9 |
+| Gorra beige | 9 |
+| Shaker negro | 10 |
+| Shaker transparente (en el sistema: "claro") | 10 |
+| Medias negras (Grande 37-40 / Súper 41-44) | 30 / 30 |
+| Medias hueso (Grande / Súper) | 18 / 18 |
+| Medias beige (Grande / Súper) | 17 / 18 (Facundo se queda un par Grande) |
+
+El sistema carga este stock una sola vez al arrancar (`src/programacion/stock-inicial.js`).
+
+## Precios y packs (definidos para el Drop 00)
+
+Costos por unidad: gorra $15.325, medias $2.708, shaker $6.270. Precios pensados para una marca que recién arranca: por debajo de las marcas grandes en lo que se compara directo, con los packs como forma de subir el ticket.
 
 | Producto | Precio de lista |
 |---|---|
-| Gorra | $29.900 |
-| Medias (par) | $9.900 |
-| Shaker | $12.900 |
+| Gorra | $27.900 |
+| Medias (par) | $8.900 |
+| Shaker | $11.900 |
 
-El shaker es el más delicado: su costo ($6.270) es casi lo que cuesta un shaker básico en tienda. Se justifica como producto de marca o dentro de un pack.
-
-| Pack | Incluye | Precio sugerido |
+| Pack | Incluye | Precio |
 |---|---|---|
-| **Pledge** | Gorra + par de medias | $34.900 |
-| **Kept** | Shaker + par de medias | $19.900 |
-| **Oath** | Gorra + par de medias + shaker | $47.900 |
-| Medias x2 (sin nombre) | 2 pares | $17.900 |
-| Medias x3 (sin nombre) | 3 pares | $26.900 |
+| **Pledge** | Gorra + par de medias | $32.900 |
+| **Kept** | Shaker + par de medias | $17.900 |
+| **Oath** | Gorra + par de medias + shaker | $44.900 |
+| Medias x2 (sin nombre) | 2 pares | $15.900 |
+| Medias x3 (sin nombre) | 3 pares | $22.900 |
 
-- Los nombres Pledge, Kept y Oath están decididos por Facundo. Por color, la idea es **Oath · Obsidian** (negro) y **Oath · Bone** (hueso/beige): sin confirmar.
-- Solo se nombran los packs que combinan productos distintos.
-- Con 20 gorras y 20 shakers, como mucho se arman 20 packs que lleven gorra y 20 que lleven shaker, en total entre todos.
+- Los nombres Pledge, Kept y Oath están decididos por Facundo. Solo se nombran los packs que combinan productos distintos.
+- Con 18 gorras y 20 shakers, como mucho se arman 18 packs que lleven gorra y 20 que lleven shaker, en total entre todos.
+- Las medias se eligen por color (negro, hueso, beige) y talle (Grande 37-40, Súper 41-44) en la tienda, la Caja y el bot.
 
 ## Por confirmar
 
 - Cuándo se abre la venta del Drop 00 y cuánto detalle se muestra. Hoy lo público es solo "Drop 00 en 2026" (y "Drop 01 en 2027"), sin meses ni días.
-- Reparto de talles y colores de las medias.
 - Shakers: material del vaso, método del logo, medidas, peso, entrega y estado del pago. La capacidad ya está (700 ml).
 - Entrega de las medias.
 - Composición y etiquetado de medias y gorras (composición de fibras, origen y cuidado). Las medias no llevan etiqueta tejida: ver si alcanza con un *hangtag* impreso y consultarlo con un contador.

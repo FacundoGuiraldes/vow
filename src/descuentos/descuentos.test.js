@@ -56,9 +56,9 @@ describe("pedido con código", () => {
     const ctx = await armar();
     const { "a@x.com": { codigo } } = await ctx.codigos.asegurarCodigos({ emails: ["a@x.com"], porcentaje: 10, venceEn: null });
     const r = await pedir(ctx, { codigo: codigo.toLowerCase() });
-    assert.equal(r.importe, 2 * 11610); // 12.900 − 10%
-    assert.deepEqual(r.descuento, { porcentaje: 10, ahorro: 2 * 1290 });
-    assert.equal(ctx.preferencias[0].items[0].unit_price, 11610);
+    assert.equal(r.importe, 2 * 10710); // 11.900 − 10%
+    assert.deepEqual(r.descuento, { porcentaje: 10, ahorro: 2 * 1190 });
+    assert.equal(ctx.preferencias[0].items[0].unit_price, 10710);
     await assert.rejects(pedir(ctx, { codigo }), /otro pedido/); // apartado mientras se paga
     const pago = { id: 9, external_reference: r.id, status: "approved", currency_id: "ARS", transaction_amount: r.importe };
     assert.equal(await confirmarPago({ repo: ctx.repo, pago, codigos: ctx.codigos }), "venta registrada");
@@ -86,7 +86,7 @@ describe("pedido con código", () => {
     const ctx = await armar();
     await assert.rejects(pedir(ctx, { codigo: "VOW-AAAAAA" }), (e) => e instanceof ErrorPedido && /no existe/.test(e.message));
     await assert.rejects(pedir({ ...ctx, codigos: null }, { codigo: "VOW-AAAAAA" }), /no están disponibles/);
-    assert.equal((await pedir(ctx)).importe, 2 * 12900); // sin código, precio completo
+    assert.equal((await pedir(ctx)).importe, 2 * 11900); // sin código, precio completo
   });
 });
 

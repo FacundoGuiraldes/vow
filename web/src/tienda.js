@@ -4,8 +4,17 @@ import { negocio } from './negocio.js';
 import { TOPE_POR_LINEA, ajustarCarrito, maximoParaSumar } from './stock-carrito.js';
 
 const pesos = n => `$${n.toLocaleString('es-AR')}`;
-const COLORES = { gorra: ['negra', 'beige'], shaker: ['negro', 'claro'] };
+const COLORES = { gorra: ['negra', 'beige'], shaker: ['negro', 'claro'], medias: ['negro', 'hueso', 'beige'] };
+const TALLES = { grande: 'Grande (37 al 40)', super: 'Súper (41 al 44)' };
+const CAMPOS = ['gorra', 'shaker', 'medias', 'talle'];
 const REQUEST_TIMEOUT_MS = 15000;
+
+// "(negra)", "(hueso, talle grande)"...
+function descripcionOpciones(l) {
+  const partes = [l.gorra && `gorra ${l.gorra}`, l.shaker && `shaker ${l.shaker}`, l.medias && `medias ${l.medias}`].filter(Boolean);
+  if (l.talle) partes.push(`talle ${l.talle === 'super' ? 'súper' : l.talle}`);
+  return partes.length ? ` (${partes.join(', ')})` : '';
+}
 
 function el(tag, props = {}, ...hijos) {
   const nodo = document.createElement(tag);
@@ -74,7 +83,7 @@ export async function iniciarTienda(apiUrl) {
       const total = carrito.reduce((a, l) => a + l.precio * l.cantidad, 0);
       carritoEl.append(
         el('ul', { class: 'tienda__lineas' }, carrito.map((l, i) => el('li', {},
-          el('span', {}, `${l.cantidad} × ${l.nombre}${[l.gorra, l.shaker].filter(Boolean).length ? ` (${[l.gorra, l.shaker].filter(Boolean).join(', ')})` : ''}`),
+          el('span', {}, `${l.cantidad} × ${l.nombre}${descripcionOpciones(l)}`),
           el('span', {}, pesos(l.precio * l.cantidad)),
           el('button', { type: 'button', class: 'tienda__quitar', 'aria-label': `Quitar ${l.nombre}`, onclick: () => { carrito.splice(i, 1); dibujarCarrito(); } }, 'Quitar')))),
         ...(descuento ? [el('p', { class: 'tienda__total' }, el('span', {}, `Descuento VOW (${descuento}%)`), el('strong', {}, `− ${pesos(total - carrito.reduce((a, l) => a + Math.round(l.precio * (100 - descuento) / 100) * l.cantidad, 0))}`))] : []),
@@ -95,14 +104,30 @@ export async function iniciarTienda(apiUrl) {
     lista.replaceChildren();
     refrescadores = [];
     for (const p of estado.productos) {
-      const selects = p.pide.map(grupo => {
-        const select = el('select', { 'aria-label': `Color de ${grupo === 'gorra' ? 'la gorra' : 'el shaker'}`, name: grupo, 'data-producto': p.id },
-          COLORES[grupo].map(color => el('option', { value: color, disabled: !estado.colores[grupo][color] }, estado.colores[grupo][color] ? color : `${color} (agotado)`)));
-        const primero = COLORES[grupo].find(c => estado.colores[grupo][c]);
+      const selects = p.pide.flatMap(grupo => {
+        const hayColor = (color) => (grupo === 'medias' ? Object.values(estado.colores.medias[color]).some(Boolean) : estado.colores[grupo][color]);
+        const etiqueta = { gorra: 'la gorra', shaker: 'el shaker', medias: 'las medias' }[grupo];
+        const select = el('select', { 'aria-label': `Color de ${etiqueta}`, name: grupo, 'data-producto': p.id },
+          COLORES[grupo].map(color => el('option', { value: color, disabled: !hayColor(color) }, hayColor(color) ? color : `${color} (agotado)`)));
+        const primero = COLORES[grupo].find(hayColor);
         if (primero) select.value = primero;
         const previo = elegido[`${p.id}:${grupo}`];
-        if (previo && estado.colores[grupo][previo]) select.value = previo;
-        return select;
+        if (previo && hayColor(previo)) select.value = previo;
+        if (grupo !== 'medias') return [select];
+        // Talle: solo los que quedan en el color elegido
+        const talle = el('select', { 'aria-label': 'Talle de las medias', name: 'talle', 'data-producto': p.id });
+        const dibujarTalles = () => {
+          const previoTalle = talle.value || elegido[`${p.id}:talle`];
+          talle.replaceChildren(...Object.keys(TALLES).map(t => {
+            const hay = Boolean(estado.colores.medias[select.value]?.[t]);
+            return el('option', { value: t, disabled: !hay }, hay ? TALLES[t] : `${TALLES[t]} (agotado)`);
+          }));
+          const libre = Object.keys(TALLES).find(t => estado.colores.medias[select.value]?.[t]);
+          talle.value = previoTalle && estado.colores.medias[select.value]?.[previoTalle] ? previoTalle : (libre ?? 'grande');
+        };
+        dibujarTalles();
+        select.addEventListener('change', () => { dibujarTalles(); talle.dispatchEvent(new Event('change')); });
+        return [select, talle];
       });
       const cantidad = el('input', { type: 'number', min: '1', max: String(TOPE_POR_LINEA), value: cantidades[p.id] || '1', 'data-producto': p.id, 'aria-label': `Cantidad de ${p.nombre}` });
       const agregar = el('button', {
@@ -115,7 +140,7 @@ export async function iniciarTienda(apiUrl) {
           if (!Number.isInteger(n) || n < 1) { cantidad.value = '1'; return; }
           const sumar = Math.min(n, tope); // nunca más de lo que queda
           const linea = { producto: p.id, nombre: p.nombre, precio: p.precio, cantidad: sumar, ...colores };
-          const igual = carrito.find(l => l.producto === linea.producto && l.gorra === linea.gorra && l.shaker === linea.shaker);
+          const igual = carrito.find(l => l.producto === linea.producto && CAMPOS.every(c => l[c] === linea[c]));
           if (igual) igual.cantidad += sumar;
           else carrito.push(linea);
           dibujarCarrito();
@@ -208,7 +233,7 @@ export async function iniciarTienda(apiUrl) {
     const datos = new FormData(form);
     const envio = datos.get('entrega') === 'envio';
     const cuerpo = {
-      items: carrito.map(({ producto, cantidad, gorra, shaker }) => ({ producto, cantidad, ...(gorra ? { gorra } : {}), ...(shaker ? { shaker } : {}) })),
+      items: carrito.map(({ producto, cantidad, gorra, shaker, medias, talle }) => ({ producto, cantidad, ...(gorra ? { gorra } : {}), ...(shaker ? { shaker } : {}), ...(medias ? { medias } : {}), ...(talle ? { talle } : {}) })),
       ...(String(datos.get('codigo') ?? '').trim() ? { codigo: String(datos.get('codigo')).trim() } : {}),
       comprador: { nombre: datos.get('nombre'), email: datos.get('email'), telefono: datos.get('telefono') },
       entrega: envio ? { tipo: 'envio', cp: datos.get('cp'), calle: datos.get('calle'), numero: datos.get('numero'), piso: datos.get('piso'), localidad: datos.get('localidad'), provincia: datos.get('provincia') } : { tipo: 'retiro' }

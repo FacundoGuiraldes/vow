@@ -4,28 +4,35 @@
 import { esFechaISO } from "./fechas.js";
 import { avisarCambioDeStock } from "./stock-eventos.js";
 
-// Lo que hay en el Almacén. "medias" va sin desglose de color y talle hasta que Facundo confirme el reparto.
+// Lo que hay en el Almacén. Las medias van por color y talle (Grande 37-40, Súper 41-44).
 export const PRODUCTOS = {
   "gorra-negra": { nombre: "Gorra negra", corto: "Gorras negras", grupo: "gorra" },
   "gorra-beige": { nombre: "Gorra beige", corto: "Gorras beige", grupo: "gorra" },
   "shaker-negro": { nombre: "Shaker negro", corto: "Shakers negros", grupo: "shaker" },
   "shaker-claro": { nombre: "Shaker claro", corto: "Shakers claros", grupo: "shaker" },
-  medias: { nombre: "Medias (par)", corto: "Medias (pares)", grupo: "medias" },
+  "medias-negro-grande": { nombre: "Medias negras Grande", corto: "Medias negras Grande", grupo: "medias" },
+  "medias-negro-super": { nombre: "Medias negras Súper", corto: "Medias negras Súper", grupo: "medias" },
+  "medias-hueso-grande": { nombre: "Medias hueso Grande", corto: "Medias hueso Grande", grupo: "medias" },
+  "medias-hueso-super": { nombre: "Medias hueso Súper", corto: "Medias hueso Súper", grupo: "medias" },
+  "medias-beige-grande": { nombre: "Medias beige Grande", corto: "Medias beige Grande", grupo: "medias" },
+  "medias-beige-super": { nombre: "Medias beige Súper", corto: "Medias beige Súper", grupo: "medias" },
 };
 export const SKUS = Object.keys(PRODUCTOS);
 
 // Lo que se vende: cada uno descuenta de uno o más SKUs. gorra/shaker piden color porque hay dos.
 export const CATALOGO = {
-  gorra: { nombre: "Gorra", precio: 29900, usa: [["gorra", 1]] },
-  medias: { nombre: "Medias (par)", precio: 9900, usa: [["medias", 1]] },
-  shaker: { nombre: "Shaker", precio: 12900, usa: [["shaker", 1]] },
-  pledge: { nombre: "Pack Pledge (gorra + medias)", precio: 34900, usa: [["gorra", 1], ["medias", 1]] },
-  kept: { nombre: "Pack Kept (shaker + medias)", precio: 19900, usa: [["shaker", 1], ["medias", 1]] },
-  oath: { nombre: "Pack Oath (gorra + medias + shaker)", precio: 47900, usa: [["gorra", 1], ["medias", 1], ["shaker", 1]] },
-  medias2: { nombre: "Medias x2", precio: 17900, usa: [["medias", 2]] },
-  medias3: { nombre: "Medias x3", precio: 26900, usa: [["medias", 3]] },
+  gorra: { nombre: "Gorra", precio: 27900, usa: [["gorra", 1]] },
+  medias: { nombre: "Medias (par)", precio: 8900, usa: [["medias", 1]] },
+  shaker: { nombre: "Shaker", precio: 11900, usa: [["shaker", 1]] },
+  pledge: { nombre: "Pack Pledge (gorra + medias)", precio: 32900, usa: [["gorra", 1], ["medias", 1]] },
+  kept: { nombre: "Pack Kept (shaker + medias)", precio: 17900, usa: [["shaker", 1], ["medias", 1]] },
+  oath: { nombre: "Pack Oath (gorra + medias + shaker)", precio: 44900, usa: [["gorra", 1], ["medias", 1], ["shaker", 1]] },
+  medias2: { nombre: "Medias x2", precio: 15900, usa: [["medias", 2]] },
+  medias3: { nombre: "Medias x3", precio: 22900, usa: [["medias", 3]] },
 };
 const COLORES = { gorra: { negra: "gorra-negra", beige: "gorra-beige" }, shaker: { negro: "shaker-negro", claro: "shaker-claro" } };
+export const COLORES_MEDIAS = ["negro", "hueso", "beige"];
+export const TALLES_MEDIAS = { grande: "37 al 40", super: "41 al 44" };
 const MAX_UNIDADES = 100_000;
 const MAX_MOVIMIENTOS = 150;
 const MAX_VENTAS = 150;
@@ -59,6 +66,15 @@ function skuDe(grupo, color, nombreItem) {
   throw new ErrorInventario(`${nombreItem}: falta el color de ${grupo === "gorra" ? "la gorra (negra o beige)" : "el shaker (negro o claro)"}.`);
 }
 
+// Medias: color (negro, hueso o beige) + talle (grande o super) → "medias-negro-grande"
+function skuMedias(color, talle, nombreItem) {
+  const c = limpiar(color, 20).toLowerCase();
+  const t = limpiar(talle, 20).toLowerCase().replace("súper", "super");
+  if (!COLORES_MEDIAS.includes(c)) throw new ErrorInventario(`${nombreItem}: falta el color de las medias (negro, hueso o beige).`);
+  if (!TALLES_MEDIAS[t]) throw new ErrorInventario(`${nombreItem}: falta el talle de las medias (grande 37-40 o súper 41-44).`);
+  return `medias-${c}-${t}`;
+}
+
 // Convierte una línea de venta en lo que descuenta, o tira ErrorInventario
 export function lineaDeVenta(item) {
   const producto = limpiar(item?.producto, 20).toLowerCase();
@@ -70,8 +86,8 @@ export function lineaDeVenta(item) {
   const colores = {};
   const descuenta = {};
   for (const [grupo, porUnidad] of def.usa) {
-    const sku = grupo === "medias" ? "medias" : skuDe(grupo, grupo === "gorra" ? item.gorra ?? item.color : item.shaker ?? item.color, def.nombre);
-    if (grupo !== "medias") colores[grupo] = sku;
+    const sku = grupo === "medias" ? skuMedias(item.medias ?? item.color, item.talle, def.nombre) : skuDe(grupo, grupo === "gorra" ? item.gorra ?? item.color : item.shaker ?? item.color, def.nombre);
+    colores[grupo] = sku;
     descuenta[sku] = (descuenta[sku] ?? 0) + porUnidad * cantidad;
   }
   return { producto, nombre: def.nombre, cantidad, precio, colores, descuenta };
@@ -90,7 +106,7 @@ const enCola = (trabajo) => {
 // Aplica un cambio y devuelve { inventario, resumen }. origen: "juego" o "bot".
 //   { tipo: "entrada", sku, cantidad, nota? }           llegó mercadería: suma
 //   { tipo: "ajuste", sku, cantidad, nota? }            deja el stock en esa cantidad (por conteo o corrección)
-//   { tipo: "venta", items: [{ producto, cantidad, gorra?, shaker? }], nota?, fecha? }   resta el stock solo
+//   { tipo: "venta", items: [{ producto, cantidad, gorra?, shaker?, medias? (color), talle? }], nota?, fecha? }   resta el stock solo
 //   { tipo: "anular_venta", id }                        devuelve el stock de esa venta
 export function aplicarInventario(repo, cambio, { origen = "juego", ahora = Date.now() } = {}) {
   return enCola(async () => {
@@ -135,7 +151,8 @@ export function aplicarInventario(repo, cambio, { origen = "juego", ahora = Date
       const v = inv.ventas[id];
       if (!v) throw new ErrorInventario("No encuentro esa venta.");
       if (v.anulada) throw new ErrorInventario("Esa venta ya estaba anulada.");
-      for (const l of v.items) for (const [sku, n] of Object.entries(l.descuenta)) inv.stock[sku] += n;
+      // Las ventas de antes de los talles descontaron "medias" suelto: ese SKU ya no existe y no hay a dónde devolverlo
+      for (const l of v.items) for (const [sku, n] of Object.entries(l.descuenta)) if (sku in inv.stock) inv.stock[sku] += n;
       v.anulada = true;
       v.anulada_el = en;
       resumen = `Venta anulada (${v.fecha}, ${pesos(v.importe)}): el stock volvió al Almacén`;
@@ -164,7 +181,7 @@ export function vistaInventario(inv, hoy = new Date().toISOString().slice(0, 10)
   return {
     stock: inv.stock,
     productos: Object.fromEntries(Object.entries(PRODUCTOS).map(([k, v]) => [k, v.nombre])),
-    catalogo: Object.fromEntries(Object.entries(CATALOGO).map(([k, v]) => [k, { nombre: v.nombre, precio: v.precio, usa: v.usa, pide: v.usa.map(([g]) => g).filter((g) => g !== "medias") }])),
+    catalogo: Object.fromEntries(Object.entries(CATALOGO).map(([k, v]) => [k, { nombre: v.nombre, precio: v.precio, usa: v.usa, pide: v.usa.map(([g]) => g) }])),
     ventas: ventas.slice(0, 30),
     totales: { ventas: vivas.length, importe: vivas.reduce((a, v) => a + v.importe, 0), hoy: { ventas: delDia.length, importe: delDia.reduce((a, v) => a + v.importe, 0), unidades: unidades(delDia) } },
     movimientos: inv.movimientos.slice(-10),
@@ -178,4 +195,24 @@ export function markdownDeInventario(inv) {
   const lineas = ventas.length ? ventas.map((v) => `- ${v.fecha} · ${v.items.map((l) => `${l.cantidad} × ${CATALOGO[l.producto]?.nombre ?? l.producto}${Object.values(l.colores).length ? ` (${Object.values(l.colores).join(", ")})` : ""}`).join(" + ")} · ${pesos(v.importe)}${v.nota ? ` · ${v.nota.replace(/\|/g, "/")}` : ""}${v.anulada ? " · ANULADA" : ""}`) : ["_Todavía no hay ventas._"];
   const movs = inv.movimientos.length ? [...inv.movimientos].reverse().slice(0, 40).map((m) => `- ${m.en.slice(0, 16).replace("T", " ")} UTC · ${m.origen === "juego" ? "juego" : m.origen === "web" ? "tienda web" : "bot"} · ${m.texto}`) : ["_Sin movimientos._"];
   return ["# Inventario y ventas del Drop 00", "", "Copia automática del Almacén y la Caja de VOW HQ. La fuente de verdad es la base de datos del servicio: no se edita a mano acá (el próximo sincronizado lo pisa).", "", "## Stock", "", "| Producto | Cantidad |", "| --- | --- |", ...filas, "", "## Ventas", "", ...lineas, "", "## Últimos movimientos", "", ...movs, ""].join("\n");
+}
+
+// Carga única del stock real: deja cada SKU en la cantidad indicada con un solo movimiento. Se usa una sola vez (la marca queda en el estado).
+export function cargarStockInicial(repo, objetivo, { marca, ahora = Date.now() } = {}) {
+  return enCola(async () => {
+    if (await repo.leerEstado(marca)) return null;
+    const inv = await leerInventario(repo);
+    for (const [sku, n] of Object.entries(objetivo)) {
+      if (!PRODUCTOS[sku]) throw new ErrorInventario(`Producto desconocido: ${sku}.`);
+      inv.stock[sku] = entero(n, `El stock de ${sku}`, { min: 0 });
+    }
+    const resumen = `Stock inicial del Drop 00 cargado: ${Object.entries(objetivo).map(([s, n]) => `${PRODUCTOS[s].nombre.toLowerCase()} ${n}`).join(", ")}`;
+    inv.movimientos.push({ en: new Date(ahora).toISOString(), origen: "juego", texto: resumen.slice(0, 220) });
+    inv.movimientos = inv.movimientos.slice(-MAX_MOVIMIENTOS);
+    await repo.guardarEstado("inventario", inv);
+    await repo.guardarEstado(marca, { en: new Date(ahora).toISOString() });
+    avisarCambioDeStock();
+    await repo.agregarNovedad(`Almacén (oficina): ${resumen}`.slice(0, 1000));
+    return inv;
+  });
 }

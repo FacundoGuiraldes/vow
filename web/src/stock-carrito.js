@@ -3,7 +3,8 @@
 
 export const TOPE_POR_LINEA = 5; // unidades de un mismo producto por línea del carrito (igual que el servidor)
 
-const skuDe = (grupo, linea) => (grupo === 'medias' ? 'medias' : `${grupo}-${linea[grupo]}`);
+// Las medias van por color (linea.medias) y talle (linea.talle)
+const skuDe = (grupo, linea) => (grupo === 'medias' ? `medias-${linea.medias}-${linea.talle}` : `${grupo}-${linea[grupo]}`);
 
 // Lo que descuenta una línea de cada SKU
 export function unidadesDeLinea(producto, linea) {

@@ -10,16 +10,16 @@ import { ajustarCarrito, maximoParaSumar } from "../../web/src/stock-carrito.js"
 const COMPRADOR = { nombre: "Ana Pérez", email: "ana@mail.com", telefono: "11 5555-1234" };
 const base = { urlPublica: "https://api.vow.test", urlLanding: "https://vow.test" };
 const mp = { crearPreferencia: async (p) => ({ init_point: `https://mp.test/${p.external_reference}` }) };
-const SKUS = ["gorra-negra", "gorra-beige", "shaker-negro", "shaker-claro", "medias"];
-const COLOR = { gorra: "negra", shaker: "claro" }; // los colores que se piden en la prueba
+const SKUS = ["gorra-negra", "gorra-beige", "shaker-negro", "shaker-claro", "medias-negro-grande", "medias-negro-super", "medias-hueso-grande", "medias-hueso-super", "medias-beige-grande", "medias-beige-super"];
+const COLOR = { gorra: "negra", shaker: "claro", medias: "negro", talle: "grande" }; // los colores que se piden en la prueba
 
 const conStock = async (stock) => {
   const repo = crearRepositorioMemoria();
   for (const [sku, cantidad] of Object.entries(stock)) if (cantidad > 0) await aplicarInventario(repo, { tipo: "entrada", sku, cantidad });
   return repo;
 };
-const lineaDe = (producto, cantidad) => ({ producto, cantidad, ...Object.fromEntries(CATALOGO[producto].usa.map(([g]) => g).filter((g) => g !== "medias").map((g) => [g, COLOR[g]])) });
-const skusDe = (producto) => CATALOGO[producto].usa.map(([g]) => (g === "medias" ? "medias" : `${g}-${COLOR[g]}`));
+const lineaDe = (producto, cantidad) => ({ producto, cantidad, ...Object.fromEntries(CATALOGO[producto].usa.flatMap(([g]) => (g === "medias" ? [["medias", COLOR.medias], ["talle", COLOR.talle]] : [[g, COLOR[g]]]))) });
+const skusDe = (producto) => CATALOGO[producto].usa.map(([g]) => (g === "medias" ? "medias-negro-grande" : `${g}-${COLOR[g]}`));
 const pedidoAceptado = async (stock, producto, cantidad) => {
   const repo = await conStock(stock);
   const { color, ...linea } = lineaDe(producto, cantidad);
@@ -53,7 +53,7 @@ describe("lo que ofrece la web coincide con lo que acepta el servidor", () => {
 });
 
 describe("carrito con varias líneas", () => {
-  const stock = { "gorra-negra": 2, "shaker-claro": 1, medias: 3, "gorra-beige": 0, "shaker-negro": 0 };
+  const stock = { "gorra-negra": 2, "shaker-claro": 1, "medias-negro-grande": 3, "gorra-beige": 0, "shaker-negro": 0 };
   const info = disponibilidadDe(stock);
 
   test("las medias sueltas y las de los packs comparten el mismo stock", () => {
@@ -69,16 +69,16 @@ describe("carrito con varias líneas", () => {
 
   test("si el stock baja con el carrito armado, se recorta lo que ya no alcanza", () => {
     const carrito = [lineaDe("medias", 3), lineaDe("kept", 1)];
-    const baja = disponibilidadDe({ ...stock, medias: 1 });
+    const baja = disponibilidadDe({ ...stock, "medias-negro-grande": 1 });
     assert.equal(ajustarCarrito(carrito, baja.productos, baja.maximos), true);
     const usadas = carrito.reduce((a, l) => a + (l.producto === "medias" ? l.cantidad : 1), 0);
     assert.ok(usadas <= 1, `quedaron ${usadas} pares`);
   });
 
   test("nunca se ofrece más del tope por compra", () => {
-    const grande = disponibilidadDe({ ...stock, medias: 50 });
+    const grande = disponibilidadDe({ ...stock, "medias-negro-grande": 50 });
     const medias = grande.productos.find((p) => p.id === "medias");
     assert.equal(maximoParaSumar(medias, COLOR, grande.maximos, [], grande.productos), TOPE_POR_COMPRA);
-    assert.ok(grande.maximos.medias <= 15, "no se informa cuánto stock hay por encima del tope");
+    assert.ok(grande.maximos["medias-negro-grande"] <= 15, "no se informa cuánto stock hay por encima del tope");
   });
 });

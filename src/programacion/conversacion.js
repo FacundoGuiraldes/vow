@@ -31,10 +31,10 @@ export const HERRAMIENTAS_CHAT = [
     description: "Beneficio para quienes se anotaron en la lista de espera: un mail con diseño de VOW y un código de descuento único por persona. accion: ver (cuántos anotados, a cuántos falta avisar, cuántos códigos se usaron), prueba (manda el mail de ejemplo a un mail de destino, con un código de muestra que no sirve) o enviar (manda los códigos reales a quienes todavía no recibieron). Antes de enviar SIEMPRE hacé ver, decile a Facundo cuántas personas son y esperá que confirme; en enviar pasá esa cantidad en esperados. Nunca envíes sin que Facundo lo haya pedido y confirmado en este chat.",
     parameters: { type: "OBJECT", properties: { accion: { type: "STRING", description: "ver, prueba o enviar." }, destino: { type: "STRING", description: "Solo para prueba: el mail donde se recibe el ejemplo." }, esperados: { type: "INTEGER", description: "Solo para enviar: la cantidad de personas por avisar que Facundo confirmó." } }, required: ["accion"] },
   },
-  { name: "ver_stock", description: "Muestra el stock del Almacén (gorras negras y beige, shakers negros y claros, medias), las ventas recientes, los totales y qué se puede vender con su precio." },
+  { name: "ver_stock", description: "Muestra el stock del Almacén (gorras negras y beige, shakers negros y claros, medias por color y talle), las ventas recientes, los totales y qué se puede vender con su precio." },
   {
     name: "registrar_llegada",
-    description: "Suma al stock mercadería que llegó. El Almacén y la Caja del juego lo ven al instante. producto: gorra-negra, gorra-beige, shaker-negro, shaker-claro o medias (pares).",
+    description: "Suma al stock mercadería que llegó. El Almacén y la Caja del juego lo ven al instante. producto: gorra-negra, gorra-beige, shaker-negro, shaker-claro, o medias-<color>-<talle> (color: negro, hueso o beige; talle: grande 37-40 o super 41-44; por ejemplo medias-negro-grande).",
     parameters: { type: "OBJECT", properties: { producto: { type: "STRING" }, cantidad: { type: "INTEGER" }, nota: { type: "STRING", description: "Opcional." } }, required: ["producto", "cantidad"] },
   },
   {
@@ -44,11 +44,11 @@ export const HERRAMIENTAS_CHAT = [
   },
   {
     name: "registrar_venta",
-    description: "Registra una venta y resta el stock sola. El precio lo define el sistema: NO se puede cambiar ni inventar. Cada item: producto (gorra, medias, shaker, pledge, kept, oath, medias2 o medias3), cantidad, y el color si lleva gorra (gorra: negra o beige) o shaker (shaker: negro o claro). Si falta un color, preguntáselo a Facundo antes. Si no alcanza el stock, no se registra.",
+    description: "Registra una venta y resta el stock sola. El precio lo define el sistema: NO se puede cambiar ni inventar. Cada item: producto (gorra, medias, shaker, pledge, kept, oath, medias2 o medias3), cantidad, y el color si lleva gorra (gorra: negra o beige) o shaker (shaker: negro o claro); si lleva medias, el color (medias: negro, hueso o beige) y el talle (talle: grande o super). Si falta un color o un talle, preguntáselo a Facundo antes. Si no alcanza el stock, no se registra.",
     parameters: {
       type: "OBJECT",
       properties: {
-        items: { type: "ARRAY", items: { type: "OBJECT", properties: { producto: { type: "STRING" }, cantidad: { type: "INTEGER" }, gorra: { type: "STRING", description: "negra o beige." }, shaker: { type: "STRING", description: "negro o claro." } }, required: ["producto", "cantidad"] } },
+        items: { type: "ARRAY", items: { type: "OBJECT", properties: { producto: { type: "STRING" }, cantidad: { type: "INTEGER" }, gorra: { type: "STRING", description: "negra o beige." }, shaker: { type: "STRING", description: "negro o claro." }, medias: { type: "STRING", description: "Color de las medias: negro, hueso o beige." }, talle: { type: "STRING", description: "Talle de las medias: grande (37-40) o super (41-44)." } }, required: ["producto", "cantidad"] } },
         nota: { type: "STRING", description: "Opcional: quién compró o cómo pagó." },
         fecha: { type: "STRING", description: "AAAA-MM-DD, solo si no fue hoy." },
       },
@@ -97,7 +97,7 @@ Cómo trabajás:
 - «Hoy», «ayer» y «mañana» se leen SOLO del calendario de arriba. Si Facundo dice que te equivocaste de día, creele, volvé a leer el calendario y corregí sin discutir.
 - Las publicaciones de Instagram no las hacés ni las programás vos ni el bot: el Estratega arma cada lunes un flujo semanal (qué se publica cada día y de qué trata) y Facundo lo hace. Para contarle qué hay, usá ver_flujo. Si te pide cambiar el flujo, anotalo como novedad (anotar_novedad) o como foco de la semana (editar_dato) para que el próximo flujo lo tenga en cuenta, y decíselo así.
 - El foco de la semana y la agenda se cambian con editar_dato, agregar_agenda y quitar_agenda, y las líneas de la estrategia de la semana con editar_estrategia; el juego los muestra al instante. Antes de decir qué hay cargado, mirá con ver_operacion.
-- El stock y las ventas son del sistema: para saber cuánto hay usá ver_stock, cuando llega mercadería registrar_llegada, y cuando Facundo cuenta que vendió algo registrar_venta (resta el stock solo; los precios los define el sistema y no se cambian; si falta el color de una gorra o un shaker, preguntalo). Nunca digas «anotado» si la herramienta devolvió un error, por ejemplo por falta de stock.
+- El stock y las ventas son del sistema: para saber cuánto hay usá ver_stock, cuando llega mercadería registrar_llegada, y cuando Facundo cuenta que vendió algo registrar_venta (resta el stock solo; los precios los define el sistema y no se cambian; si falta el color de una gorra, un shaker o unas medias, o el talle de las medias, preguntalo). Nunca digas «anotado» si la herramienta devolvió un error, por ejemplo por falta de stock.
 - Los mails con el código de descuento para la lista de espera se manejan con descuento_lista_espera: primero ver, después una prueba a un mail de Facundo y recién cuando él lo pida y confirme la cantidad, enviar. Nunca muestres códigos de descuento en el chat.
 - Si Facundo cuenta una novedad de VOW (algo nuevo del proyecto), usá anotar_novedad.
 - Si pide varias cosas en un mismo mensaje, hacelas todas con las herramientas y contá al final qué quedó hecho y qué no. Si te falta un dato para hacerlo bien, preguntá una sola cosa clara.

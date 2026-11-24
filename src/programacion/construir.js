@@ -12,6 +12,8 @@ import { crearRutasVentas } from "../pagos/rutas.js";
 import { crearArrepentimientos } from "../pagos/arrepentimiento.js";
 import { crearRutasProgramacion } from "./rutas.js";
 import { crearServicio } from "./servicio.js";
+import { cargarStockInicial } from "./inventario.js";
+import { MARCA_STOCK_INICIAL, STOCK_INICIAL } from "./stock-inicial.js";
 
 export const VARIABLES_OBLIGATORIAS = ["PROGRAMACION_SECRETO", "URL_PUBLICA"];
 
@@ -20,6 +22,12 @@ export async function construirProgramacion({ pool, env = process.env, fetchFn =
   if (faltan.length) return { router: null, faltan };
 
   const repo = crearRepositorio(pool);
+  // Carga única del stock real (queda una marca en la base: los reinicios no la repiten)
+  try {
+    if (await cargarStockInicial(repo, STOCK_INICIAL, { marca: MARCA_STOCK_INICIAL })) console.log("Stock inicial del Drop 00 cargado.");
+  } catch (error) {
+    console.error("No se pudo cargar el stock inicial:", error.message);
+  }
   // Instagram solo se lee (rendimiento para el juego): el sistema no publica
   const meta = env.INSTAGRAM_TOKEN && env.INSTAGRAM_USER_ID ? crearClienteMeta({ token: env.INSTAGRAM_TOKEN, idCuenta: env.INSTAGRAM_USER_ID, fetchFn }) : null;
 
