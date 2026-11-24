@@ -21,7 +21,7 @@
 
 Los datos del vendedor se cargan en `web/src/negocio.js`; lo que está en `null` no se muestra. Hoy se muestra solo marca, responsable, mail, Instagram y país.
 
-1. **CUIT, razón social y condición frente al IVA** (monotributo o responsable inscripto) y **domicilio** de contacto. *Actualización 24/11/2026: CUIT, razón social y condición (Responsable Monotributo) ya están cargados desde la constancia de ARCA; falta decidir qué domicilio se publica.* La normativa de defensa del consumidor pide identificar al proveedor; sin estos datos no conviene vender.
+1. **CUIT, razón social y condición frente al IVA** (monotributo o responsable inscripto) y **domicilio** de contacto. *Actualización 24/11/2026: CUIT, razón social y condición (Responsable Monotributo) ya están cargados desde la constancia de ARCA; el domicilio publicado es el de atención y retiro (Gdor. Marcelino Ugarte 2257, Olivos). Conviene que el contador confirme que alcanza como domicilio del proveedor.* La normativa de defensa del consumidor pide identificar al proveedor; sin estos datos no conviene vender.
 2. **Inscripción como contribuyente** y facturación electrónica de las ventas (consultar con un contador).
 3. **Registro de la base de datos** de la lista de espera ante la AAIP (Ley 25.326, Registro Nacional de Bases de Datos). Consultar con un abogado si corresponde y cuándo.
 4. **Confirmar la política de devolución**: los textos prometen que VOW paga la devolución por arrepentimiento (lo dice la ley) y que el reembolso va por Mercado Pago. Confirmar plazos reales y quién atiende `vow2026ar@gmail.com`.

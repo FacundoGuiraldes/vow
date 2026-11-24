@@ -6,7 +6,7 @@ export const negocio = {
   razonSocial: 'Guiraldes Facundo', // nombre o razón social que figura en ARCA (ex AFIP)
   cuit: '20-43920819-9', // CUIT
   condicionIva: 'Responsable Monotributo', // por ejemplo "Responsable Monotributo"
-  domicilio: null,          // domicilio legal o de atención
+  domicilio: 'Gdor. Marcelino Ugarte 2257, B1636 Olivos, Provincia de Buenos Aires', // domicilio de atención (el mismo del retiro)
   email: 'vow2026ar@gmail.com',
   instagram: 'vow_ar',
   pais: 'Argentina',
