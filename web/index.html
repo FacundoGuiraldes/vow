@@ -32,6 +32,7 @@
       <li><a href="#sec-01" aria-label="Ir a la sección 01">01</a></li>
       <li><a href="#sec-02" aria-label="Ir a la sección 02">02</a></li>
       <li><a href="#productos" aria-label="Ir al Drop 00">Drop</a></li>
+      <li id="indice-tienda" hidden><a href="#tienda" aria-label="Ir a la tienda">Tienda</a></li>
       <li><a href="#sec-05" aria-label="Ir a la sección 03, acceso">03</a></li>
     </ol>
   </nav>
@@ -86,9 +87,13 @@
     </section>
 
     <section class="tienda" id="tienda" aria-labelledby="tienda-title" hidden>
-      <div class="section-label" aria-hidden="true">DROP 00</div>
+      <div class="section-label" aria-hidden="true">TIENDA</div>
       <p class="tienda__aviso" id="tienda-aviso" role="status" hidden></p>
-      <h2 class="title-large" id="tienda-title">Drop 00</h2>
+      <div class="tienda__cabecera">
+        <p class="tienda__estado"><span class="tienda__punto" aria-hidden="true"></span>Venta abierta</p>
+        <h2 class="title-large tienda__titulo-grande" id="tienda-title">Tienda</h2>
+        <p class="tienda__sub">Drop 00. Elegí, pagá con Mercado Pago y retirás o te lo enviamos.</p>
+      </div>
       <ul class="tienda__lista" id="tienda-lista"></ul>
       <form id="tienda-form" class="tienda__form" novalidate>
         <h3>Tu pedido</h3>

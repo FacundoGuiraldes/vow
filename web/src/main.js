@@ -331,7 +331,30 @@ form.addEventListener('submit', async e => {
 });
 
 // Tienda del Drop 00: solo se muestra si el servidor tiene la venta abierta
-iniciarTienda(API_URL);
+iniciarTienda(API_URL, () => {
+  // Venta abierta: la tienda se anuncia como apartado propio (cinta, índice y botón del hero)
+  document.body.classList.add('venta-abierta');
+  const cinta = 'VENTA ABIERTA · TIENDA DROP 00 · GORRAS, SHAKERS Y MEDIAS · COMPRÁ ACÁ · ';
+  document.getElementById('marquee-text').textContent = cinta.repeat(16);
+  document.getElementById('marquee-sr').textContent = cinta.replace(/[\s·]+$/, '');
+  document.getElementById('indice-tienda').hidden = false;
+  const tiendaSeccion = document.getElementById('tienda');
+  const botonTienda = document.getElementById('hero-tienda');
+  botonTienda.removeAttribute('target');
+  botonTienda.removeAttribute('rel');
+  botonTienda.href = '#tienda';
+  botonTienda.querySelector('span').textContent = 'Comprar en la tienda';
+  botonTienda.hidden = false;
+  for (const link of document.querySelectorAll('a[href="#tienda"]')) {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      scrollToElement(tiendaSeccion, { onComplete: () => tiendaSeccion.focus({ preventScroll: true }) });
+    });
+  }
+  tiendaSeccion.tabIndex = -1;
+  ScrollTrigger.create({ trigger: '#tienda', start: 'top center', end: 'bottom center', onToggle: self => { if (self.isActive) setActiveSection('tienda'); } });
+  ScrollTrigger.refresh();
+});
 
 // ---------- Pausa de la cinta (WCAG 2.2.2: el movimiento que dura más de 5 s se puede detener) ----------
 const pausaCinta = document.getElementById('pausa-cinta');

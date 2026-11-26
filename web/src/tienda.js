@@ -41,7 +41,7 @@ async function pedirJson(url, opciones = {}) {
   }
 }
 
-export async function iniciarTienda(apiUrl) {
+export async function iniciarTienda(apiUrl, alAbrir = () => {}) {
   const seccion = document.getElementById('tienda');
   if (!seccion) return;
   mostrarResultadoDePago();
@@ -265,6 +265,7 @@ export async function iniciarTienda(apiUrl) {
 
   dibujarCarrito();
   seccion.hidden = false;
+  alAbrir();
 }
 
 // Mercado Pago devuelve al comprador a /?pago=ok|pendiente|error
