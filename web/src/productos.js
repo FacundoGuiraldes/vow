@@ -52,7 +52,7 @@ function tarjeta(p, animar) {
   FOTOS[p.grupo][color].forEach((_, i) => {
     const b = el('button', 'prod__thumb', String(i + 1).padStart(2, '0'));
     b.type = 'button';
-    b.setAttribute('aria-label', `${p.nombre}, vista ${i + 1}`);
+    b.setAttribute('aria-label', `Vista ${String(i + 1).padStart(2, '0')} de ${p.nombre.toLowerCase()}`);
     b.addEventListener('click', () => { foto = i; dibujar(true); });
     miniaturas.append(b);
   });
