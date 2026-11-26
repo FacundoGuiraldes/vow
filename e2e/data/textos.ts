@@ -6,14 +6,9 @@ import { MENSAJE_INSTAGRAM_INVALIDO } from "../../src/api/servidor.js";
 export const textos = {
   ...content,
   hero: { ...content.hero, titulo: /Tu promesa\.\s*Tu fuerza\./i },
-  catalogo: {
-    cargando: "Cargando el Drop 01…",
-    error: "No pudimos cargar el Drop 01. Probá de nuevo más tarde.",
-  },
   regiones: {
     manifiesto: "Manifiesto",
-    drop: "Drop 01",
-    resumenDrop: "Resumen del Drop 01",
+    drop: "Los productos",
     acceso: "ACCESO",
   },
   privacidad: "Política de privacidad",

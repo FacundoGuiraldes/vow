@@ -16,9 +16,9 @@ test.describe("Navegación y anclas", { tag: "@funcional" }, () => {
     await expect(formulario.email).toBeInViewport();
   });
 
-  test("el índice lleva al Drop 01 y lo marca como sección activa", async ({ page, landing }) => {
+  test("el índice lleva a los productos y los marca como sección activa", async ({ page, landing }) => {
     test.skip((page.viewportSize()?.width ?? 0) < ANCHO_MINIMO_INDICE, "El índice solo existe desde 1200 px de ancho.");
-    const linkDrop = landing.linkDelIndice("Ir al Drop 01");
+    const linkDrop = landing.linkDelIndice("Ir a los productos");
     const seccionDrop = landing.region(textos.regiones.drop);
 
     await expect(landing.linkDelIndice("Ir a la sección 01")).toHaveAttribute("aria-current", "true");
