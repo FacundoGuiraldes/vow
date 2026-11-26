@@ -1,6 +1,7 @@
 // Tienda del Drop 00: aparece solo si la API dice que la venta está abierta (VENTA_ABIERTA=1 en el servidor).
 // El navegador solo manda qué quiere y a dónde: el precio lo calcula el servidor, y el pago se hace en Mercado Pago.
 import { negocio } from './negocio.js';
+import { fotoDe } from './fotos.js';
 import { TOPE_POR_LINEA, ajustarCarrito, maximoParaSumar } from './stock-carrito.js';
 
 const pesos = n => `$${n.toLocaleString('es-AR')}`;
@@ -157,8 +158,15 @@ export async function iniciarTienda(apiUrl) {
       }
       for (const s of selects) s.addEventListener('change', refrescar);
       refrescadores.push(refrescar);
+      // Foto del producto: cambia con el color elegido (en los packs, la del primer producto)
+      const grupoFoto = p.pide[0];
+      const selectFoto = selects.find(s => s.name === grupoFoto);
+      const foto = el('img', { class: 'tienda__foto', alt: '', width: '72', height: '96', loading: 'lazy', decoding: 'async' });
+      const ponerFoto = () => { const src = fotoDe(grupoFoto, selectFoto?.value); if (src) foto.src = src; else foto.hidden = true; };
+      ponerFoto();
+      selectFoto?.addEventListener('change', ponerFoto);
       lista.append(el('li', { class: 'tienda__producto' },
-        el('div', {}, el('h3', {}, p.nombre), el('p', { class: 'tienda__precio' }, pesos(p.precio))),
+        el('div', { class: 'tienda__titulo' }, foto, el('div', {}, el('h3', {}, p.nombre), el('p', { class: 'tienda__precio' }, pesos(p.precio)))),
         el('div', { class: 'tienda__opciones' }, selects, cantidad, agregar)));
     }
   }

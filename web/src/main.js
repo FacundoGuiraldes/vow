@@ -11,6 +11,7 @@ import logoSvg from './assets/logo.svg?raw';
 import Lenis from '@studio-freight/lenis';
 import { gsap } from 'gsap';
 import { iniciarTienda } from './tienda.js';
+import { iniciarProductos } from './productos.js';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -19,7 +20,6 @@ gsap.registerPlugin(ScrollTrigger);
 const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
 const WAITLIST_ENDPOINT = `${API_URL}/api/lista-espera`;
 const HEALTH_ENDPOINT = `${API_URL}/api/salud`;
-const CATALOG_ENDPOINT = `${API_URL}/api/productos?drop=1`;
 const REQUEST_TIMEOUT_MS = 10000;
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -222,108 +222,8 @@ if (finePointer) {
 // Aviso silencioso al cargar: despierta la API si está dormida para que el envío del formulario sea rápido
 fetch(HEALTH_ENDPOINT, { cache: 'no-store' }).catch(() => {});
 
-// ---------- Catálogo Drop 01 (desde la API) ----------
-// El servidor gratuito puede tardar cerca de un minuto en despertar: aviso a los 8 s y corte a los 60 s
-const CATALOG_SLOW_MS = 8000;
-const CATALOG_TIMEOUT_MS = 60000;
-// Texto visible cuando la API responde bien pero el drop todavía no tiene productos cargados
-const CATALOG_EMPTY_TEXT = 'El Drop 01 se abre pronto. Anotate en la lista y sos el primero en enterarte.';
-const CATALOG_STATUS_LABELS = { concepto: 'CONCEPTO', proximamente: 'PRÓXIMAMENTE', disponible: 'DISPONIBLE' };
-
-const catalogStatus = document.getElementById('catalogo-estado');
-const catalogList = document.getElementById('catalogo-lista');
-// Número decorativo de la tarjeta (aria-hidden): refleja la cantidad real; la lista ya la informa a lectores
-const dropCount = document.getElementById('drop-count');
-
-function setCatalogStatus(text, { error = false, visuallyHidden = false } = {}) {
-  catalogStatus.textContent = text;
-  catalogStatus.classList.toggle('is-error', error);
-  catalogStatus.classList.toggle('sr-only', visuallyHidden);
-}
-
-// Nombre de color de la API -> variable CSS. Se compara en minúsculas y sin tildes ("bordó" = "bordo")
-const COLOR_VARS = {
-  beige: '--c-beige',
-  negro: '--c-negro',
-  bordo: '--c-bordo',
-  'gris topo': '--c-gris-topo',
-  hueso: '--c-hueso'
-};
-const normalizeColor = name => String(name).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-
-function renderColorDots(colores) {
-  const names = Array.isArray(colores) ? colores : [];
-  const dots = el('span', 'catalog-dots');
-  dots.setAttribute('role', 'img');
-  dots.setAttribute('aria-label', `Colores: ${names.join(', ')}`);
-  names.forEach(name => {
-    const dot = el('i');
-    const cssVar = COLOR_VARS[normalizeColor(name)];
-    // Color desconocido: círculo neutro (solo borde); el nombre igual queda en el aria-label
-    if (cssVar) dot.style.setProperty('--dot', `var(${cssVar})`);
-    dots.append(dot);
-  });
-  return dots;
-}
-
-// Solo textContent: los datos vienen de la API y nunca se interpretan como HTML
-function renderCatalogItem(product) {
-  const estado = CATALOG_STATUS_LABELS[product.estado] ? product.estado : 'concepto';
-  const li = el('li', `lineup-item catalog-item is-${estado}`);
-  const detail = el('span', 'lineup-spec catalog-detail');
-  detail.append(el('span', 'catalog-desc', product.descripcion));
-  if (Array.isArray(product.colores) && product.colores.length > 0) {
-    detail.append(el('span', 'catalog-colors', `Colores: ${product.colores.join(' / ')}`));
-  }
-  li.append(
-    el('span', 'lineup-id', String(product.numero).padStart(2, '0')),
-    el('span', 'lineup-name', product.nombre),
-    detail,
-    renderColorDots(product.colores),
-    el('span', 'catalog-cat', product.categoria ?? ''),
-    el('span', 'lineup-status', CATALOG_STATUS_LABELS[estado])
-  );
-  return li;
-}
-
-async function loadCatalog() {
-  const controller = new AbortController();
-  const slowTimer = setTimeout(
-    () => setCatalogStatus('El servidor se está despertando, puede tardar hasta un minuto…'),
-    CATALOG_SLOW_MS
-  );
-  const timeoutTimer = setTimeout(() => controller.abort(), CATALOG_TIMEOUT_MS);
-  try {
-    const res = await fetch(CATALOG_ENDPOINT, { signal: controller.signal, headers: { Accept: 'application/json' } });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const { productos } = await res.json();
-    if (!Array.isArray(productos)) throw new Error('Respuesta inválida');
-
-    catalogList.replaceChildren(...productos.map(renderCatalogItem));
-    dropCount.textContent = String(productos.length).padStart(2, '0');
-    if (productos.length === 0) {
-      // Sin productos: lista oculta y mensaje visible (antes solo lo leían los lectores de pantalla)
-      catalogList.hidden = true;
-      setCatalogStatus(CATALOG_EMPTY_TEXT);
-    } else {
-      catalogList.hidden = false;
-    // Las filas entran de a una (solo con movimiento permitido)
-    if (!reducedMotion) gsap.from(catalogList.children, { opacity: 0, y: 16, duration: 0.5, ease: 'expo.out', stagger: 0.05, scrollTrigger: { trigger: catalogList, start: 'top 88%', once: true } });
-      setCatalogStatus(`Drop 01: ${productos.length} productos en desarrollo.`, { visuallyHidden: true });
-    }
-    ScrollTrigger.refresh();
-  } catch (err) {
-    console.error('[VOW] No se pudo cargar el Drop 01:', err.message);
-    catalogList.hidden = true;
-    dropCount.textContent = '—';
-    setCatalogStatus('No pudimos cargar el Drop 01. Probá de nuevo más tarde.', { error: true });
-  } finally {
-    clearTimeout(slowTimer);
-    clearTimeout(timeoutTimer);
-  }
-}
-
-loadCatalog();
+// ---------- Productos del Drop 00 (fotos reales) ----------
+iniciarProductos(document.getElementById('prods'), reducedMotion);
 
 // ---------- Formulario de lista de espera ----------
 const form = document.getElementById('waitlist-form');

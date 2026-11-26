@@ -22,20 +22,10 @@ test.describe("Smoke", { tag: "@smoke" }, () => {
   test("se ven las secciones principales y el footer", async ({ landing }) => {
     await landing.abrir();
 
-    for (const nombre of Object.values(textos.regiones).filter((n) => n !== textos.regiones.resumenDrop)) {
+    for (const nombre of Object.values(textos.regiones)) {
       await expect(landing.region(nombre), `sección "${nombre}"`).toBeAttached();
     }
     await expect(landing.footer).toBeAttached();
-  });
-
-  test("el catálogo del Drop 01 muestra los productos que devuelve la API", async ({ page, landing, catalogo }) => {
-    const respuesta = page.waitForResponse((r) => r.url().includes("/api/productos?drop=1"), { timeout: 90_000 });
-    await landing.abrir();
-
-    const { productos } = (await (await respuesta).json()) as { productos: { nombre: string }[] };
-    expect(productos.length).toBeGreaterThan(0);
-    await expect(catalogo.productos).toHaveCount(productos.length);
-    await expect(catalogo.producto(productos[0].nombre)).toBeVisible();
   });
 
   test("GET /api/salud responde ok", async ({ request }) => {
